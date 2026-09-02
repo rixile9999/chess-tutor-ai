@@ -10,6 +10,7 @@ import atexit
 import os
 import shutil
 import threading
+import weakref
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -55,6 +56,10 @@ def _name_from_uci_id(raw: str) -> str:
     return "stockfish"
 
 
+_LIVE_ENGINES: weakref.WeakSet[Engine] = weakref.WeakSet()
+"""Every engine process that has not been quit yet, pooled or not, so shutdown can find them."""
+
+
 class Engine:
     def __init__(
         self,
@@ -66,6 +71,8 @@ class Engine:
         if resolved is None:
             raise RuntimeError("Stockfish not found: set STOCKFISH_PATH or install it on PATH")
         self._engine = chess.engine.SimpleEngine.popen_uci(resolved)
+        self._closed = False
+        _LIVE_ENGINES.add(self)
         settings = get_settings()
         options = {
             "Threads": threads if threads is not None else settings.engine_threads,
@@ -78,6 +85,10 @@ class Engine:
         """Cache key for analyses, e.g. 'stockfish-18'."""
 
     def close(self) -> None:
+        if self._closed:
+            return
+        self._closed = True
+        _LIVE_ENGINES.discard(self)
         try:
             self._engine.quit()
         except chess.engine.EngineError:
@@ -173,8 +184,18 @@ pool = EnginePool()
 # python-chess runs each engine's event loop on a non-daemon thread, and the interpreter joins
 # those threads before ordinary atexit handlers run. Idle engines must therefore be quit from
 # the threading shutdown hook (the one concurrent.futures uses), or process exit blocks forever.
+
+
+def close_all() -> None:
+    """Quit the pool and every other engine still alive (a leaked one would otherwise keep its
+    non-daemon thread, and with it the whole process, from exiting)."""
+    pool.close()
+    for engine in list(_LIVE_ENGINES):
+        engine.close()
+
+
 _register_thread_atexit = getattr(threading, "_register_atexit", None)
 if _register_thread_atexit is not None:
-    _register_thread_atexit(pool.close)
+    _register_thread_atexit(close_all)
 else:  # pragma: no cover - older interpreters
-    atexit.register(pool.close)
+    atexit.register(close_all)

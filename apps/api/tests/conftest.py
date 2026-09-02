@@ -58,3 +58,17 @@ def client() -> Iterator[TestClient]:
 async def aclient() -> AsyncIterator[AsyncClient]:
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
         yield c
+
+
+def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
+    """Quit every engine process, then guarantee the interpreter exits.
+
+    python-chess runs each engine on a non-daemon thread; one that is still alive after the
+    session would hang the process forever (seen on the GitHub runner). If anything is still
+    blocking a minute later, dump every thread's stack to stderr and exit non-zero so the cause
+    shows up in the log instead of a timeout."""
+    import faulthandler
+    import sys
+
+    engine_mod.close_all()
+    faulthandler.dump_traceback_later(60, exit=True, file=sys.stderr)
