@@ -70,6 +70,7 @@ export interface MoveReviewOut {
 export interface PhaseAccuracy {
   opening: number; middlegame: number; endgame: number;
   delta_opening: number | null; delta_middlegame: number | null; delta_endgame: number | null;
+  opening_moves?: number; middlegame_moves?: number; endgame_moves?: number; baseline_band?: string;
 }
 export interface StructureStat { key: string; name: string; games: number; win_rate: number; avg_loss_cp: number }
 export interface MotifMiss { kind: string; count: number }

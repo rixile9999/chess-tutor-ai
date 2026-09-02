@@ -59,24 +59,34 @@ function PhaseCard({ phase }: { phase: PhaseAccuracy | null }) {
   }
   const raw = [phase.opening, phase.middlegame, phase.endgame].map((n) => (typeof n === 'number' && !Number.isNaN(n) ? n : 0));
   const scale = Math.max(...raw) <= 1 ? 100 : 1;
-  const tiles: [string, number, number | null | undefined][] = [
-    ['오프닝', raw[0], phase.delta_opening],
-    ['미들게임', raw[1], phase.delta_middlegame],
-    ['엔드게임', raw[2], phase.delta_endgame],
+  const moves = [phase.opening_moves, phase.middlegame_moves, phase.endgame_moves];
+  const tiles: [string, number, number | null | undefined, boolean][] = [
+    ['오프닝', raw[0], phase.delta_opening, moves[0] === 0],
+    ['미들게임', raw[1], phase.delta_middlegame, moves[1] === 0],
+    ['엔드게임', raw[2], phase.delta_endgame, moves[2] === 0],
   ];
   return (
     <Card title="단계별 정확도" sub="100점 만점">
       <div className="pf-tiles">
-        {tiles.map(([label, v, d]) => (
-          <Tile key={label} label={label} value={v * scale} delta={typeof d === 'number' && !Number.isNaN(d) ? d * scale : null} />
+        {tiles.map(([label, v, d, empty]) => (
+          <Tile key={label} label={label} value={v * scale} delta={typeof d === 'number' && !Number.isNaN(d) ? d * scale : null} empty={empty} />
         ))}
       </div>
     </Card>
   );
 }
 
-function Tile({ label, value, delta }: { label: string; value: number; delta: number | null }) {
+function Tile({ label, value, delta, empty }: { label: string; value: number; delta: number | null; empty?: boolean }) {
   const tone = delta === null ? 'none' : delta > 0 ? 'good' : delta < 0 ? 'bad' : 'zero';
+  if (empty) {
+    return (
+      <div className="pf-tile">
+        <div className="small muted">{label}</div>
+        <div className="mono pf-tile-value faint">–</div>
+        <div className="mono small faint pf-tile-delta">이 단계의 수가 없음</div>
+      </div>
+    );
+  }
   return (
     <div className="pf-tile">
       <div className="small muted">{label}</div>

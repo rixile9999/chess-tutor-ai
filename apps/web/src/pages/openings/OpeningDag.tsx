@@ -40,8 +40,9 @@ export function OpeningDag({ map, color, minGames, selectedId, onSelect }: Props
     const vw = el.clientWidth, vh = el.clientHeight;
     if (!vw || !vh || !width || !height) return;
     const pad = 20;
-    const k = Math.min(1, (vw - pad * 2) / width, (vh - pad * 2) / height);
-    const tx = (vw - width * k) / 2, ty = Math.max(pad, (vh - height * k) / 2);
+    // Fit the whole map when it is small; otherwise keep the board thumbnails readable and let the user pan.
+    const k = Math.max(0.7, Math.min(1, (vw - pad * 2) / width, (vh - pad * 2) / height));
+    const tx = Math.max(pad, (vw - width * k) / 2), ty = Math.max(pad, (vh - height * k) / 2);
     select(el).call(z.transform, zoomIdentity.translate(tx, ty).scale(k));
   }, [width, height]);
   useEffect(() => { fit(); }, [fit]);

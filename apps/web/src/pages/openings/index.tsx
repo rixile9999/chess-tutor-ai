@@ -33,6 +33,16 @@ export default function OpeningsPage() {
 
   useEffect(() => { setSelected(null); }, [username, color, depth, minGames]);
 
+  // First load: if the user has no games as the default colour, show the other colour instead of an empty map.
+  const [autoSwitched, setAutoSwitched] = useState(false);
+  useEffect(() => {
+    if (autoSwitched || mapQ.status !== 404) return;
+    setAutoSwitched(true);
+    const other: Color = color === 'white' ? 'black' : 'white';
+    setColor(other);
+    setPiece((p) => mirrorPiece(p, other));
+  }, [mapQ.status, autoSwitched, color]);
+
   const changeColor = (c: Color) => {
     if (c === color) return;
     setColor(c);
