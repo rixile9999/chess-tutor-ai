@@ -1,0 +1,55 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&amp;family=IBM+Plex+Sans+KR:wght@400;500;600;700&amp;family=IBM+Plex+Mono:wght@400;500;600&amp;display=swap">
+  <style>
+    body { margin: 0; background: #f4efe6; color: #2b2622; font-family: 'IBM Plex Sans KR', 'Apple SD Gothic Neo', 'Noto Sans KR', system-ui, sans-serif; font-size: 14px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
+    a { color: #2478a6; text-decoration: none; } a:hover { color: #1b5f85; text-decoration: underline; }
+    * { box-sizing: border-box; }
+    .mono { font-family: 'IBM Plex Mono', 'SF Mono', Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; }
+    .display { font-family: 'Gowun Batang', 'Apple Myungjo', 'Noto Serif KR', Georgia, serif; }
+    .muted { color: #6b6259; }
+    .faint { color: #9b9187; }
+    .small { font-size: 12px; }
+    .card { background: #fcf9f3; border: 1px solid #e4dbcb; border-radius: 10px; }
+    .h3 { font-family: 'Gowun Batang', 'Apple Myungjo', 'Noto Serif KR', Georgia, serif; font-size: 16px; font-weight: 700; color: #2b2622; margin: 0; letter-spacing: -0.01em; }
+    .eyebrow { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #9b9187; }
+    .chip { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 10px; border-radius: 999px; border: 1px solid #cdc1ab; font-size: 12px; font-weight: 500; color: #6b6259; background: #fcf9f3; }
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 36px; padding: 0 14px; border-radius: 8px; font-size: 13px; font-weight: 600; font-family: 'IBM Plex Sans KR', 'Apple SD Gothic Neo', 'Noto Sans KR', system-ui, sans-serif; white-space: nowrap; flex-shrink: 0; }
+    .btn-primary { background: #2b2622; color: #f4efe6; }
+    .btn-ghost { border: 1px solid #cdc1ab; color: #2b2622; background: transparent; }
+    .badge { display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 8px; border-radius: 6px; font-size: 12px; font-weight: 700; }
+    .badge-bad { background: rgba(194, 90, 60, 0.12); color: #c25a3c; }
+    .badge-good { background: rgba(36, 120, 166, 0.10); color: #2478a6; }
+    .badge-neutral { background: rgba(43, 38, 34, 0.07); color: #6b6259; }
+    .mv { font-family: 'IBM Plex Mono', 'SF Mono', Menlo, Consolas, monospace; font-weight: 600; }
+    table { border-collapse: collapse; }
+  </style>
+</helmet>
+<div style="width: 720px; height: 480px; background: #f7f5f0; padding: 20px 24px; display: flex; flex-direction: column; gap: 12px; color: #4a4540; font-family: 'IBM Plex Sans KR', 'Apple SD Gothic Neo', 'Noto Sans KR', system-ui, sans-serif">
+    <div style="display: flex; align-items: baseline; gap: 12px"><span class="display" style="font-size: 18px; font-weight: 700; color: #2b2622">대안 B · 대화형 코치</span><span style="font-size: 12.5px; color: #7b736a">설명이 아니라 대화. 질문할 수 있고, 코치가 보드를 가리키며 답함</span></div>
+    <div style="flex: 1; display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 14px; min-height: 0">
+      <div style="display: flex; flex-direction: column; gap: 8px"><div style="border: 1.5px dashed #b8b0a4; border-radius: 6px; background: #ecE8e1; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #7b736a; text-align: center; padding: 6px; height: 250px">보드 (작게)</div><div style="border: 1.5px dashed #b8b0a4; border-radius: 6px; background: #ecE8e1; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #7b736a; text-align: center; padding: 6px; flex: 1">수 목록</div></div>
+      <div style="display: flex; flex-direction: column; gap: 8px; border: 1.5px dashed #b8b0a4; border-radius: 6px; padding: 12px; background: #f1ede6">
+        <div style="display: flex; flex-direction: column; gap: 3px; align-self: flex-start; max-width: 82%">
+    <div style="font-size: 10.5px; color: #9b9187">코치</div>
+    <div style="padding: 8px 10px; border-radius: 10px; background: #ffffff; border: 1px solid #d5cec2; font-size: 12px; line-height: 1.5">20…Qd7은 비숍을 지키려는 자연스러운 수였어요. 하지만 퀸이 룩과 같은 줄에 서게 됐죠. 보드에서 d파일을 강조해 둘게요.</div></div>
+        <div style="display: flex; flex-direction: column; gap: 3px; align-self: flex-end; max-width: 82%">
+    <div style="font-size: 10.5px; color: #9b9187">나</div>
+    <div style="padding: 8px 10px; border-radius: 10px; background: #dcd6cb; border: 1px solid #d5cec2; font-size: 12px; line-height: 1.5">왜 Nxe7+는 안 되고 Nxf6+만 되는 거야?</div></div>
+        <div style="display: flex; flex-direction: column; gap: 3px; align-self: flex-start; max-width: 82%">
+    <div style="font-size: 10.5px; color: #9b9187">코치</div>
+    <div style="padding: 8px 10px; border-radius: 10px; background: #ffffff; border: 1px solid #d5cec2; font-size: 12px; line-height: 1.5">Nxe7+는 퀸이 잡으면서 체크를 해결하고 d파일에서도 벗어나요. f6는 퀸이 못 가는 칸이라 다릅니다. 두 수순을 나란히 재생해 볼까요?</div></div>
+        <div style="flex: 1"></div>
+        <div style="border: 1.5px dashed #b8b0a4; border-radius: 6px; background: #ecE8e1; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #7b736a; text-align: center; padding: 6px; height: 38px">질문 입력 · "이 구조에서 내 계획은?"</div>
+      </div>
+    </div>
+  </div></x-dc>
+</body>
+</html>

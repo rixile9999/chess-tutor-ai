@@ -1,0 +1,159 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&amp;family=IBM+Plex+Sans+KR:wght@400;500;600;700&amp;family=IBM+Plex+Mono:wght@400;500;600&amp;display=swap">
+  <style>
+    body { margin: 0; background: #f4efe6; color: #2b2622; font-family: 'IBM Plex Sans KR', 'Apple SD Gothic Neo', 'Noto Sans KR', system-ui, sans-serif; font-size: 14px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
+    a { color: #2478a6; text-decoration: none; } a:hover { color: #1b5f85; text-decoration: underline; }
+    * { box-sizing: border-box; }
+    .mono { font-family: 'IBM Plex Mono', 'SF Mono', Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; }
+    .display { font-family: 'Gowun Batang', 'Apple Myungjo', 'Noto Serif KR', Georgia, serif; }
+    .muted { color: #6b6259; }
+    .faint { color: #9b9187; }
+    .small { font-size: 12px; }
+    .card { background: #fcf9f3; border: 1px solid #e4dbcb; border-radius: 10px; }
+    .h3 { font-family: 'Gowun Batang', 'Apple Myungjo', 'Noto Serif KR', Georgia, serif; font-size: 16px; font-weight: 700; color: #2b2622; margin: 0; letter-spacing: -0.01em; }
+    .eyebrow { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #9b9187; }
+    .chip { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 10px; border-radius: 999px; border: 1px solid #cdc1ab; font-size: 12px; font-weight: 500; color: #6b6259; background: #fcf9f3; }
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 36px; padding: 0 14px; border-radius: 8px; font-size: 13px; font-weight: 600; font-family: 'IBM Plex Sans KR', 'Apple SD Gothic Neo', 'Noto Sans KR', system-ui, sans-serif; white-space: nowrap; flex-shrink: 0; }
+    .btn-primary { background: #2b2622; color: #f4efe6; }
+    .btn-ghost { border: 1px solid #cdc1ab; color: #2b2622; background: transparent; }
+    .badge { display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 8px; border-radius: 6px; font-size: 12px; font-weight: 700; }
+    .badge-bad { background: rgba(194, 90, 60, 0.12); color: #c25a3c; }
+    .badge-good { background: rgba(36, 120, 166, 0.10); color: #2478a6; }
+    .badge-neutral { background: rgba(43, 38, 34, 0.07); color: #6b6259; }
+    .mv { font-family: 'IBM Plex Mono', 'SF Mono', Menlo, Consolas, monospace; font-weight: 600; }
+    table { border-collapse: collapse; }
+  </style>
+</helmet>
+<div style="width: 1440px; height: 900px; background: #f4efe6; display: flex; flex-direction: column; overflow: hidden">
+  <div style="height: 52px; flex-shrink: 0; display: flex; align-items: center; gap: 16px; padding: 0 20px; border-bottom: 1px solid #e4dbcb">
+    <div class="display" style="font-size: 20px; font-weight: 700; letter-spacing: -0.02em">체스 튜터</div>
+    <div style="width: 1px; height: 22px; background: #cdc1ab"></div>
+    <div style="display: flex; align-items: center; gap: 10px; font-size: 13px; color: #6b6259"><span style="color: #2b2622; font-weight: 600">프로필</span><span>chess.com 연동 · 2,341판 가져옴 · 마지막 동기화 오늘 09:12</span></div>
+    <div style="flex: 1"></div>
+    <div class="btn btn-ghost" style="height: 32px">기보 가져오기</div>
+    <div class="chip">래피드 1560</div>
+    <div style="width: 32px; height: 32px; border-radius: 50%; background: #2b2622; color: #f4efe6; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600">나</div>
+  </div>
+  <div style="flex: 1; display: flex; min-height: 0">
+    <div style="width: 64px; flex-shrink: 0; border-right: 1px solid #e4dbcb; display: flex; flex-direction: column; align-items: center; gap: 6px; padding-top: 12px"><div style="display: flex; flex-direction: column; align-items: center; gap: 4px; width: 52px; height: 56px; justify-content: center; border-radius: 10px; color: #9b9187; background: transparent"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"></rect><path d="M3 9h18M3 15h18M9 3v18M15 3v18"></path></svg><span style="font-size: 11px; font-weight: 500">리뷰</span></div><div style="display: flex; flex-direction: column; align-items: center; gap: 4px; width: 52px; height: 56px; justify-content: center; border-radius: 10px; color: #9b9187; background: transparent"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="2.5"></circle><circle cx="19" cy="6" r="2.5"></circle><circle cx="19" cy="18" r="2.5"></circle><path d="M7.4 11L16.6 7M7.4 13l9.2 4"></path></svg><span style="font-size: 11px; font-weight: 500">오프닝</span></div><div style="display: flex; flex-direction: column; align-items: center; gap: 4px; width: 52px; height: 56px; justify-content: center; border-radius: 10px; color: #2b2622; background: rgba(43, 38, 34, 0.08)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"></path></svg><span style="font-size: 11px; font-weight: 600">프로필</span></div><div style="display: flex; flex-direction: column; align-items: center; gap: 4px; width: 52px; height: 56px; justify-content: center; border-radius: 10px; color: #9b9187; background: transparent"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="4.5"></circle><circle cx="12" cy="12" r="1"></circle></svg><span style="font-size: 11px; font-weight: 500">훈련</span></div></div>
+    <div style="flex: 1; min-width: 0; display: flex; gap: 24px; padding: 20px 24px"><div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+    <div style="display: flex; align-items: flex-end; gap: 14px">
+      <div class="display" style="font-size: 26px; font-weight: 700; letter-spacing: -0.02em">약점 리포트</div>
+      <div class="muted" style="font-size: 13px; padding-bottom: 4px">최근 60판 · 2026-07-01 ~ 08-30 · chess.com 래피드</div>
+      <div style="flex: 1"></div>
+      <div class="chip">래피드 1560 <span class="mono" style="color: #2478a6">▲34</span></div>
+      <div class="chip">블리츠 1482 <span class="mono" style="color: #c25a3c">▼12</span></div>
+    </div>
+    <div style="display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 16px">
+      <div class="card" style="padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; ">
+    <div style="display: flex; align-items: baseline; gap: 10px"><span class="h3">튜터의 요약</span><span class="small muted">통계를 설명과 연결합니다</span></div><div style="font-size: 14.5px; line-height: 1.7; max-width: 720px">지난 두 달 동안 가장 큰 손실은 <b>헤지호그 구조에서 …d5 브레이크의 타이밍</b>이었습니다. 12판 중 8판에서 브레이크가 평균 5수 늦었고, 그 사이 백이 e5나 g4로 먼저 움직였습니다. 전술에서는 <b>나이트가 체크와 함께 비켜서는 디스커버드 어택</b>을 17번 놓쳤습니다. 이 둘은 같은 게임에서 자주 겹칩니다. 미들게임 정확도가 같은 구간보다 6점 낮은 이유의 대부분이 여기 있습니다.</div>
+        <div style="display: flex; gap: 8px"><a href="#" style="font-size: 13px">관련 게임 9판 보기</a><span class="faint">·</span><a href="#" style="font-size: 13px">헤지호그 계획 다시 읽기</a></div></div>
+      <div class="card" style="padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; ">
+    <div style="display: flex; align-items: baseline; gap: 10px"><span class="h3">단계별 정확도</span><span class="small muted">100점 만점</span></div><div style="display: flex; gap: 10px"><div style="flex: 1; padding: 12px 14px; border-radius: 8px; background: #f4efe6; border: 1px solid #e4dbcb">
+    <div class="small muted">오프닝</div>
+    <div class="mono" style="font-size: 30px; font-weight: 600; line-height: 1.1; margin-top: 2px">84</div>
+    <div class="mono small" style="color: #2478a6; margin-top: 4px">+2 <span class="faint">vs 같은 구간</span></div>
+  </div><div style="flex: 1; padding: 12px 14px; border-radius: 8px; background: #f4efe6; border: 1px solid #e4dbcb">
+    <div class="small muted">미들게임</div>
+    <div class="mono" style="font-size: 30px; font-weight: 600; line-height: 1.1; margin-top: 2px">71</div>
+    <div class="mono small" style="color: #c25a3c; margin-top: 4px">−6 <span class="faint">vs 같은 구간</span></div>
+  </div><div style="flex: 1; padding: 12px 14px; border-radius: 8px; background: #f4efe6; border: 1px solid #e4dbcb">
+    <div class="small muted">엔드게임</div>
+    <div class="mono" style="font-size: 30px; font-weight: 600; line-height: 1.1; margin-top: 2px">63</div>
+    <div class="mono small" style="color: #c25a3c; margin-top: 4px">−3 <span class="faint">vs 같은 구간</span></div>
+  </div></div></div>
+    </div>
+    <div style="display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr) minmax(0, 0.9fr); gap: 16px">
+      <div class="card" style="padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; ">
+    <div style="display: flex; align-items: baseline; gap: 10px"><span class="h3">구조별 성적</span><span class="small muted">판수 · 승률 · 판당 평균 손실(센티폰)</span></div><table style="width: 100%"><tr style="font-size: 13px">
+      <td style="padding: 6px 0; font-weight: 500">헤지호그</td>
+      <td class="mono muted" style="padding: 6px 8px; text-align: right">12판</td>
+      <td class="mono" style="padding: 6px 8px; text-align: right; color: #c25a3c; font-weight: 600">33%</td>
+      <td style="padding: 6px 0 6px 8px"><div style="display: flex; align-items: center; gap: 8px"><div style="width: 114px; height: 8px; border-radius: 4px; background: #c25a3c"></div><span class="mono small muted">−142</span></div></td>
+    </tr><tr style="font-size: 13px">
+      <td style="padding: 6px 0; font-weight: 500">오픈 센터</td>
+      <td class="mono muted" style="padding: 6px 8px; text-align: right">15판</td>
+      <td class="mono" style="padding: 6px 8px; text-align: right; color: #2b2622; font-weight: 600">47%</td>
+      <td style="padding: 6px 0 6px 8px"><div style="display: flex; align-items: center; gap: 8px"><div style="width: 70px; height: 8px; border-radius: 4px; background: #9b9187"></div><span class="mono small muted">−88</span></div></td>
+    </tr><tr style="font-size: 13px">
+      <td style="padding: 6px 0; font-weight: 500">IQP · 상대 보유</td>
+      <td class="mono muted" style="padding: 6px 8px; text-align: right">11판</td>
+      <td class="mono" style="padding: 6px 8px; text-align: right; color: #2b2622; font-weight: 600">45%</td>
+      <td style="padding: 6px 0 6px 8px"><div style="display: flex; align-items: center; gap: 8px"><div style="width: 76px; height: 8px; border-radius: 4px; background: #9b9187"></div><span class="mono small muted">−95</span></div></td>
+    </tr><tr style="font-size: 13px">
+      <td style="padding: 6px 0; font-weight: 500">프렌치 구조</td>
+      <td class="mono muted" style="padding: 6px 8px; text-align: right">8판</td>
+      <td class="mono" style="padding: 6px 8px; text-align: right; color: #2b2622; font-weight: 600">50%</td>
+      <td style="padding: 6px 0 6px 8px"><div style="display: flex; align-items: center; gap: 8px"><div style="width: 56px; height: 8px; border-radius: 4px; background: #9b9187"></div><span class="mono small muted">−70</span></div></td>
+    </tr><tr style="font-size: 13px">
+      <td style="padding: 6px 0; font-weight: 500">카로칸 어드밴스</td>
+      <td class="mono muted" style="padding: 6px 8px; text-align: right">9판</td>
+      <td class="mono" style="padding: 6px 8px; text-align: right; color: #2b2622; font-weight: 600">61%</td>
+      <td style="padding: 6px 0 6px 8px"><div style="display: flex; align-items: center; gap: 8px"><div style="width: 32px; height: 8px; border-radius: 4px; background: #9b9187"></div><span class="mono small muted">−40</span></div></td>
+    </tr></table></div>
+      <div class="card" style="padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; ">
+    <div style="display: flex; align-items: baseline; gap: 10px"><span class="h3">놓친 전술 모티프</span><span class="small muted">리뷰에서 태그된 횟수</span></div><div style="display: flex; flex-direction: column; gap: 9px"><div style="display: grid; grid-template-columns: 130px minmax(0, 1fr) 56px; gap: 10px; align-items: center; font-size: 13px">
+    <div style="font-weight: 500">디스커버드 어택</div>
+    <div style="height: 10px; border-radius: 4px; background: rgba(43, 38, 34, 0.06); overflow: hidden"><div style="width: 100%; height: 100%; background: #c25a3c; border-radius: 0 4px 4px 0"></div></div>
+    <div class="mono muted" style="text-align: right">17회</div>
+  </div><div style="display: grid; grid-template-columns: 130px minmax(0, 1fr) 56px; gap: 10px; align-items: center; font-size: 13px">
+    <div style="font-weight: 500">나이트 포크</div>
+    <div style="height: 10px; border-radius: 4px; background: rgba(43, 38, 34, 0.06); overflow: hidden"><div style="width: 82%; height: 100%; background: #2b2622; border-radius: 0 4px 4px 0"></div></div>
+    <div class="mono muted" style="text-align: right">14회</div>
+  </div><div style="display: grid; grid-template-columns: 130px minmax(0, 1fr) 56px; gap: 10px; align-items: center; font-size: 13px">
+    <div style="font-weight: 500">핀</div>
+    <div style="height: 10px; border-radius: 4px; background: rgba(43, 38, 34, 0.06); overflow: hidden"><div style="width: 53%; height: 100%; background: #2b2622; border-radius: 0 4px 4px 0"></div></div>
+    <div class="mono muted" style="text-align: right">9회</div>
+  </div><div style="display: grid; grid-template-columns: 130px minmax(0, 1fr) 56px; gap: 10px; align-items: center; font-size: 13px">
+    <div style="font-weight: 500">백랭크</div>
+    <div style="height: 10px; border-radius: 4px; background: rgba(43, 38, 34, 0.06); overflow: hidden"><div style="width: 35%; height: 100%; background: #2b2622; border-radius: 0 4px 4px 0"></div></div>
+    <div class="mono muted" style="text-align: right">6회</div>
+  </div><div style="display: grid; grid-template-columns: 130px minmax(0, 1fr) 56px; gap: 10px; align-items: center; font-size: 13px">
+    <div style="font-weight: 500">수비수 제거</div>
+    <div style="height: 10px; border-radius: 4px; background: rgba(43, 38, 34, 0.06); overflow: hidden"><div style="width: 24%; height: 100%; background: #2b2622; border-radius: 0 4px 4px 0"></div></div>
+    <div class="mono muted" style="text-align: right">4회</div>
+  </div></div></div>
+      <div class="card" style="padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; ">
+    <div style="display: flex; align-items: baseline; gap: 10px"><span class="h3">시간 관리</span><span class="small muted">남은 시간과 실수의 관계</span></div><div style="display: flex; flex-direction: column; gap: 10px">
+          <div style="font-size: 13px; line-height: 1.55">30초 미만에 둔 수의 블런더율이 <b style="color: #c25a3c">18%</b>입니다. 같은 구간 기준 9%. 헤지호그에서 20수 전후에 시간이 몰립니다.</div>
+          <div style="display: grid; grid-template-columns: 130px minmax(0, 1fr) 56px; gap: 10px; align-items: center; font-size: 13px">
+    <div style="font-weight: 500">30초 미만</div>
+    <div style="height: 10px; border-radius: 4px; background: rgba(43, 38, 34, 0.06); overflow: hidden"><div style="width: 90%; height: 100%; background: #c25a3c; border-radius: 0 4px 4px 0"></div></div>
+    <div class="mono muted" style="text-align: right">18%</div>
+  </div><div style="display: grid; grid-template-columns: 130px minmax(0, 1fr) 56px; gap: 10px; align-items: center; font-size: 13px">
+    <div style="font-weight: 500">30초 이상</div>
+    <div style="height: 10px; border-radius: 4px; background: rgba(43, 38, 34, 0.06); overflow: hidden"><div style="width: 30%; height: 100%; background: #2b2622; border-radius: 0 4px 4px 0"></div></div>
+    <div class="mono muted" style="text-align: right">6%</div>
+  </div><div style="display: grid; grid-template-columns: 130px minmax(0, 1fr) 56px; gap: 10px; align-items: center; font-size: 13px">
+    <div style="font-weight: 500">구간 기준</div>
+    <div style="height: 10px; border-radius: 4px; background: rgba(43, 38, 34, 0.06); overflow: hidden"><div style="width: 45%; height: 100%; background: #9b9187; border-radius: 0 4px 4px 0"></div></div>
+    <div class="mono muted" style="text-align: right">9%</div>
+  </div>
+        </div></div>
+    </div>
+    <div style="display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 16px">
+      <div class="card" style="padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; ">
+    <div style="display: flex; align-items: baseline; gap: 10px"><span class="h3">오늘의 훈련</span><span class="small muted">내 기보에서 만든 문제 · 간격 반복</span></div><div style="display: flex; gap: 10px">
+          <div style="flex: 1; padding: 12px 14px; border-radius: 8px; border: 1px solid #e4dbcb; background: #f4efe6; display: flex; flex-direction: column; gap: 6px"><div class="small muted">복습 예정</div><div style="font-weight: 600">내 기보 퍼즐 <span class="mono">7</span>개</div><div class="small muted">8/29 리뷰의 20…Qd7 포함</div><div class="btn btn-primary" style="height: 32px; margin-top: 4px">시작</div></div>
+          <div style="flex: 1; padding: 12px 14px; border-radius: 8px; border: 1px solid #e4dbcb; background: #f4efe6; display: flex; flex-direction: column; gap: 6px"><div class="small muted">모티프 세트</div><div style="font-weight: 600">디스커버드 어택 <span class="mono">12</span>문제</div><div class="small muted">Lichess 퍼즐 DB에서 선별</div><div class="btn btn-ghost" style="height: 32px; margin-top: 4px">시작</div></div>
+          <div style="flex: 1; padding: 12px 14px; border-radius: 8px; border: 1px solid #e4dbcb; background: #f4efe6; display: flex; flex-direction: column; gap: 6px"><div class="small muted">구조 스터디</div><div style="font-weight: 600">헤지호그 …d5 타이밍</div><div class="small muted">내 게임 3국면 + 마스터 3국면</div><div class="btn btn-ghost" style="height: 32px; margin-top: 4px">열기</div></div>
+        </div></div>
+      <div class="card" style="padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; ">
+    <div style="display: flex; align-items: baseline; gap: 10px"><span class="h3">레퍼토리 구멍</span><span class="small muted">책에서 벗어난 지점과 그 뒤의 손실</span></div><div style="display: flex; flex-direction: column; gap: 8px; font-size: 13px">
+          <div style="display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 6px; background: #f4efe6; border: 1px solid #e4dbcb"><span class="mv">1.d4 상대</span><span class="muted">12수 이전 책 이탈</span><span class="mono" style="color: #c25a3c; font-weight: 600">61%</span><div style="flex: 1"></div><span class="mono muted">평균 −0.8</span></div>
+          <div style="display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 6px; background: #f4efe6; border: 1px solid #e4dbcb"><span class="mv">1.e4 c5 2.c3</span><span class="muted">알라핀 · 4판</span><span class="mono" style="color: #c25a3c; font-weight: 600">0승</span><div style="flex: 1"></div><a href="#">오프닝 지도에서 보기</a></div>
+        </div></div>
+    </div>
+  </div></div>
+  </div>
+</div></x-dc>
+</body>
+</html>

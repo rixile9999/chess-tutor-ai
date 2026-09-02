@@ -1,0 +1,28 @@
+/* Design tokens lifted from design/build.mjs (the mockup). */
+:root {
+  --paper: #f4efe6;
+  --surface: #fcf9f3;
+  --ink: #2b2622;
+  --ink-2: #6b6259;
+  --ink-3: #9b9187;
+  --line: #e4dbcb;
+  --line-strong: #cdc1ab;
+  --good: #2478a6;
+  --good-bg: rgba(36, 120, 166, 0.1);
+  --bad: #c25a3c;
+  --bad-bg: rgba(194, 90, 60, 0.12);
+  --board-light: #ecdfc5;
+  --board-dark: #a98b68;
+  --font-ui: 'IBM Plex Sans KR', 'Apple SD Gothic Neo', 'Noto Sans KR', system-ui, sans-serif;
+  --font-display: 'Gowun Batang', 'Apple Myungjo', 'Noto Serif KR', Georgia, serif;
+  --font-mono: 'IBM Plex Mono', 'SF Mono', Menlo, Consolas, monospace;
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.5;
+}

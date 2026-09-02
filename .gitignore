@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+
+# Node
+node_modules/
+apps/web/dist/
+
+# Env / local
+.env
+.env.*
+!.env.example
+.DS_Store
+.claude/
+
+# Engine binaries and large data
+engines/
+data/
+*.pgn.zst
+*.bin
+
+# Design canvas build output (regenerate with node design/build.mjs + seed)
+design/chess-tutor-mockup.html
