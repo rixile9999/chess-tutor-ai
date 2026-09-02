@@ -47,6 +47,8 @@ select = ["E", "F", "I", "UP", "B"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+# Fail on a typo'd marker instead of silently running the test unmarked.
+addopts = ["--strict-markers"]
 
 [tool.mypy]
 python_version = "3.12"

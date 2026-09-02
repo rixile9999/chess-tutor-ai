@@ -45,6 +45,7 @@ from chess_tutor.schemas import (
     TrainingSummary,
 )
 from chess_tutor.services import games as games_svc
+from chess_tutor.services import users
 
 try:  # pawn-break catalogue of the openings workstream; the report degrades without it
     from chess_tutor.services.openings_map import BREAKS, first_breaks
@@ -117,8 +118,8 @@ BASELINES: tuple[tuple[int, int, tuple[float, float, float]], ...] = (
 until they are measured on the Lichess database; the band label goes out with the report."""
 
 
-class UserNotFound(LookupError):
-    pass
+UserNotFound = users.UserNotFound
+"""Re-exported so /profile keeps its import; the resolver lives in services.users."""
 
 
 def now_utc() -> datetime:
@@ -665,11 +666,11 @@ def summary_text(
 
 
 async def find_users(session: AsyncSession, username: str) -> list[User]:
-    """Every account with this name, platform accounts before local ones."""
-    stmt = select(User).where(func.lower(User.username) == username.strip().lower())
-    users = list((await session.execute(stmt)).scalars())
-    users.sort(key=lambda u: (u.platform == "local", u.id))
-    return users
+    """Every account with this name, platform accounts before local ones.
+
+    The one resolver, shared with training, so a profile and a puzzle deck never disagree
+    about which accounts a name covers."""
+    return await users.find_users(session, username)
 
 
 async def games_in_window(

@@ -17,7 +17,7 @@ export function FeaturesPanel({ features, aLabel = 'A', bLabel = 'B' }: Props) {
     <div className="rv-section" style={{ gap: 8 }}>
       <div className="rv-section-head">
         <span className="h3">국면 특징</span>
-        <span className="small muted">폰 구조, 기물 활동, 킹 안전 같은 항목을 두 국면에서 비교</span>
+        <span className="small muted">폰 구조, 기물 활동, 킹 안전 같은 항목을 이 국면에서 양쪽 비교</span>
       </div>
       <table className="rv-table">
         <thead>

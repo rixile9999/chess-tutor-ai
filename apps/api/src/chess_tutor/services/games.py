@@ -16,6 +16,7 @@ from datetime import UTC, datetime
 import chess
 import chess.pgn
 from sqlalchemy import Select, delete, func, inspect, select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -29,6 +30,16 @@ STANDARD_START = chess.STARTING_FEN
 SUPPORTED_VARIANTS = {"standard", "from position", "chess"}
 _PLATFORMS = {"chesscom", "lichess"}
 _MISSING = {"", "?", "-", "??"}
+PGN_RESULTS = {"1-0", "0-1", "1/2-1/2", "*"}
+"""The four results the PGN standard defines; anything else is stored as unknown."""
+NULL_MOVE_UCI = "0000"
+
+# Header values are written by whoever produced the PGN, and the columns in models.py are
+# narrow. SQLite ignores the widths, Postgres raises, so they are cut here instead.
+NAME_LEN = 64
+TIME_CONTROL_LEN = 32
+ECO_LEN = 8
+OPENING_LEN = 128
 
 
 @dataclass
@@ -84,6 +95,11 @@ def _clean(value: str | None) -> str | None:
         return None
     value = value.strip()
     return None if value in _MISSING else value
+
+
+def _fit(value: str | None, limit: int) -> str | None:
+    """Trim an untrusted header value to the width of the column that will hold it."""
+    return None if value is None else value[:limit]
 
 
 def _int_or_none(value: str | None) -> int | None:
@@ -151,17 +167,18 @@ def _from_game(game: chess.pgn.Game, raw: str) -> ParsedGame:
         if book is not None:
             eco = eco or book.eco
             name = name or book.name
+    result = _clean(headers.get("Result")) or "*"
     return ParsedGame(
         pgn=raw,
-        white=_clean(headers.get("White")) or "?",
-        black=_clean(headers.get("Black")) or "?",
-        result=_clean(headers.get("Result")) or "*",
+        white=_fit(_clean(headers.get("White")), NAME_LEN) or "?",
+        black=_fit(_clean(headers.get("Black")), NAME_LEN) or "?",
+        result=result if result in PGN_RESULTS else "*",
         white_elo=_int_or_none(headers.get("WhiteElo")),
         black_elo=_int_or_none(headers.get("BlackElo")),
-        time_control=_clean(headers.get("TimeControl")),
+        time_control=_fit(_clean(headers.get("TimeControl")), TIME_CONTROL_LEN),
         played_at=parse_played_at(headers),
-        eco=eco,
-        opening_name=name,
+        eco=_fit(eco, ECO_LEN),
+        opening_name=_fit(name, OPENING_LEN),
         initial_fen=start.fen(),
         moves=infos,
         headers=headers,
@@ -170,8 +187,9 @@ def _from_game(game: chess.pgn.Game, raw: str) -> ParsedGame:
 
 
 def parse_pgn(text: str) -> ParseReport:
-    """Read every game in text. Games with illegal moves, no moves, or an unsupported variant
-    are reported in errors and left out, so nothing half-parsed reaches the database."""
+    """Read every game in text. Games with illegal moves, no moves, an illegal starting
+    position or an unsupported variant are reported in errors and left out, so nothing
+    half-parsed reaches the database."""
     text = text.replace("\r\n", "\n").replace("\r", "\n")
     stream = io.StringIO(text)
     games: list[ParsedGame] = []
@@ -196,8 +214,19 @@ def parse_pgn(text: str) -> ParseReport:
         except ValueError as exc:
             errors.append(f"{index}번째 게임의 시작 국면을 읽을 수 없어 건너뜁니다 ({exc}).")
             continue
+        # A syntactically fine [FEN] header can still describe a position the rules forbid
+        # (two white kings, no black king, a side already in check on the opponent's move).
+        # Stockfish crashes on those, so they must never be stored.
+        if not chess.Board(parsed.initial_fen).is_valid():
+            errors.append(f"{index}번째 게임의 시작 국면이 규칙에 맞지 않아 건너뜁니다.")
+            continue
         if not parsed.moves:
             errors.append(f"{index}번째 게임에는 수가 없어 건너뜁니다.")
+            continue
+        # A null move ('--') is a placeholder for a move nobody made. Stored as uci 0000 it
+        # would be replayed, analysed and reviewed as if it were real.
+        if any(move.uci == NULL_MOVE_UCI for move in parsed.moves):
+            errors.append(f"{index}번째 게임에는 널 무브(--)가 있어 건너뜁니다.")
             continue
         games.append(parsed)
     return ParseReport(games=games, errors=errors)
@@ -297,14 +326,29 @@ def platform_for(source: str) -> str:
 
 
 async def get_or_create_user(session: AsyncSession, username: str, platform: str) -> User:
+    """The account for this name and platform, created when it is new.
+
+    Two imports of the same account can run at once (a double-clicked button, a retry), and
+    both would pass the SELECT before either INSERT lands. The insert therefore runs in a
+    savepoint: on the uq_user_platform conflict the savepoint alone rolls back, the row the
+    other request committed is read instead, and the outer transaction survives."""
     username = username.strip()
-    user = await session.scalar(
-        select(User).where(func.lower(User.username) == username.lower(), User.platform == platform)
+    stmt = select(User).where(
+        func.lower(User.username) == username.lower(), User.platform == platform
     )
-    if user is None:
-        user = User(username=username, platform=platform)
-        session.add(user)
-        await session.flush()
+    user = await session.scalar(stmt)
+    if user is not None:
+        return user
+    try:
+        async with session.begin_nested():
+            user = User(username=username, platform=platform)
+            session.add(user)
+            await session.flush()
+    except IntegrityError:
+        user = await session.scalar(stmt)
+        if user is None:
+            raise
+    assert user is not None
     return user
 
 
@@ -333,7 +377,11 @@ async def upsert_games(
 
     game_ids lists the newly stored rows in input order. When username is given, the games are
     attached to that user (created on first sight, platform = source or 'local' for pgn) and
-    user_color is set where the name plays White or Black."""
+    user_color is set where the name plays White or Black.
+
+    Each row is inserted in its own savepoint: when a concurrent import of the same games wins
+    the race to uq_game_source, that one row counts as skipped instead of the whole request
+    failing with an IntegrityError."""
     user: User | None = None
     if username and username.strip():
         user = await get_or_create_user(session, username, platform_for(source))
@@ -376,10 +424,15 @@ async def upsert_games(
             ply_count=pg.ply_count,
             headers=dict(pg.headers),
         )
-        session.add(game)
+        try:
+            async with session.begin_nested():
+                session.add(game)
+                await session.flush()
+        except IntegrityError:
+            skipped += 1
+            continue
         new_rows.append(game)
 
-    await session.flush()
     await session.commit()
     return ImportResult(
         imported=len(new_rows),

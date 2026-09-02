@@ -128,6 +128,9 @@ class AnalysisSummary(BaseModel):
     """counts[color][classification]."""
     eval_series: list[float] = []
     """Evaluation in pawns after each ply, clamped to [-10, 10]; index 0 = start position."""
+    multipv: int = 0
+    """MultiPV width the search used. 0 in an analysis stored before this field existed; the
+    depth lives on GameAnalysis."""
 
 
 class GameAnalysis(BaseModel):
@@ -181,6 +184,8 @@ class Alternative(BaseModel):
     line: list[str]
     is_best: bool = False
     why: str = ""
+    claims: list[Claim] = []
+    """Board facts `why` states, so the verifier can check the sentence it becomes."""
 
 
 class FeatureDiffRow(BaseModel):

@@ -236,14 +236,58 @@ def test_natural_reason_mockup_matches_mockup_copy() -> None:
 # ---------- endpoints ----------
 
 
-def test_status_endpoint(client: TestClient, no_maia: None) -> None:
+def test_status_endpoint_without_maia_in_the_chain(client: TestClient, no_maia: None) -> None:
+    """`no_maia` removes the MaiaBackend entirely, so the maia_* fields report 'not in chain'."""
     res = client.get("/maia/status")
     assert res.status_code == 200
     body = res.json()
     assert set(body) >= {"maia2_available", "backend", "maia_loaded", "stockfish_available"}
-    assert body["maia2_available"] is False
+    assert body["maia2_available"] is False and body["maia_loaded"] is False
+    assert body["maia_error"] is None
     assert body["backend"] == ("engine" if find_stockfish() else "random")
     assert client.get("/maia/_status").status_code == 200
+
+
+def _installed_maia(monkeypatch: pytest.MonkeyPatch) -> maia_service.MaiaBackend:
+    """A real MaiaBackend that reports the package as present, without importing torch."""
+    monkeypatch.setattr(maia_service.MaiaBackend, "installed", staticmethod(lambda: True))
+    return maia_service.MaiaBackend()
+
+
+def test_status_reports_a_loaded_maia_backend(
+    client: TestClient,
+    engine_backend: maia_service.EngineBackend,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    maia = _installed_maia(monkeypatch)
+    maia._model = object()  # what a successful load() leaves behind
+    maia_service.use_backends(maia, engine_backend, maia_service.RandomBackend())
+    try:
+        body = client.get("/maia/status").json()
+    finally:
+        maia_service.use_backends()
+    assert body["maia2_available"] is True
+    assert body["maia_loaded"] is True
+    assert body["maia_error"] is None
+    assert body["backend"] == "maia"  # first available backend in the chain
+
+
+def test_status_reports_why_an_installed_maia_is_unusable(
+    client: TestClient,
+    engine_backend: maia_service.EngineBackend,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    maia = _installed_maia(monkeypatch)
+    maia._error = "RuntimeError: weights missing"  # what a failed load() leaves behind
+    maia_service.use_backends(maia, engine_backend, maia_service.RandomBackend())
+    try:
+        body = client.get("/maia/status").json()
+    finally:
+        maia_service.use_backends()
+    assert body["maia2_available"] is False
+    assert body["maia_loaded"] is False
+    assert body["maia_error"] == "RuntimeError: weights missing"
+    assert body["backend"] == ("engine" if find_stockfish() else "random")
 
 
 def test_move_endpoint(client: TestClient, no_maia: None) -> None:

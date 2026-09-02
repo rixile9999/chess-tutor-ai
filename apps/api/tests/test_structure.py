@@ -109,6 +109,27 @@ def test_closed_center_and_unclassified() -> None:
     assert key_at(chess.Board()) == "unclassified"
 
 
+def test_endings_never_get_a_named_middlegame_structure() -> None:
+    # A named structure carries plans about knights, rooks and bishops, so it may not be
+    # claimed once the pieces (or the pawns) are gone.
+    bare = [
+        "4k3/p7/8/8/3P4/8/8/4K3 w - - 0 1",  # would match iqp on pawn placement alone
+        "4k3/8/8/8/2PP4/8/5p2/4K3 w - - 0 1",  # would match hanging_pawns
+        "8/5ppp/4k3/8/3P4/4K3/5PPP/8 w - - 0 1",  # realistic king-and-pawn ending
+        "8/6k1/8/3K4/3P4/8/8/8 w - - 0 1",
+    ]
+    for fen in bare:
+        info = classify(chess.Board(fen))
+        assert info.key in {"open_center", "closed_center", "unclassified"}, (fen, info.key)
+    # a rook ending keeps the generic centre description it always had
+    assert classify(chess.Board("8/5pk1/6p1/8/8/4R3/r4PPP/6K1 w - - 0 40")).key == "open_center"
+    # the same pawn placement with pieces on the board is still an IQP
+    assert classify(chess.Board(IQP)).key == "iqp"
+    thin = chess.Board("4k3/p7/8/8/3P4/8/8/4K3 w - - 0 1")
+    thin.set_piece_at(chess.G1, chess.Piece(chess.KNIGHT, chess.WHITE))
+    assert classify(thin).key != "iqp"  # one piece, still not enough pawns for a structure
+
+
 def test_every_key_has_a_korean_name() -> None:
     for key, name in STRUCTURE_NAMES.items():
         assert name and "—" not in name, key

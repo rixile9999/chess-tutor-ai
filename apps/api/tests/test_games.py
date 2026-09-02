@@ -2,14 +2,18 @@
 
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
+from typing import Any
 
 import chess
 import httpx
+import pytest
 import respx
 from fastapi.testclient import TestClient
 from httpx import AsyncClient
-from sqlalchemy import select
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from chess_tutor import db
 from chess_tutor.models import Game, User
@@ -88,6 +92,73 @@ def test_parse_reports_broken_and_variant_games() -> None:
     assert svc.parse_pgn("").games == [] and svc.parse_pgn("   \n").errors == []
 
 
+def test_illegal_setup_position_is_rejected() -> None:
+    """A well-formed [FEN] header can still be an illegal position, and Stockfish segfaults on
+    those. They must never be stored, so the engine is never handed one."""
+    illegal = (
+        '[Event "?"]\n[White "a"]\n[Black "b"]\n[Result "*"]\n'
+        '[SetUp "1"]\n[FEN "8/8/8/8/8/8/8/KKQ5 w - - 0 1"]\n\n1. Qc7 *\n'
+    )
+    assert chess.Board("8/8/8/8/8/8/8/KKQ5 w - - 0 1").is_valid() is False
+    report = svc.parse_pgn(illegal)
+    assert report.games == []
+    assert len(report.errors) == 1 and "규칙에 맞지 않아" in report.errors[0]
+
+    # A legal from-position game is still imported.
+    endgame = (
+        '[Event "?"]\n[White "a"]\n[Black "b"]\n[Result "*"]\n'
+        '[SetUp "1"]\n[FEN "8/8/8/8/8/4k3/6P1/6K1 w - - 0 1"]\n\n1. Kf1 *\n'
+    )
+    legal = svc.parse_pgn(endgame)
+    assert len(legal.games) == 1 and legal.errors == []
+    assert legal.games[0].initial_fen == "8/8/8/8/8/4k3/6P1/6K1 w - - 0 1"
+
+
+def test_import_pgn_endpoint_skips_an_illegal_setup(client: TestClient) -> None:
+    illegal = (
+        '[Event "?"]\n[White "a"]\n[Black "b"]\n[Result "*"]\n'
+        '[SetUp "1"]\n[FEN "8/8/8/8/8/8/8/KKQ5 w - - 0 1"]\n\n1. Qc7 *\n'
+    )
+    res = client.post("/games/import/pgn", json={"pgn": illegal, "username": "tutee"})
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert (body["imported"], body["skipped"], body["game_ids"]) == (0, 1, [])
+    assert len(body["errors"]) == 1 and "규칙에 맞지 않아" in body["errors"][0]
+    assert client.get("/games").json() == []
+
+
+def test_over_long_headers_are_cut_to_the_column_widths() -> None:
+    """Header values are written by whoever produced the PGN. SQLite ignores the VARCHAR
+    widths in models.py; Postgres raises, so the values are cut on the way in."""
+    pgn = (
+        f'[Event "?"]\n[White "{"w" * 200}"]\n[Black "{"b" * 200}"]\n'
+        '[Result "won by resignation"]\n'
+        f'[TimeControl "{"9" * 100}"]\n[ECO "{"A" * 40}"]\n[Opening "{"o" * 400}"]\n\n1. e4 e5 *\n'
+    )
+    (game,) = svc.parse_pgn_games(pgn)
+    assert len(game.white) == 64 and len(game.black) == 64
+    assert len(game.time_control or "") == 32
+    assert len(game.eco or "") == 8
+    assert len(game.opening_name or "") == 128
+    assert game.result == "*"  # not one of the four PGN results
+
+
+def test_pgn_results_outside_the_standard_set_become_unknown() -> None:
+    base = TWO_GAMES.replace('[Result "0-1"]', '[Result "0:1"]')
+    assert svc.parse_pgn_games(base)[0].result == "*"
+    draw = TWO_GAMES.replace('[Result "0-1"]', '[Result "1/2-1/2"]')
+    assert svc.parse_pgn_games(draw)[0].result == "1/2-1/2"
+
+
+def test_null_moves_are_not_imported_as_moves() -> None:
+    """'--' is a placeholder for a move nobody made; stored as uci 0000 it would be analysed
+    and reviewed as if it were real."""
+    pgn = '[Event "?"]\n[White "a"]\n[Black "b"]\n[Result "*"]\n\n1. e4 -- 2. d4 d5 *\n'
+    report = svc.parse_pgn(pgn)
+    assert report.games == []
+    assert len(report.errors) == 1 and "널 무브" in report.errors[0]
+
+
 def test_user_color_is_case_insensitive() -> None:
     older, newer = svc.parse_pgn_games(TWO_GAMES)
     assert older.color_of("TUTEE") == "black"
@@ -119,6 +190,74 @@ async def test_upsert_dedupes_and_sets_user_color() -> None:
         assert [g.user_color for g in rows] == ["black", "white", None]
         assert all(g.user_id == first.user_id for g in rows[:2])
         assert rows[0].ply_count == 4 and rows[1].ply_count == 7
+
+
+async def test_get_or_create_user_survives_a_concurrent_insert(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Two imports of one account both pass the SELECT before either INSERT lands. The loser
+    must read the winner's row, not raise IntegrityError out of the endpoint."""
+    factory = db.session_factory()
+    original_flush = AsyncSession.flush
+    raced = False
+
+    async def racing_flush(self: AsyncSession, *args: Any, **kwargs: Any) -> None:
+        nonlocal raced
+        if not raced:  # the other request commits between our SELECT and our INSERT
+            raced = True
+            async with factory() as other:
+                other.add(User(username="tutee", platform="local"))
+                await other.commit()
+        await original_flush(self, *args, **kwargs)
+
+    monkeypatch.setattr(AsyncSession, "flush", racing_flush)
+    async with factory() as session:
+        user = await svc.get_or_create_user(session, "tutee", "local")
+        user_id = user.id
+        await session.commit()
+    assert raced
+    monkeypatch.undo()
+    async with factory() as session:
+        rows = (await session.scalars(select(User))).all()
+        assert [(u.username, u.platform) for u in rows] == [("tutee", "local")]
+        assert user_id == rows[0].id
+
+
+async def test_concurrent_imports_of_the_same_games_do_not_500(aclient: AsyncClient) -> None:
+    """A double-clicked import button: both requests answer 200 and the games are stored once."""
+    payload = {"pgn": TWO_GAMES, "username": "tutee"}
+    first, second = await asyncio.gather(
+        aclient.post("/games/import/pgn", json=payload),
+        aclient.post("/games/import/pgn", json=payload),
+    )
+    for res in (first, second):
+        assert res.status_code == 200, res.text
+        body = res.json()
+        assert body["imported"] + body["skipped"] == 2, body
+    async with db.session_factory()() as session:
+        assert (await session.scalars(select(func.count()).select_from(Game))).one() == 2
+        assert (await session.scalars(select(func.count()).select_from(User))).one() == 1
+
+
+async def test_upsert_counts_a_lost_race_as_skipped(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The same game arriving twice at once conflicts on uq_game_source. That one row counts
+    as skipped and the rest of the batch is still stored, instead of the whole request dying."""
+    parsed = svc.parse_pgn_games(TWO_GAMES)
+    factory = db.session_factory()
+    async with factory() as other:
+        await svc.upsert_games(other, [parsed[0]], "pgn")
+
+    async def blind(*_args: Any, **_kwargs: Any) -> dict[str, Game]:
+        """The dedupe SELECT as it looked before the other request committed."""
+        return {}
+
+    monkeypatch.setattr(svc, "_existing_by_source_id", blind)
+    async with factory() as session:
+        result = await svc.upsert_games(session, parsed, "pgn", username="tutee")
+    assert (result.imported, result.skipped) == (1, 1)
+    monkeypatch.undo()
+    async with factory() as session:
+        assert (await session.scalars(select(func.count()).select_from(Game))).one() == 2
 
 
 async def test_game_moves_and_boards_of() -> None:

@@ -235,18 +235,21 @@ def test_e2e_import_analyse_review_profile_train(client: TestClient) -> None:
     res = client.post(f"/training/puzzles/from-game/{game_id}")
     assert res.status_code == 200, res.text
     puzzles = res.json()
-    assert puzzles, "the knight blunder should have produced a puzzle"
+    assert puzzles, "the opponent's blunders should have produced puzzles"
     for puzzle in puzzles:
         assert puzzle["source_game_id"] == game_id and puzzle["source_ply"] is not None
         board = chess.Board(puzzle["fen"])
         assert puzzle["orientation"] == ("white" if board.turn else "black")
+        # The user played White, so every puzzle is solved as White: a puzzle cut from the
+        # user's own blunder would hand them Black and ask them to punish themselves.
+        assert puzzle["orientation"] == "white"
+        assert moves[puzzle["source_ply"] - 1]["color"] == "black"
         assert len(puzzle["solution"]) % 2 == 1
         for uci in puzzle["solution"]:
             board.push(chess.Move.from_uci(uci))
         assert puzzle["reps"] == 0 and puzzle["interval_days"] == 0.0
-    knight_puzzle = next(p for p in puzzles if p["source_ply"] == KNIGHT_BLUNDER_PLY)
-    assert knight_puzzle["orientation"] == "black"
-    assert knight_puzzle["solution"][0] == "h7h6"
+    assert KNIGHT_BLUNDER_PLY not in {p["source_ply"] for p in puzzles}
+    target = puzzles[0]
 
     # the same game again creates nothing new
     assert client.post(f"/training/puzzles/from-game/{game_id}").json() == []
@@ -256,17 +259,17 @@ def test_e2e_import_analyse_review_profile_train(client: TestClient) -> None:
     due = res.json()
     assert {p["id"] for p in due} == {p["id"] for p in puzzles}
 
-    res = client.get(f"/training/puzzles/{knight_puzzle['id']}")
-    assert res.status_code == 200 and res.json()["fen"] == knight_puzzle["fen"]
+    res = client.get(f"/training/puzzles/{target['id']}")
+    assert res.status_code == 200 and res.json()["fen"] == target["fen"]
 
     res = client.post(
-        f"/training/puzzles/{knight_puzzle['id']}/attempt", json={"correct": True, "seconds": 9}
+        f"/training/puzzles/{target['id']}/attempt", json={"correct": True, "seconds": 9}
     )
     assert res.status_code == 200, res.text
     assert res.json()["reps"] == 1 and res.json()["interval_days"] == 1.0
 
     res = client.get("/training/puzzles/due", params={"username": USERNAME})
-    assert knight_puzzle["id"] not in {p["id"] for p in res.json()}
+    assert target["id"] not in {p["id"] for p in res.json()}
 
     res = client.get("/training/summary", params={"username": USERNAME})
     assert res.status_code == 200 and res.json()["due_puzzles"] == len(puzzles) - 1
@@ -275,11 +278,12 @@ def test_e2e_import_analyse_review_profile_train(client: TestClient) -> None:
     assert res.json()["training"]["due_puzzles"] == len(puzzles) - 1
 
     # ----- sparring -----
-    res = client.post("/maia/move", json={"fen": knight_puzzle["fen"], "rating": 1500})
+    knight_fen = moves[KNIGHT_BLUNDER_PLY - 1]["fen_after"]
+    res = client.post("/maia/move", json={"fen": knight_fen, "rating": 1500})
     assert res.status_code == 200, res.text
     sparring = res.json()
-    assert sparring["san"] in _legal_sans(knight_puzzle["fen"])
-    assert chess.Board(knight_puzzle["fen"]).parse_san(sparring["san"]).uci() == sparring["uci"]
+    assert sparring["san"] in _legal_sans(knight_fen)
+    assert chess.Board(knight_fen).parse_san(sparring["san"]).uci() == sparring["uci"]
     assert sparring["source"] == "engine"
     assert sum(sparring["probs"].values()) == pytest.approx(1.0, abs=1e-3)
     assert sparring["probs"]["Kxh6"] == max(sparring["probs"].values())

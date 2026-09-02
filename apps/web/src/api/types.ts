@@ -12,7 +12,8 @@ export interface GameSummary {
   ply_count: number; analysis_status: AnalysisStatus;
 }
 export interface GameDetail extends GameSummary { pgn: string; initial_fen: string; moves: MoveInfo[] }
-export interface ImportResult { imported: number; skipped: number; game_ids: number[]; user_id: number | null }
+/** `errors` holds one Korean sentence per game that was skipped because it could not be read; those games are counted in `skipped` too. */
+export interface ImportResult { imported: number; skipped: number; game_ids: number[]; user_id: number | null; errors: string[] }
 
 export interface Score { cp: number | null; mate: number | null }
 export interface EngineLine { rank: number; score: Score; pv: string[]; pv_uci: string[] }

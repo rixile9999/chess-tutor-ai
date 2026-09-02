@@ -2,7 +2,7 @@ import type { Color, GameAnalysis, GameDetail, MoveReviewOut } from '../../api/t
 import { ExplanationPanel } from './ExplanationPanel';
 import { FeaturesPanel } from './FeaturesPanel';
 import { StrategyPanel } from './StrategyPanel';
-import type { Preview } from './shared';
+import { sideLabel, type Preview } from './shared';
 
 export type Tab = 'move' | 'plan' | 'features';
 const TABS: { key: Tab; label: string }[] = [
@@ -79,7 +79,8 @@ export function ReviewPanel(p: Props) {
       ? <StrategyPanel review={review} strategy={strategy} ply={ply} userColor={userColor} rating={p.rating} boardFen={p.boardFen} preview={p.preview} onPreview={p.onPreview} onSavePuzzle={p.onSavePuzzle} />
       : <div className="rv-empty">이 국면에는 전략 정보가 없습니다. 오프닝을 벗어난 중반 국면에서 구조와 계획이 정리됩니다.</div>;
   } else {
-    body = <FeaturesPanel features={strategy?.features ?? []} />;
+    // Column a of strategy.features is the side that moved (reasoning.strategy_view pov), b the opponent.
+    body = <FeaturesPanel features={strategy?.features ?? []} aLabel={sideLabel(review.color)} bLabel={sideLabel(review.color === 'white' ? 'black' : 'white')} />;
   }
 
   return (

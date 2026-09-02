@@ -4,6 +4,7 @@ write the 'why not X' note and draw arrows."""
 
 from __future__ import annotations
 
+import re
 from collections.abc import Iterator
 
 import chess
@@ -21,6 +22,7 @@ needs_engine = pytest.mark.skipif(find_stockfish() is None, reason="stockfish bi
 FEN = "5rk1/p3bppp/1pq1pn2/3N4/4P3/4B3/PP2QPPP/3R2K1 b - - 4 20"
 AFTER = "5rk1/p2qbppp/1p2pn2/3N4/4P3/4B3/PP2QPPP/3R2K1 w - - 5 21"
 PUNISHED = "5rk1/p2qbppp/1p2pN2/8/4P3/4B3/PP2QPPP/3R2K1 b - - 0 21"
+OPERA = "4kb1r/p2n1ppp/4q3/4p1B1/4P3/1Q6/PPP2PPP/2KR4 w k - 0 16"
 PGN = (
     '[Event "mockup"]\n[White "a"]\n[Black "b"]\n[Result "1-0"]\n[SetUp "1"]\n'
     f'[FEN "{FEN}"]\n\n20... Qd7 21. Nxf6+ Bxf6 22. Rxd7 1-0'
@@ -42,6 +44,12 @@ async def _insert_game() -> int:
         session.add(game)
         await session.commit()
         return game.id
+
+
+def _sans(fen: str) -> set[str]:
+    """Every legal move of a position in SAN, for assertions that must not pin an engine choice."""
+    board = chess.Board(fen)
+    return {board.san(move) for move in board.legal_moves}
 
 
 def _line(fen: str, sans: str, cp: int | None = None, mate: int | None = None, rank: int = 1):
@@ -87,6 +95,63 @@ def test_branch_labels_from_material_and_mate() -> None:
     assert review_svc.outcome_label(quiet, kh8, schemas.Score(cp=-350), black) == "큰 손실 없음"
     assert review_svc.outcome_label(quiet, kh8, schemas.Score(cp=350), black) == "결정적 열세"
     assert review_svc.outcome_label(quiet, kh8, schemas.Score(cp=150), black) == "열세"
+
+
+def test_a_mate_the_mover_delivers_is_not_a_material_loss() -> None:
+    """Opera game: 16.Qb8+ Nxb8 17.Rd8# gives up the queen and mates, so the branch must not
+    be labelled by what the queen sacrifice cost."""
+    board = chess.Board(OPERA)
+    line = _line(OPERA, "Qb8+ Nxb8 Rd8#", mate=2)
+    moves = [chess.Move.from_uci(u) for u in line.pv_uci]
+    assert review_svc.outcome_label(board, moves, line.score, chess.WHITE) == review_svc.MATE_WON
+    # the same line seen from the mated side keeps the old label
+    assert review_svc.outcome_label(board, moves, line.score, chess.BLACK) == review_svc.MATE_LOST
+    # a mate score alone is enough, even when the shown plies stop short of it
+    short = review_svc.outcome_label(board, moves[:1], schemas.Score(mate=2), chess.WHITE)
+    assert short == review_svc.MATE_WON
+    branches = review_svc.branches_from(board, [line], chess.WHITE)
+    assert [b.result for b in branches] == [review_svc.MATE_WON]
+
+
+def test_alternatives_never_repeat_the_played_move() -> None:
+    board = chess.Board(FEN)
+    lines = [
+        _line(FEN, "Nxd5 exd5", cp=30, rank=1),
+        _line(FEN, "Qd7 Nxf6+", cp=560, rank=2),
+        _line(FEN, "exd5 exd5", cp=60, rank=3),
+    ]
+    played = chess.Board(FEN).parse_san("Qd7").uci()
+    alternatives = review_svc.alternatives_of(board, lines, "black", played)
+    assert [a.san for a in alternatives] == ["Nxd5", "exd5"]
+    assert [a.is_best for a in alternatives] == [True, False]
+    assert all(a.claims for a in alternatives)
+    # when the engine's own top line is the move that was played, nothing is 'the best' any
+    # more: the panel says '대신 두었어야 할 수'
+    swapped = [lines[1].model_copy(update={"rank": 1}), lines[0].model_copy(update={"rank": 2})]
+    alternatives = review_svc.alternatives_of(board, swapped, "black", played)
+    assert [a.san for a in alternatives] == ["Nxd5"]
+    assert not alternatives[0].is_best
+
+
+def test_good_arrow_is_dropped_when_its_origin_is_empty_after_the_move() -> None:
+    start = chess.Board()
+    start.push_san("e4")
+    move = schemas.MoveAnalysis(
+        ply=2,
+        san="e5",
+        uci="e7e5",
+        color="black",
+        fen_before=start.fen(),
+        fen_after="rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2",
+        eval_before=schemas.Score(cp=30),
+        eval_after=schemas.Score(cp=35),
+        best_move_san="e6",
+        best_move_uci="e7e6",
+        classification="good",
+    )
+    # e7->e6 is a move in the position *before* e5, but the board shows the position after it
+    arrows = review_svc.arrows_of(move, None, [_line(start.fen(), "e6 d4", cp=30)])
+    assert [(a.orig, a.dest, a.color) for a in arrows] == [("e7", "e5", "ink")]
 
 
 def test_note_needs_a_clearly_worse_second_line() -> None:
@@ -163,13 +228,21 @@ async def test_review_of_the_mockup_blunder(aclient: AsyncClient) -> None:
     assert all(2 <= len(b["moves"]) <= 3 for b in refutation["branches"])
     assert refutation["branches"][0]["result"] == "퀸 상실"
     assert {b["result"] for b in refutation["branches"][1:]} == {"같은 결과"}
-    assert refutation["note"] is not None and refutation["note"].startswith(
-        "왜 Nxe7+이 아니라 Nxf6+인가"
-    )
+    # The note contrasts the punishing move with the engine's runner-up, and which move that is
+    # depends on the engine build, so assert the shape and that the runner-up is a real move.
+    note = refutation["note"]
+    assert note is not None and note.endswith(".")
+    match = re.match(r"^왜 (\S+?)[이가] 아니라 Nxf6\+인가: ", note)
+    assert match is not None, note
+    assert match.group(1) in _sans(AFTER) - {"Nxf6+"}
 
     alternatives = body["alternatives"]
     assert len(alternatives) == 2 and alternatives[0]["is_best"] and not alternatives[1]["is_best"]
-    assert {a["san"] for a in alternatives} <= {"Nxd5", "exd5", "Bd8"}
+    # Same reasoning: the two suggested moves are engine ranks 1 and 2 in the position before the
+    # blunder. Pin that they are legal, distinct and not the move that was actually played.
+    sans = {a["san"] for a in alternatives}
+    assert len(sans) == 2 and sans <= _sans(FEN) - {"Qd7"}
+    assert all(a["eval"]["cp"] is not None or a["eval"]["mate"] is not None for a in alternatives)
     assert all(a["why"].endswith(".") for a in alternatives)
     assert body["comparison"]["a_san"] == alternatives[0]["san"]
     assert body["comparison"]["b_san"] == "Qd7"  # the played move is not in the top two
@@ -225,7 +298,9 @@ async def test_move_list_cache_and_errors(
     assert res.status_code == 200
     body = res.json()
     assert body["classification"] == "best" and body["refutation"] is None
-    assert body["alternatives"][0]["san"] == "Nxf6+" and body["alternatives"][0]["is_best"]
+    # Nxf6+ was played, so it is not offered as a move to play 'instead' (reasoning-R5)
+    assert all(a["san"] != "Nxf6+" for a in body["alternatives"])
+    assert not any(a["is_best"] for a in body["alternatives"])
     assert body["comparison"]["a_san"] == "Nxf6+" and body["comparison"]["b_san"] != "Nxf6+"
     assert body["explanation"]["headline"] == "21. Nxf6+ 최선"
     assert body["explanation"]["verified"] is True

@@ -31,6 +31,10 @@ KOREAN_NAMES: dict[str, str] = {
     "mate_threat": "메이트 위협",
 }
 
+UNDERDEFENDED_NAME = "수비 부족 기물"
+"""Label of a hanging_piece motif whose target does have a defender: it is not defenceless,
+it is only attacked by something cheaper than itself, so it must not be called 무방비."""
+
 PIECE_KOREAN: dict[str, str] = {
     "K": "킹",
     "Q": "퀸",
@@ -66,6 +70,9 @@ class Motif:
     or, for a piece the move captured, from the position before it."""
     line: tuple[str, ...] = ()
     """SAN moves from the position after the move that show the threat (e.g. the mating move)."""
+    defended: bool = False
+    """hanging_piece only: the target has a defender and is merely attacked by a cheaper
+    piece, so it is labelled 수비 부족 기물 instead of 무방비 기물."""
 
     def as_dict(self) -> dict[str, object]:
         return {
@@ -76,7 +83,7 @@ class Motif:
             "with_check": self.with_check,
             "safe": self.safe,
             "line": list(self.line),
-            "label": KOREAN_NAMES.get(self.kind, self.kind),
+            "label": label_of(self),
             "description": describe(self),
         }
 
@@ -122,6 +129,7 @@ def _make(
     targets: Iterable[chess.Square],
     with_check: bool,
     line: Iterable[str] = (),
+    defended: bool = False,
 ) -> Motif:
     targets = tuple(targets)
     enemy = not before.turn
@@ -136,7 +144,16 @@ def _make(
         attacker_piece=_symbol(after, before, attacker),
         target_pieces=tuple(_enemy_symbol(after, before, t, enemy) for t in targets),
         line=tuple(line),
+        defended=defended,
     )
+
+
+def label_of(motif: Motif) -> str:
+    """Korean name shown for this motif. Only hanging_piece has two of them: the target is
+    either undefended (무방비 기물) or defended but attacked by something cheaper."""
+    if motif.kind == "hanging_piece" and motif.defended:
+        return UNDERDEFENDED_NAME
+    return KOREAN_NAMES.get(motif.kind, motif.kind)
 
 
 def _valuable_targets(board: chess.Board, squares: chess.SquareSet) -> tuple[chess.Square, ...]:
@@ -182,14 +199,32 @@ def see(board: chess.Board, target: chess.Square, color: chess.Color) -> int:
     return gain
 
 
-def _can_capture(after: chess.Board, target: chess.Square) -> bool:
-    """Whether the side that just moved could legally capture on `target` next move. When the
-    move gave check the opponent must answer it first, so the threat is taken at face value."""
+def _can_capture(after: chess.Board, target: chess.Square, color: chess.Color) -> bool:
+    """Whether the side that just moved (`color`) could legally capture on `target` next move.
+    When the move gave check the opponent answers first and picks the reply that suits it, so
+    the threat only holds when no legal reply both parries the check and saves the piece."""
     if after.is_check():
-        return True
+        return all(_still_capturable(after, reply, target, color) for reply in _replies(after))
     probe = after.copy(stack=False)
     probe.push(chess.Move.null())
     return any(probe.generate_legal_moves(to_mask=chess.BB_SQUARES[target]))
+
+
+def _replies(after: chess.Board) -> list[chess.Move]:
+    return list(after.legal_moves)
+
+
+def _still_capturable(
+    after: chess.Board, reply: chess.Move, target: chess.Square, color: chess.Color
+) -> bool:
+    """After `reply` the piece on `target` is still there and still falls with a material gain."""
+    after.push(reply)
+    try:
+        if after.piece_at(target) is None or value_at(after, target) < VALUABLE:
+            return False
+        return see(after, target, color) > 0
+    finally:
+        after.pop()
 
 
 def _ray_pairs(
@@ -229,11 +264,16 @@ def _sliders(board: chess.Board, color: chess.Color) -> chess.SquareSet:
 
 
 def _new_ray_pairs(
-    before: chess.Board, after: chess.Board, square: chess.Square
+    before: chess.Board, after: chess.Board, square: chess.Square, move: chess.Move
 ) -> Iterator[tuple[chess.Square, chess.Square]]:
-    """Ray pairs of the slider on `square` after the move that did not already exist before."""
+    """Ray pairs of the slider on `square` after the move that did not already exist before.
+    When the slider is the piece that just moved its new square was empty before, so the
+    comparison is against the pairs it held from its old square: a pin or skewer the slider
+    already had while sliding along the same line is not created by the move."""
     old: set[tuple[chess.Square, chess.Square]] = set()
-    if before.piece_at(square) == after.piece_at(square):
+    if square == move.to_square:
+        old = set(_ray_pairs(before, move.from_square))
+    elif before.piece_at(square) == after.piece_at(square):
         old = set(_ray_pairs(before, square))
     for pair in _ray_pairs(after, square):
         if pair not in old:
@@ -270,20 +310,32 @@ def _is_hanging(board: chess.Board, target: chess.Square, color: chess.Color) ->
 # ---------- detectors ----------
 
 
+def _vacated(board: chess.Board, move: chess.Move) -> set[chess.Square]:
+    """Squares the move empties: the square the piece left plus, for an en-passant capture,
+    the square of the pawn taken next to it."""
+    squares = {move.from_square}
+    if board.is_en_passant(move):
+        squares.add(
+            chess.square(chess.square_file(move.to_square), chess.square_rank(move.from_square))
+        )
+    return squares
+
+
 def discovered_attacks(board: chess.Board, move: chess.Move) -> list[Motif]:
-    """Sliders of the mover's colour that newly attack a valuable enemy piece through the
-    square the moving piece vacated."""
+    """Sliders of the mover's colour that newly attack a valuable enemy piece through a
+    square the move vacated."""
     _require_legal(board, move)
     color = board.turn
     after = _after(board, move)
     enemy = after.occupied_co[not color]
+    vacated = _vacated(board, move)
     found: list[Motif] = []
     for sq in _sliders(after, color):
         if sq == move.to_square:
             continue
         new_attacks = after.attacks(sq) & ~board.attacks(sq) & enemy
         through_vacated = chess.SquareSet(
-            t for t in new_attacks if move.from_square in chess.SquareSet(chess.between(sq, t))
+            t for t in new_attacks if vacated & set(chess.SquareSet(chess.between(sq, t)))
         )
         targets = _valuable_targets(after, through_vacated)
         if targets:
@@ -301,14 +353,34 @@ def discovered_attacks(board: chess.Board, move: chess.Move) -> list[Motif]:
     return found
 
 
+def _fork_wins_something(
+    after: chess.Board, color: chess.Color, forker: chess.Square, spoils: tuple[chess.Square, ...]
+) -> bool:
+    """A fork only deserves the name when one of the pieces it hits can actually be taken:
+    a target that falls with a material gain, or one worth more than the forking piece.
+    When the fork gives check the opponent answers first, so a target has to survive every
+    legal reply (otherwise the check is simply parried by saving or by taking the forker)."""
+    if after.is_check():
+        return all(
+            any(_still_capturable(after, reply, t, color) for t in spoils)
+            for reply in _replies(after)
+        )
+    forker_value = _piece_value(after, forker)
+    return any(see(after, t, color) > 0 or _piece_value(after, t) > forker_value for t in spoils)
+
+
 def forks(board: chess.Board, move: chess.Move) -> list[Motif]:
-    """The moved piece attacks two or more valuable enemy pieces (the king counts)."""
+    """The moved piece attacks two or more valuable enemy pieces (the king counts) and wins
+    at least one of them: two attacked pieces alone are geometry, not a fork."""
     _require_legal(board, move)
     color = board.turn
     after = _after(board, move)
     attacked = after.attacks(move.to_square) & after.occupied_co[not color]
     targets = _valuable_targets(after, attacked)
     if len(targets) < 2:
+        return []
+    spoils = tuple(t for t in targets if after.piece_type_at(t) != chess.KING)
+    if not spoils or not _fork_wins_something(after, color, move.to_square, spoils):
         return []
     return [
         _make(
@@ -333,7 +405,7 @@ def pins(board: chess.Board, move: chess.Move) -> list[Motif]:
     enemy = chess.SquareSet(after.occupied_co[not color])
     found: list[Motif] = []
     for sq in _sliders(after, color):
-        for front, behind in _new_ray_pairs(board, after, sq):
+        for front, behind in _new_ray_pairs(board, after, sq, move):
             if front not in enemy or behind not in enemy:
                 continue
             front_type = after.piece_type_at(front)
@@ -366,7 +438,7 @@ def skewers(board: chess.Board, move: chess.Move) -> list[Motif]:
     enemy = chess.SquareSet(after.occupied_co[not color])
     found: list[Motif] = []
     for sq in _sliders(after, color):
-        for front, behind in _new_ray_pairs(board, after, sq):
+        for front, behind in _new_ray_pairs(board, after, sq, move):
             if front not in enemy or behind not in enemy:
                 continue
             if after.piece_type_at(behind) == chess.KING:
@@ -408,7 +480,7 @@ def hanging_pieces(board: chess.Board, move: chess.Move) -> list[Motif]:
             continue  # it was already hanging before the move
         if not _is_hanging(after, t, color):
             continue
-        if see(after, t, color) <= 0 or not _can_capture(after, t):
+        if see(after, t, color) <= 0 or not _can_capture(after, t, color):
             continue
         attacker = move.to_square if move.to_square in new_attackers else min(new_attackers)
         found.append(
@@ -420,6 +492,7 @@ def hanging_pieces(board: chess.Board, move: chess.Move) -> list[Motif]:
                 attacker=attacker,
                 targets=(t,),
                 with_check=after.is_check(),
+                defended=bool(after.attackers(not color, t)),
             )
         )
     return found
@@ -608,7 +681,7 @@ def trapped_pieces(board: chess.Board, move: chess.Move) -> list[Motif]:
             continue
         if board.is_attacked_by(color, t) and see(board, t, color) > 0:
             continue  # it was already lost before the move
-        if not _can_capture(after, t):
+        if not _can_capture(after, t, color):
             continue
         if _can_be_saved(after, t, color):
             continue
@@ -772,7 +845,7 @@ def _join(items: list[str]) -> str:
 
 def describe(motif: Motif) -> str:
     """Short Korean phrase built only from the squares and piece letters in the motif."""
-    name = KOREAN_NAMES.get(motif.kind, motif.kind)
+    name = label_of(motif)
     targets = [
         _piece_square(p, sq) for p, sq in zip(motif.target_pieces, motif.targets, strict=False)
     ] or [chess.square_name(sq) for sq in motif.targets]

@@ -129,11 +129,15 @@ PGN/API 임포트
 - 남은 것: 마스터 오버레이는 토큰 없이는 꺼져 있다(월간 DB 자체 집계 미착수)
 
 ### 통합 상태 (2026-09-02)
-- 백엔드: `ruff format`·`ruff check`·`mypy --strict` 통과, pytest 204개 약 10초(엔진 테스트는 깊이 ≤ 8). `tests/test_e2e.py`가 TestClient로 임포트 → 분석 → 리뷰 → 프로필 → 오프닝 지도 → 퍼즐 → 스파링을 한 번에 돈다
+- 백엔드: `ruff format`·`ruff check`·`mypy --strict` 통과, pytest 271개 약 22초(엔진 테스트는 깊이 ≤ 8). `tests/test_e2e.py`가 TestClient로 임포트 → 분석 → 리뷰 → 프로필 → 오프닝 지도 → 퍼즐 → 스파링을 한 번에 돈다
 - 웹: `pnpm lint`, `tsc --noEmit`, `pnpm build` 통과. 라우트 `/games`, `/review/:gameId/:ply`, `/profile/:username`, `/openings`, `/training`
 - 실서버 스모크: uvicorn 기동 후 `/health`, `/docs`와 위 흐름 전부 200. Maia-2 가중치가 있으면 사람 뷰와 스파링의 `source`가 `maia`로 나온다
-- CI(`.github/workflows/ci.yml`): API는 ruff format/check → mypy → pytest, 웹은 eslint → build. Stockfish가 없는 러너에서는 엔진 테스트가 건너뛰어진다
-- 알려진 간극: Alembic 마이그레이션 없음(`create_all`). 웹 단위 테스트(vitest) 없음. 엔진 `Threads=2`라 깊이 8의 차선 PV는 실행마다 조금 달라질 수 있다(같은 프로세스 안의 이전 탐색에는 더 이상 영향받지 않는다: 탐색마다 `ucinewgame`)
+- 실수·블런더 판정은 깊이 +6에서 `fen_before`와 `fen_after`를 다시 재서 확인한 뒤 확정한다. `eval_before`와 `eval_after`가 서로 다른 탐색에서 나오는 탓에 지평선 바로 너머의 강제 수순이 손실로 잡히던 문제를 없앤다(오페라 게임 15.Bxd7+는 깊이 12에서 블런더로 찍혔다). 둔 수가 부모 국면의 MultiPV 안에 있으면 그 줄의 점수를 `eval_after`로 쓴다. 라이브 API 재확인(2026-09-02): 같은 기보를 `duke2`로 다시 임포트해 깊이 12로 분석하면 15.Bxd7+는 `best`(승률 손실 0)로 나오고 백의 mistake·blunder는 0개다
+- 탐색을 바꾸는 엔진 옵션(Threads, Hash)은 캐시 정체성에 들어간다: `engine_cache.engine`과 `analyses.engine`이 `stockfish-18-t2-h256` 꼴이라 설정이 바뀌면 옛 줄을 재사용하지 않는다. `?depth=`를 준 요청은 저장된 깊이가 다르면 다시 분석한다
+- CI(`.github/workflows/ci.yml`): API는 stockfish 설치 → ruff format/check → mypy → pytest, 웹은 eslint → build. 러너에 `apt-get install stockfish`로 엔진을 깔고 `STOCKFISH_PATH=/usr/games/stockfish`를 주므로(데비안 바이너리는 PATH에 없다) `test_e2e`를 포함한 엔진 테스트가 CI에서도 전부 돈다. 두 잡 모두 `timeout-minutes: 20`
+- 재검 탐색이 둔 수를 얕은 MultiPV의 최선보다 높게 매길 수 있으므로 `best`인 수의 SAN이 `best_move_san`과 다를 수 있다. 이때 리드 문장은 "엔진 최선 수와 같습니다"가 아니라 "엔진 최선 Bxf6과 차이가 없습니다"로 나간다(`services/verbalize.py`)
+- 리뷰 스모크: `GET /review/2/20`(10… cxb5 실수)은 `verified: true`, 주장 25/25, 문장에 칸 나열이 없다. `ANTHROPIC_API_KEY`가 없으면 `source`는 `template`
+- 알려진 간극: Alembic 마이그레이션 없음(`create_all`). 웹 단위 테스트(vitest) 없음. 엔진 `Threads=2`는 깊이 8의 차선 PV가 실행마다 달라지므로 테스트에서는 `tests/conftest.py`가 `ENGINE_THREADS=1`로 고정한다. 운영 기본값은 그대로 2이고, 차선 수에 의존하는 단언은 구조적으로 쓴다(같은 프로세스 안의 이전 탐색에는 영향받지 않는다: 탐색마다 `ucinewgame`)
 
 ---
 
@@ -147,7 +151,7 @@ brew install stockfish            # macOS
 cd apps/api
 uv sync --all-groups              # Maia-2까지: uv sync --all-groups --extra maia
 uv run ruff format src tests && uv run ruff check src tests
-uv run pytest -q                  # 약 10초, Stockfish 필요
+uv run pytest -q                  # 약 22초, Stockfish 필요
 uv run uvicorn chess_tutor.api:app --reload   # http://localhost:8000/docs
 
 # 프론트엔드

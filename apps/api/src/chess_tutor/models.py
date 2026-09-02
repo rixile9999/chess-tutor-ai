@@ -3,7 +3,7 @@ defined by the pydantic models in schemas.py."""
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import (
@@ -24,7 +24,14 @@ from chess_tutor.db import Base
 
 
 def utcnow() -> datetime:
-    return datetime.utcnow()
+    """Current UTC time, naive.
+
+    Read from a timezone-aware clock (`datetime.utcnow` is deprecated and returns a naive value
+    that only pretends to be UTC), then stripped of the tzinfo because the columns below are
+    `DateTime` without timezone: SQLite stores no offset, so a value read back is naive and an
+    aware default would make every comparison in services.puzzles and services.profile raise.
+    Those modules' `now_utc` helpers produce the same naive-UTC value."""
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 class User(Base):

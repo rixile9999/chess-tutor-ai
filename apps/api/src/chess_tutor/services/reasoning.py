@@ -34,6 +34,7 @@ from chess_tutor.schemas import (
 )
 from chess_tutor.services import plans as kb
 from chess_tutor.values import PIECE_VALUE
+from chess_tutor.verify import Claim
 
 Analyse = Callable[[str, int, int], list[EngineLine]]
 """analyse(fen, depth, multipv) -> engine lines, injected so tests can fake the engine."""
@@ -110,6 +111,10 @@ def _wa(text: str) -> str:
 
 def _ga(text: str) -> str:
     return f"{text}{'이' if _has_batchim(text)[0] else '가'}"
+
+
+def _neun(text: str) -> str:
+    return f"{text}{'은' if _has_batchim(text)[0] else '는'}"
 
 
 def _play(board: chess.Board, moves: Iterable[chess.Move]) -> chess.Board:
@@ -330,12 +335,22 @@ def _favours(row: FeatureDiffRow, a_san: str, b_san: str) -> str:
     return a_san if (row.delta or 0.0) > 0 else b_san
 
 
-def _detail(row: FeatureDiffRow, a_san: str, b_san: str) -> str:
-    """'(a_san 후 ..., b_san 후 ...)' when both cells are short plain facts; otherwise nothing,
-    since the row itself carries the evidence and nesting long cells reads badly."""
-    if all(len(c) <= 24 and "(" not in c for c in (row.a, row.b)):
-        return f"({a_san} 후 {row.a}, {b_san} 후 {row.b})"
-    return ""
+def score_text(score: Score) -> str:
+    """'+0.4', '-2.1' or '#3', always from White's point of view (the eval bar convention)."""
+    if score.mate is not None:
+        return f"#{score.mate}"
+    return f"{(score.cp or 0) / 100:+.1f}"
+
+
+def _verdict_clause(a_san: str, b_san: str, eval_a: Score, eval_b: Score) -> str:
+    return f"엔진 평가는 {a_san} {score_text(eval_a)}, {b_san} {score_text(eval_b)}입니다."
+
+
+def _mate_for(score: Score, pov: chess.Color) -> int:
+    """+1 when the score is a forced mate for ``pov``, -1 when it is one against, else 0."""
+    if score.mate is None:
+        return 0
+    return 1 if (score.mate > 0) == (pov == chess.WHITE) else -1
 
 
 def _comparison_summary(
@@ -344,33 +359,34 @@ def _comparison_summary(
     rows: list[FeatureDiffRow],
     eval_a: Score,
     eval_b: Score,
+    pov: chess.Color = chess.WHITE,
 ) -> str:
-    """One sentence from the two largest deltas; each clause names the row it came from."""
+    """One sentence on why a beats b: the features that speak for ``a_san`` and then the
+    engine verdict.
+
+    The heading above this sentence is '왜 a가 b보다 나은가', so the leading clause may never
+    be built from a row that favours b. When every row favours b the sentence concedes that
+    much and ends on the evaluation, which is the fact that decides the comparison."""
+    verdict = _verdict_clause(a_san, b_san, eval_a, eval_b)
+    if _mate_for(eval_a, pov) == 1:
+        return f"{_ga(a_san)} 메이트로 이어집니다. {verdict}"
+    if _mate_for(eval_b, pov) == -1:
+        return f"{_ga(b_san)} 메이트를 허용합니다. {verdict}"
+    if eval_a.mate is not None or eval_b.mate is not None:
+        return verdict
     ranked = sorted(
         (r for r in rows if r.delta is not None), key=lambda r: abs(r.delta or 0.0), reverse=True
-    )[:2]
-    if not ranked:
-        ea, eb = _fmt(eval_a.as_pawns()), _fmt(eval_b.as_pawns())
-        return (
-            "두 수 뒤 국면의 특징 차이는 찾지 못했습니다. "
-            f"엔진 평가는 {a_san} {ea}, {b_san} {eb}입니다."
-        )
-    first = ranked[0]
-    fav1 = _favours(first, a_san, b_san)
-    if len(ranked) == 1:
-        return f"{fav1}는 {first.feature}{_detail(first, a_san, b_san)}에서 앞섭니다."
-    second = ranked[1]
-    fav2 = _favours(second, a_san, b_san)
-    if fav1 == fav2:
-        particle = _wa(first.feature)[len(first.feature) :]
-        return (
-            f"{fav1}는 {first.feature}{_detail(first, a_san, b_san)}{particle} "
-            f"{second.feature}{_detail(second, a_san, b_san)}에서 앞섭니다."
-        )
-    return (
-        f"{fav1}는 {first.feature}{_detail(first, a_san, b_san)}에서 앞서고, "
-        f"{fav2}는 {second.feature}{_detail(second, a_san, b_san)}에서 앞섭니다."
     )
+    ours = [r for r in ranked if _favours(r, a_san, b_san) == a_san][:2]
+    if ours:
+        features = (
+            _wa(ours[0].feature) + " " + ours[1].feature if len(ours) == 2 else ours[0].feature
+        )
+        return f"{_ga(a_san)} {features}에서 앞섭니다. {verdict}"
+    theirs = [r for r in ranked if _favours(r, a_san, b_san) == b_san][:1]
+    if theirs:
+        return f"{theirs[0].feature}만 놓고 보면 {_ga(b_san)} 앞서지만, {verdict}"
+    return f"두 수 뒤 국면의 특징 차이는 찾지 못했습니다. {verdict}"
 
 
 def compare_moves(
@@ -384,22 +400,33 @@ def compare_moves(
     eval_b: Score,
     horizon: int = HORIZON,
 ) -> Comparison:
-    """Why a is better than b: play both lines to the horizon, diff the end positions for pov,
-    keep only rows that differ and summarise the two largest deltas in one sentence.
+    """Why a is better than b: play both lines to the same depth, diff the end positions for
+    pov, keep only rows that differ and summarise them in one sentence.
 
-    ``pv_a``/``pv_b`` start with the compared moves themselves."""
+    ``pv_a``/``pv_b`` start with the compared moves themselves. Both lines stop at the same
+    ply so the two positions are comparable at all (a quiet position six plies later says
+    nothing about a position three plies in), and when either line ends in mate the feature
+    rows are dropped: counting material in a mating position is meaningless and the
+    evaluation already carries the whole answer."""
     color = _color(pov)
-    end_a = _play(board, pv_a[: min(len(pv_a), horizon)])
-    end_b = _play(board, pv_b[: min(len(pv_b), horizon)])
+    plies = min(len(pv_a), len(pv_b), horizon)
+    end_a = _play(board, pv_a[:plies])
+    end_b = _play(board, pv_b[:plies])
     div_ply, div_fen = divergence(board, pv_a, pv_b)
-    rows = [r for r in _feature_rows(end_a, end_b, color) if _differs(r)]
+    decided = (
+        end_a.is_game_over()
+        or end_b.is_game_over()
+        or eval_a.mate is not None
+        or eval_b.mate is not None
+    )
+    rows = [] if decided else [r for r in _feature_rows(end_a, end_b, color) if _differs(r)]
     return Comparison(
         a_san=a_san,
         b_san=b_san,
         divergence_ply=div_ply,
         divergence_fen=div_fen,
         rows=rows,
-        summary=_comparison_summary(a_san, b_san, rows, eval_a, eval_b),
+        summary=_comparison_summary(a_san, b_san, rows, eval_a, eval_b, color),
     )
 
 
@@ -413,6 +440,28 @@ def _valuable_attacked(board: chess.Board, from_sq: chess.Square, color: chess.C
         for sq in sorted(board.attacks(from_sq) & board.occupied_co[color])
         if PIECE_VALUE[board.piece_type_at(sq) or chess.PAWN] >= 3
     ]
+
+
+def _named_targets(
+    board: chess.Board, squares: Iterable[chess.Square], limit: int = 2
+) -> list[tuple[chess.Square, str]]:
+    """The ``limit`` most valuable of ``squares``, each as '(square, "d7 퀸")'.
+
+    Prose names pieces, not square lists, and the caller claims exactly these squares, so the
+    text and the claims stay in lockstep however many targets the motif found."""
+    named = [
+        (PIECE_VALUE[piece], sq, f"{chess.square_name(sq)} {PIECE_KO[piece]}")
+        for sq in squares
+        if (piece := board.piece_type_at(sq)) is not None
+    ]
+    named.sort(key=lambda item: (-item[0], item[1]))
+    return [(sq, text) for _, sq, text in named[:limit]]
+
+
+def _join_ko(items: list[str]) -> str:
+    if len(items) <= 1:
+        return "".join(items)
+    return _wa(items[0]) + " " + _join_ko(items[1:])
 
 
 def _describe_move(board: chess.Board, move: chess.Move) -> str:
@@ -439,16 +488,49 @@ def _describe_move(board: chess.Board, move: chess.Move) -> str:
     return text
 
 
-def _motif_clause(board_after: chess.Board, motif: Motif) -> str:
-    targets = ", ".join(chess.square_name(t) for t in motif.targets)
+SPOKEN_MOTIFS = ("fork", "discovered_attack")
+"""Motifs an alternative's prose names. The others (mate threats, pins, trapped pieces) need
+facts this clause cannot state or check, and a wrong clause is worse than a missing one."""
+
+
+def _motif_clause(
+    board_after: chess.Board, motif: Motif
+) -> tuple[str, chess.Square, list[chess.Square]]:
+    """The motif in one clause plus (attacking square, named target squares) for the claims."""
     if motif.kind == "fork":
-        piece = board_after.piece_type_at(motif.mover) or chess.PAWN
-        head = f"{chess.square_name(motif.mover)} {PIECE_KO[piece]}"
+        source = motif.mover
+        piece = board_after.piece_type_at(source) or chess.PAWN
+        head = f"{chess.square_name(source)} {PIECE_KO[piece]}"
+        # A checking fork already says '체크와 함께', so the king is not named again.
+        squares = [t for t in motif.targets if board_after.piece_type_at(t) != chess.KING] or list(
+            motif.targets
+        )
+        named = _named_targets(board_after, squares)
         tail = "체크와 함께 " if motif.with_check else ""
-        return f"{_ga(head)} {tail}{_eul(targets)} 동시에 공격합니다"
-    piece = board_after.piece_type_at(motif.attacker) or chess.QUEEN
-    head = f"{chess.square_name(motif.attacker)} {PIECE_KO[piece]}"
-    return f"{head}의 길이 열려 {_eul(targets)} 겨냥합니다"
+        verb = "함께 노립니다" if len(named) > 1 else "노립니다"
+        text = f"{_ga(head)} {tail}{_eul(_join_ko([n for _, n in named]))} {verb}"
+    else:
+        source = motif.attacker
+        piece = board_after.piece_type_at(source) or chess.QUEEN
+        head = f"{chess.square_name(source)} {PIECE_KO[piece]}"
+        named = _named_targets(board_after, motif.targets, limit=1)
+        text = f"{head}의 길이 열려 {_eul(_join_ko([n for _, n in named]))} 겨냥합니다"
+    return text, source, [sq for sq, _ in named]
+
+
+def _exchange_on(
+    board: chess.Board, moves: list[chess.Move], square: chess.Square
+) -> tuple[list[str], chess.Board]:
+    """The run of captures on ``square`` at the head of ``moves`` (the exchange the move just
+    started), as SAN, and the position once they are done."""
+    probe = board.copy()
+    sans: list[str] = []
+    for move in moves:
+        if not probe.is_legal(move) or not probe.is_capture(move) or move.to_square != square:
+            break
+        sans.append(probe.san(move))
+        probe.push(move)
+    return sans, probe
 
 
 def explain_alternative(
@@ -458,9 +540,14 @@ def explain_alternative(
     eval: Score,
     best_eval: Score,
     pov: Color | chess.Color,
-) -> str:
-    """Short Korean 'why' for an alternative: its first two plies, the motifs of the first move,
-    and how its evaluation compares with the best line."""
+) -> tuple[str, list[Claim]]:
+    """Short Korean 'why' for an alternative, with the board facts it states as claims.
+
+    A coach says what the move does and what it costs, so this is at most three sentences:
+    what the move achieves, how the exchange it starts settles, and (only when it is not the
+    engine's move) what it gives up against the best line. The opponent's recapture is never
+    narrated on its own: '백은 Qxb4: b4 퀸을 퀸으로 잡습니다' ends the paragraph on the queen
+    being taken and reads as if the recommended move hung it."""
     color = _color(pov)
     if not pv:
         pv = [board.parse_san(san)]
@@ -468,45 +555,88 @@ def explain_alternative(
     if not board.is_legal(first):
         raise ValueError(f"illegal move {first} in {board.fen()}")
     mover = board.turn
+    fen = board.fen()
+    to_name = chess.square_name(first.to_square)
     parts: list[str] = []
+    claims: list[Claim] = [Claim(kind="legal_move", fen=fen, object=board.san(first))]
 
-    clause = f"{san}: {_describe_move(board, first)}"
-    if board.is_capture(first) and not board.is_en_passant(first):
-        removed = _valuable_attacked(board, first.to_square, mover)
-        captured = PIECE_KO[board.piece_type_at(first.to_square) or chess.PAWN]
-        if removed:
-            clause += (
-                f". {chess.square_name(first.to_square)} {captured}가 노리던 "
-                f"{', '.join(removed)} 위협이 사라집니다"
-            )
     after = board.copy()
     after.push(first)
+    if board.gives_check(first):
+        claims.append(Claim(kind="is_check", fen=after.fen()))
+    clause = _describe_move(board, first)
+    if board.is_en_passant(first):
+        claims.append(Claim(kind="square_empty", fen=fen, subject=to_name))
+    elif board.is_capture(first):
+        victim = board.piece_at(first.to_square)
+        if victim is not None:
+            claims.append(Claim(kind="piece_on", fen=fen, subject=to_name, object=victim.symbol()))
+        captured = PIECE_KO[board.piece_type_at(first.to_square) or chess.PAWN]
+        # The captured piece was also eyeing the piece that just took it, which is no news.
+        removed = _named_targets(
+            board,
+            [
+                square
+                for name in _valuable_attacked(board, first.to_square, mover)
+                if (square := chess.parse_square(name)) != first.from_square
+            ],
+        )
+        if removed:
+            for square, _ in removed:
+                claims.append(
+                    Claim(
+                        kind="attacks",
+                        fen=fen,
+                        subject=to_name,
+                        object=chess.square_name(square),
+                    )
+                )
+            threats = _join_ko([name for _, name in removed])
+            clause += f". {to_name} {captured}가 {_eul(threats)} 노리던 위협이 사라집니다"
     for motif in detect(board, first):
-        clause += f". {_motif_clause(after, motif)}"
+        if motif.kind not in SPOKEN_MOTIFS:
+            continue
+        text, source, targets = _motif_clause(after, motif)
+        if not targets:
+            continue
+        clause += f". {text}"
+        for target in targets:
+            claims.append(
+                Claim(
+                    kind="attacks",
+                    fen=after.fen(),
+                    subject=chess.square_name(source),
+                    object=chess.square_name(target),
+                )
+            )
     parts.append(clause)
 
-    if len(pv) > 1 and after.is_legal(pv[1]):
-        reply = pv[1]
-        reply_san = after.san(reply)
-        clause = f"{COLOR_KO[after.turn]}은 {reply_san}: {_describe_move(after, reply)}"
-        after2 = after.copy()
-        after2.push(reply)
-        hit = _valuable_attacked(after2, reply.to_square, mover)
-        if hit:
-            piece = PIECE_KO[after2.piece_type_at(reply.to_square) or chess.PAWN]
-            head = f"{chess.square_name(reply.to_square)} {piece}"
-            clause += f". {_ga(head)} {_eul(', '.join(hit))} 공격합니다"
-        new_passed = set(passed_pawns(after2, not mover)) - set(passed_pawns(board, not mover))
-        if new_passed:
-            clause += f". {COLOR_KO[not mover]} {_ga(_names(new_passed) + ' 폰')} 통과폰이 됩니다"
-        parts.append(clause)
+    sans, settled = _exchange_on(after, pv[1:], first.to_square)
+    if sans:
+        probe = after.copy()
+        for reply_san in sans:
+            claims.append(Claim(kind="legal_move", fen=probe.fen(), object=reply_san))
+            probe.push_san(reply_san)
+        opponent = COLOR_KO[not mover]
+        if len(sans) >= 2:
+            trade = (
+                f"{opponent}이 {_ro(sans[0])} 받아도 {COLOR_KO[mover]}이 {_ro(sans[1])} 되잡습니다"
+            )
+        else:
+            trade = f"{opponent}이 {_ro(sans[0])} 되잡습니다"
+        net = material(settled, mover) - material(board, mover)
+        if net > 0:
+            trade += f". 교환 뒤 {COLOR_KO[mover]}이 폰 {net}개만큼 앞섭니다"
+        elif net < 0:
+            trade += f". 교환 뒤 {COLOR_KO[not mover]}이 폰 {-net}개만큼 앞섭니다"
+        else:
+            trade += ". 교환은 대등합니다"
+        parts.append(trade)
 
-    delta = _pawns(eval, color) - _pawns(best_eval, color)
-    if delta >= -0.05:
-        parts.append("엔진 최선 수입니다")
-    else:
-        parts.append(f"최선보다 {abs(delta):.1f} 뒤집니다")
-    return ". ".join(parts) + "."
+    if _mate_for(best_eval, color) == 1 and _mate_for(eval, color) != 1:
+        # ±100 pawns stands for any mate, so a pawn difference here would be fiction.
+        parts.append("메이트를 놓칩니다")
+    return ". ".join(parts) + ".", claims
 
 
 # ---------- plan extraction from a PV ----------
@@ -664,7 +794,32 @@ def _waiting_move(
         and not board.is_capture(m)
         and not board.gives_check(m)
     ]
-    return min(fallback)[2] if fallback else None
+    if not fallback:
+        return None
+    move = min(fallback)[2]
+    if best is None:
+        return move
+    # The fallback never went through the engine, so check it keeps the evaluation too:
+    # a shuffle that drops a piece would turn the timing question into a blunder report.
+    probe = board.copy()
+    probe.push(move)
+    lines = analyse(probe.fen(), depth, 1)
+    if lines and _pawns(lines[0].score, pov) < best - EVAL_KEEP:
+        return None
+    return move
+
+
+def _timing_mate_verdict(mate_now: int, mate_later: int, delayed: str) -> str:
+    """Timing verdict when a forced mate is on one side of the comparison, said in words."""
+    if mate_now == mate_later:
+        return f"시점 차이 없음: 미뤄도 결과가 같습니다 ({delayed})"
+    if mate_now == 1:
+        return f"지금이 적기: 미루면 메이트를 놓칩니다 ({delayed})"
+    if mate_later == 1:
+        return f"아직 이르다: 준비 후에 메이트가 생깁니다 ({delayed})"
+    if mate_now == -1:
+        return f"아직 이르다: 지금 두면 메이트를 당합니다 ({delayed})"
+    return f"지금이 적기: 미루면 메이트를 당합니다 ({delayed})"
 
 
 def counterfactual(
@@ -678,7 +833,7 @@ def counterfactual(
     waiting move first, letting the opponent reply, and playing it one move later."""
     pov = board.turn
     target = board.parse_san(target_san)
-    question = f"지금 {_move_number(board)}{target_san}를 두면?"
+    question = f"지금 {_eul(_move_number(board) + target_san)} 두면?"
 
     now = board.copy()
     now.push(target)
@@ -714,8 +869,13 @@ def counterfactual(
 
     diff = _pawns(eval_later, pov) - _pawns(eval_now, pov)
     delayed = " ".join(delayed_sans)
+    mate_now, mate_later = _mate_for(eval_now, pov), _mate_for(eval_later, pov)
     if blocked:
-        verdict = f"지금이 적기: {delayed} 뒤에는 {target_san}를 둘 수 없습니다"
+        verdict = f"지금이 적기: {delayed} 뒤에는 {_eul(target_san)} 둘 수 없습니다"
+    elif mate_now or mate_later:
+        # Score.as_pawns() reports any mate as ±100, so a pawn difference between a mate and
+        # an ordinary evaluation would be a made-up number ('미루면 -105.9').
+        verdict = _timing_mate_verdict(mate_now, mate_later, delayed)
     elif diff < -TIMING_MARGIN:
         verdict = f"지금이 적기: 미루면 {_fmt(diff)} ({delayed})"
     elif diff > TIMING_MARGIN:
@@ -901,15 +1061,17 @@ def strategy_view(
         label = f"{_move_number(board)}{played_san}"
         best_san = lines_before[0].pv[0] if lines_before and lines_before[0].pv else None
         if hint_plan is not None:
-            note = f"{label}는 계획 '{hint_plan.title}'의 수입니다"
+            note = f"{_neun(label)} 계획 '{hint_plan.title}'의 수입니다"
             if best_san == played_san:
                 note += ". 엔진 1순위 수와 같습니다"
         elif pv_plan is not None:
-            note = f"{label}는 엔진 수순 안에 있고, 그 수순은 계획 '{pv_plan.title}'로 이어집니다"
+            note = (
+                f"{_neun(label)} 엔진 수순 안에 있고, 그 수순은 계획 '{pv_plan.title}'로 이어집니다"
+            )
         elif not mover_plans:
             note = f"{label}: 이 국면의 구조에는 등록된 계획이 없습니다"
         else:
-            note = f"{label}는 이 구조의 계획 목록에 없는 수입니다"
+            note = f"{_neun(label)} 이 구조의 계획 목록에 없는 수입니다"
             if best_san and best_san != played_san:
                 try:
                     best_move = board.parse_san(best_san)
@@ -917,7 +1079,7 @@ def strategy_view(
                     best_move = None
                 best_plan = _hint_plan(mover_plans, board, best_move) if best_move else None
                 if best_plan is not None:
-                    note += f". 엔진 최선 {best_san}는 계획 '{best_plan.title}'의 수입니다"
+                    note += f". 엔진 최선 {_neun(best_san)} 계획 '{best_plan.title}'의 수입니다"
         your_move = YourMove(
             san=played_san,
             classification=classification,

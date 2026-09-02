@@ -2,6 +2,7 @@ import chess
 
 from chess_tutor.motifs import (
     KOREAN_NAMES,
+    UNDERDEFENDED_NAME,
     Motif,
     back_rank,
     describe,
@@ -44,6 +45,20 @@ def test_no_discovery_before_the_blunder() -> None:
     assert discovered_attacks(board, move) == []
 
 
+def test_en_passant_capture_opens_a_discovery() -> None:
+    # exd6 e.p. empties d5 as well as e5, so Bh1 hits Qa8 through the vacated square.
+    board = chess.Board("q6k/8/8/3pP3/8/8/8/6KB w - d6 0 1")
+    move = board.parse_san("exd6")
+    assert board.is_en_passant(move)
+    (motif,) = discovered_attacks(board, move)
+    assert motif.attacker == chess.H1
+    assert motif.targets == (chess.A8,)
+    assert describe(motif) == "디스커버드 어택: d6 폰이 비켜서며 Bh1이 Qa8을 겨냥"
+    after = chess.Board("q6k/8/8/3pP3/8/8/8/6KB w - d6 0 1")
+    after.push(move)
+    assert chess.A8 in after.attacks(chess.H1)
+
+
 def test_knight_fork_is_flagged_unsafe_when_capturable() -> None:
     board = chess.Board(AFTER_QD7)
     move = board.parse_san("Nxf6+")
@@ -59,6 +74,27 @@ def test_safe_royal_fork() -> None:
     assert set(fork.targets) == {chess.D8, chess.H8}
     assert fork.with_check is True
     assert fork.safe is True
+
+
+def test_fork_needs_a_target_it_can_win() -> None:
+    # Qd5 hits both knights, but each is pawn-defended: the queen wins nothing.
+    both_defended = "7k/1p3p2/2n1n3/8/8/8/8/3QK3 w - - 0 1"
+    assert _detect(both_defended, "Qd5", forks) == []
+    assert not [m for m in _detect(both_defended, "Qd5") if m.kind == "fork"]
+    board = chess.Board(both_defended)
+    board.push_san("Qd5")
+    assert see(board, chess.C6, chess.WHITE) == see(board, chess.E6, chess.WHITE) == 0
+    # the same geometry is a fork as soon as one knight loses its defender
+    (fork,) = _detect("7k/1p6/2n1n3/8/8/8/8/3QK3 w - - 0 1", "Qd5", forks)
+    assert set(fork.targets) == {chess.C6, chess.E6}
+
+
+def test_checking_fork_the_opponent_answers_by_taking_the_forker() -> None:
+    # Re5+ hits Bb5 too, but ...fxe5 both parries the check and wins the rook.
+    fen = "4k3/8/5p2/1b6/8/8/8/4R1K1 w - - 0 1"
+    assert _detect(fen, "Re5+", forks) == []
+    assert _detect(fen, "Re5+", hanging_pieces) == []
+    assert _detect(fen, "Re5+") == []
 
 
 # ---------- pins and skewers ----------
@@ -94,6 +130,24 @@ def test_existing_pin_is_not_reported_again() -> None:
     assert _detect(fen, "h3", pins) == []
 
 
+def test_pin_the_slider_already_had_is_not_reported_again() -> None:
+    # Rd1 already pins Nd5 to Qd8; sliding to d2 or d3 keeps the same pin, it does not make it.
+    carried = "3q2k1/8/8/3n4/8/8/8/3RK3 w - - 0 1"
+    assert _detect(carried, "Rd2", pins) == []
+    assert _detect(carried, "Rd3", pins) == []
+    # the same rook arriving on the d-file for the first time does create the pin
+    (pin,) = _detect("3q2k1/8/8/3n4/8/8/8/R3K3 w - - 0 1", "Rd1", pins)
+    assert pin.targets == (chess.D5, chess.D8)
+    assert describe(pin) == "핀: Rd1이 Nd5를 Qd8에 묶음"
+
+
+def test_skewer_the_slider_already_had_is_not_reported_again() -> None:
+    carried = "r6k/8/8/q7/8/8/8/R5K1 w - - 0 1"
+    assert _detect(carried, "Ra2", skewers) == []
+    (skewer,) = _detect("r6k/8/8/q7/8/8/8/1R4K1 w - - 0 1", "Ra1", skewers)
+    assert skewer.targets == (chess.A5, chess.A8)
+
+
 def test_no_pin_through_a_pawn() -> None:
     # Ruy Lopez Bb5: the d7 pawn stands between Nc6 and Ke8.
     fen = "r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3"
@@ -118,6 +172,22 @@ def test_hanging_piece_created_by_the_move() -> None:
     assert describe(hang) == "무방비 기물: Qd5가 Nc6을 공격"
     # the knight can run, so it is not trapped
     assert _detect("4k3/8/2n5/8/8/8/8/3QK3 w - - 0 1", "Qd5", trapped_pieces) == []
+
+
+def test_defended_target_is_not_called_undefended() -> None:
+    # b4 attacks Nc5, which the b6 pawn defends: cheaper attacker, not a defenceless piece.
+    fen = "4k3/8/1p6/2n5/8/1P6/8/4K3 w - - 0 1"
+    (hang,) = _detect(fen, "b4", hanging_pieces)
+    after = chess.Board(fen)
+    after.push_san("b4")
+    assert after.attackers(chess.BLACK, chess.C5) == chess.SquareSet([chess.B6])
+    assert hang.defended is True
+    assert hang.as_dict()["label"] == UNDERDEFENDED_NAME == "수비 부족 기물"
+    assert describe(hang) == "수비 부족 기물: b4 폰이 Nc5를 공격"
+    # a target with no defender at all keeps the 무방비 wording
+    (undefended,) = _detect("4k3/8/2n5/8/8/8/8/3QK3 w - - 0 1", "Qd5", hanging_pieces)
+    assert undefended.defended is False
+    assert undefended.as_dict()["label"] == KOREAN_NAMES["hanging_piece"] == "무방비 기물"
 
 
 def test_quiet_developing_move_has_no_motifs() -> None:

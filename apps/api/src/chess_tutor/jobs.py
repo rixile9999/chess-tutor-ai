@@ -58,12 +58,15 @@ class JobRunner:
         return self._jobs.get(key)
 
     async def wait(self, key: str, timeout: float = 60.0) -> Job:
-        """Poll until the job leaves pending/running (tests and CLI use)."""
+        """Poll until the job leaves pending/running (tests and CLI use). Raises TimeoutError
+        when it is still going, so a caller cannot mistake 'still running' for 'finished'."""
         job = self._jobs[key]
         waited = 0.0
         while job.status in ("pending", "running") and waited < timeout:
             await asyncio.sleep(0.05)
             waited += 0.05
+        if job.status in ("pending", "running"):
+            raise TimeoutError(f"job {key} is still {job.status} after {timeout:g}s")
         return job
 
     async def _run(self) -> None:

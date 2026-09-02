@@ -3,12 +3,20 @@
 A puzzle hides in every mistake or blunder whose punishment is concrete: in the position the
 error left behind, the engine's best line either mates or swings the evaluation by at least
 SWING_CP centipawns for the side to move, and that line shows at least the reply (two plies).
-The solver plays the punishing side. Everything here is deterministic: no engine call, no LLM,
-and every move stored as a solution has been replayed on the board with python-chess.
+The solver plays the punishing side, which is why only the *opponent's* errors become puzzles
+once the user's colour is known: a puzzle cut from the user's own blunder would hand them the
+other colour and ask them to punish themselves.
+
+Cutting is deterministic: no LLM, and every move stored as a solution has been replayed on the
+board with python-chess. It is not, however, trustworthy on its own. The stored line comes from
+whatever depth the game was analysed at, and a shallow line can recommend a move that loses on
+the spot, so ``generate_from_game`` takes a ``verify`` fetcher and drops any puzzle a deeper
+look disagrees with (see ``verified``).
 """
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
 
 import chess
@@ -27,6 +35,10 @@ from chess_tutor.schemas import (
     Score,
     TrainingSummary,
 )
+from chess_tutor.services import users
+
+LineFetcher = Callable[[str], Awaitable[list[EngineLine]]]
+"""Fresh engine lines for a FEN. ``services.analysis.get_lines`` bound to a depth."""
 
 PUZZLE_CLASSIFICATIONS = frozenset({"mistake", "blunder"})
 SWING_CP = 150
@@ -35,6 +47,10 @@ MIN_LINE_PLIES = 2
 MAX_SOLUTION_PLIES = 4
 MATE_CP = 10_000
 """Centipawn stand-in for a mate score when computing swings."""
+VERIFY_DEPTH = 18
+"""Floor for the re-check of a candidate puzzle. Games are often analysed shallower than this
+(the default is 16, a quick pass can be 8), and a shallow line is exactly how a move that loses
+to a two-move mate ended up stored as a solution."""
 
 # SM-2 constants
 DEFAULT_EASE = 2.5
@@ -158,11 +174,20 @@ def cut_puzzle(error: MoveAnalysis, reply: MoveAnalysis) -> Puzzle | None:
     )
 
 
-def cut_puzzles(analysis_moves: list[MoveAnalysis]) -> list[Puzzle]:
-    """Every concrete puzzle in an analysed game, in ply order, without dedupe."""
+def cut_puzzles(
+    analysis_moves: list[MoveAnalysis], user_color: Color | None = None
+) -> list[Puzzle]:
+    """Every concrete puzzle in an analysed game, in ply order, without dedupe.
+
+    ``user_color`` is the colour the deck's owner played. The solver of a puzzle is the side
+    that punishes the error, so only the opponent's errors are cut: that keeps every puzzle on
+    the user's own colour. With no colour known (a game imported without a username) every
+    error is cut, as before."""
     by_ply = {move.ply: move for move in analysis_moves}
     found: list[Puzzle] = []
     for error in sorted(analysis_moves, key=lambda move: move.ply):
+        if user_color is not None and error.color == user_color:
+            continue
         reply = by_ply.get(error.ply + 1)
         if reply is None:
             continue
@@ -172,28 +197,70 @@ def cut_puzzles(analysis_moves: list[MoveAnalysis]) -> list[Puzzle]:
     return found
 
 
+# ---------- verification ----------
+
+
+def verify_depth(analysis_depth: int | None) -> int:
+    """Depth for the re-check: never shallower than the analysis, never below VERIFY_DEPTH."""
+    return max(analysis_depth or 0, VERIFY_DEPTH)
+
+
+def verified(puzzle: Puzzle, lines: list[EngineLine]) -> bool:
+    """True when a deeper look at the puzzle position still backs the stored solution.
+
+    ``lines`` are fresh engine lines for ``puzzle.fen``. Two ways a stored puzzle turns out
+    wrong, both seen in real data:
+
+    1. the solver is the one getting mated, so there is nothing to punish;
+    2. the stored first move is not the best move at all. A shallow line once offered a knight
+       recapture that walks into mate in two, presented to the user as the answer.
+
+    Anything the engine cannot speak to (no lines, no pv) is dropped rather than trusted."""
+    solution: list[str] = [str(uci) for uci in puzzle.solution or []]
+    if not solution or not lines:
+        return False
+    best = min(lines, key=lambda line: line.rank)
+    if not best.pv_uci:
+        return False
+    solver = chess.Board(puzzle.fen).turn
+    if mates_for(best.score, not solver):
+        return False
+    return best.pv_uci[0] == solution[0]
+
+
 # ---------- persistence ----------
 
 
 async def resolve_user_id(session: AsyncSession, username: str | None) -> int | None:
-    """The first account with this username on any platform, created as a local account when
-    none exists so puzzles can be scheduled before any game import."""
+    """The primary account with this username, resolved the same way the profile resolves it.
+
+    Raises users.UserNotFound for an unknown name instead of quietly creating an account: a
+    'Duke' minted from a query parameter used to own puzzles that /profile/duke counted but
+    /training/puzzles/due never showed."""
     if not username:
         return None
-    stmt = select(User).where(User.username == username).order_by(User.id)
-    user = (await session.execute(stmt)).scalars().first()
-    if user is None:
-        user = User(username=username, platform="local")
-        session.add(user)
-        await session.flush()
-    return user.id
+    return (await users.require_user(session, username)).id
 
 
 def _user_clause(username: str | None) -> ColumnElement[bool] | None:
-    """Puzzles of every account with this username (chess.com and lichess names may coexist)."""
+    """Puzzles of every account with this username (chess.com and lichess names may coexist,
+    and the same name in another case is the same person)."""
     if not username:
         return None
-    return Puzzle.user_id.in_(select(User.id).where(User.username == username))
+    return Puzzle.user_id.in_(select(User.id).where(users.matches(username)))
+
+
+def user_color_of(game: Game, username: str | None) -> Color | None:
+    """Which colour the deck's owner played in this game, or None when that is unknown."""
+    if game.user_color in ("white", "black"):
+        return game.user_color  # type: ignore[return-value]
+    if username:
+        name = users.normalise(username)
+        if (game.white or "").strip().lower() == name:
+            return "white"
+        if (game.black or "").strip().lower() == name:
+            return "black"
+    return None
 
 
 async def generate_from_game(
@@ -201,21 +268,27 @@ async def generate_from_game(
     game: Game,
     analysis_moves: list[MoveAnalysis],
     username: str | None = None,
+    verify: LineFetcher | None = None,
 ) -> list[Puzzle]:
-    """Cut, dedupe (same position, same user) and store the puzzles of one analysed game.
+    """Cut, dedupe (same position, same user), verify and store the puzzles of one analysed game.
 
-    Returns only the puzzles created by this call; positions the user already owns are skipped."""
+    Returns only the puzzles created by this call; positions the user already owns are skipped.
+    ``verify`` fetches fresh engine lines for a candidate's position; when it is given, a puzzle
+    the engine disagrees with is dropped instead of stored. Passing None skips that check and
+    stores whatever the stored analysis claimed, which is only safe in tests."""
     user_id = await resolve_user_id(session, username) if username else game.user_id
     owner = Puzzle.user_id == user_id if user_id is not None else Puzzle.user_id.is_(None)
     existing = (await session.execute(select(Puzzle.fen).where(owner))).scalars()
     seen = {position_key(fen) for fen in existing}
 
     created: list[Puzzle] = []
-    for puzzle in cut_puzzles(analysis_moves):
+    for puzzle in cut_puzzles(analysis_moves, user_color=user_color_of(game, username)):
         key = position_key(puzzle.fen)
         if key in seen:
             continue
         seen.add(key)
+        if verify is not None and not verified(puzzle, await verify(puzzle.fen)):
+            continue
         puzzle.user_id = user_id
         puzzle.game_id = game.id
         created.append(puzzle)

@@ -2,7 +2,7 @@
 
 The analyses are fabricated with the pydantic models from schemas.py, but every move, FEN and
 best move is replayed with python-chess, and the tactical claims the report is built on (a
-knight fork on c2, a bishop pin from b3, a knight fork from b3) are real motifs in real games.
+knight fork on c2, a queen pin from d3, a knight fork from b3) are real motifs in real games.
 """
 
 from __future__ import annotations
@@ -21,7 +21,9 @@ from chess_tutor.services.analysis import classify_loss, win_prob_loss
 
 USERNAME = "tester"
 
-# Game A, user White, lost: Fried Liver, then 9.a3?? (best 9.Bb3 pins d5) 9...Nxc2+ forks.
+# Game A, user White, lost: Fried Liver, then 9.a3?? (best 9.Qd3, which guards c2 and pins
+# Nd5 to Qd8) 9...Nxc2+ forks. Bc4 already pins Nd5 to Ke6, so 9.Bb3 would keep that pin, not
+# make one, and the missed-motif counter would see nothing.
 FRIED_LIVER = (
     "e4 e5 Nf3 Nc6 Bc4 Nf6 Ng5 d5 exd5 Nxd5 Nxf7 Kxf7 Qf3+ Ke6 Nc3 Ncb4 a3 Nxc2+ Kd1 Nxa1"
 ).split()
@@ -112,7 +114,7 @@ def pgn_text(sans: list[str], result: str, tag: str, start_fen: str | None = Non
 
 def game_a() -> list[MoveAnalysis]:
     evals = [30] * 17 + [-500, -500, -500, -900]
-    return fabricate(FRIED_LIVER, evals, best={17: "Bb3"}, clocks={17: 12.0})
+    return fabricate(FRIED_LIVER, evals, best={17: "Qd3"}, clocks={17: 12.0})
 
 
 def game_b() -> list[MoveAnalysis]:
@@ -183,7 +185,7 @@ def test_fabricated_games_hold_the_claimed_facts() -> None:
     a, b = game_a(), game_b()
     blunder = a[16]
     assert (blunder.san, blunder.classification, blunder.color) == ("a3", "blunder", "white")
-    assert blunder.best_move_san == "Bb3" and blunder.clock == 12.0
+    assert blunder.best_move_san == "Qd3" and blunder.clock == 12.0
     assert svc.motif_kinds(blunder.fen_before, blunder.best_move_uci) == {"pin"}
     reply = a[17]
     assert reply.san == "Nxc2+" and reply.lines[0].pv_uci == [reply.uci]

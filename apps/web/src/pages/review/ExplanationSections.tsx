@@ -1,5 +1,5 @@
 import type { Alternative, Comparison, HumanView, MotifOut, MoveReviewOut, Refutation } from '../../api/types';
-import { playSans } from '../../lib/chess';
+import { playSans, plyOfFen } from '../../lib/chess';
 import { formatScore, motifLabel, plyLabel } from '../../lib/labels';
 import { ClassBadge, LineChips, makePreview, type Preview } from './shared';
 
@@ -93,11 +93,14 @@ export function AlternativesSection({ alternatives, human, review, ply, preview,
 export function ComparisonSection({ comparison, preview, onPreview }: { comparison: Comparison; preview: Preview | null; onPreview: (p: Preview | null) => void }) {
   const c = comparison;
   const on = preview?.id === 'cmp';
+  // divergence_ply is an index into the PV, not a game ply, so the move number comes from the
+  // divergence FEN itself; without a FEN there is no honest number to show.
+  const divPly = c.divergence_fen ? plyOfFen(c.divergence_fen) : null;
   return (
     <div className="rv-section" style={{ gap: 8 }}>
       <div className="rv-section-head">
         <span className="h3">왜 {c.a_san}가 {c.b_san}보다 나은가</span>
-        {c.divergence_ply != null && <span className="small muted">분기점 · {plyLabel(c.divergence_ply)} 이후 국면 비교</span>}
+        {divPly != null && <span className="small muted">분기점 · {plyLabel(divPly)} 이후 국면</span>}
         {c.divergence_fen && (
           <button type="button" className={`chip rv-chip-btn${on ? ' rv-chip-on' : ''}`}
             onClick={() => onPreview(on ? null : { id: 'cmp', fen: c.divergence_fen as string, label: '분기 국면', lastMove: null, shapes: [] })}>

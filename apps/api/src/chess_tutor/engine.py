@@ -10,7 +10,7 @@ import atexit
 import os
 import shutil
 import threading
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 
@@ -18,6 +18,16 @@ import chess
 import chess.engine
 
 from chess_tutor.config import get_settings
+
+BUSY = "엔진이 모두 사용 중입니다. 잠시 후 다시 시도해 주세요."
+
+
+class EngineBusy(RuntimeError):
+    """Every pooled engine is checked out. Raised instead of waiting forever so a request can
+    answer 503 rather than hang behind a whole-game analysis."""
+
+    def __init__(self, message: str = BUSY) -> None:
+        super().__init__(message)
 
 
 @dataclass(frozen=True)
@@ -79,18 +89,16 @@ class Engine:
     def __exit__(self, *exc: object) -> None:
         self.close()
 
-    def analyse(
-        self, board: chess.Board, depth: int = 18, multipv: int = 3, game: object | None = None
-    ) -> list[Line]:
+    def analyse(self, board: chess.Board, depth: int = 18, multipv: int = 3) -> list[Line]:
         """Top `multipv` lines at `depth`.
 
-        `game` groups searches that may share the engine's transposition table (the positions
-        of one game). Every new token, and every call without one, starts with `ucinewgame`, so
-        a result depends only on the position, depth and multipv, never on what this process
-        searched before: the same FEN gives the same lines whether it comes from a game
-        analysis, an ad-hoc request, or a test."""
+        Every search gets a fresh `game` token, so python-chess sends `ucinewgame` and the
+        engine clears its transposition table first. A result therefore depends only on the
+        position, depth, multipv and the engine's options, never on what this process searched
+        before: the same FEN gives the same lines whether it comes from a game analysis, an
+        ad-hoc request, or a test, and a cached line is safe to reuse for either."""
         infos = self._engine.analyse(
-            board, chess.engine.Limit(depth=depth), multipv=multipv, game=game or object()
+            board, chess.engine.Limit(depth=depth), multipv=multipv, game=object()
         )
         lines: list[Line] = []
         for info in infos:
@@ -108,46 +116,54 @@ class Engine:
         lines.sort(key=lambda line: line.rank)
         return lines
 
-    def analyse_many(
-        self, boards: Iterable[chess.Board], depth: int = 18, multipv: int = 3
-    ) -> list[list[Line]]:
-        """Analyse several positions with this one process, in order, sharing one table."""
-        game = object()
-        return [self.analyse(board, depth=depth, multipv=multipv, game=game) for board in boards]
-
 
 class EnginePool:
     """A few long-lived engine processes shared by worker threads.
 
-    `borrow()` gives a thread exclusive use of one engine; at most `size` engines exist at once
-    and callers beyond that wait. An engine that raised is discarded rather than reused."""
+    `borrow()` gives a thread exclusive use of one engine; at most `size` engines exist at once.
+    A caller beyond that waits at most `wait` seconds and is then told the pool is busy
+    (`EngineBusy`) instead of blocking behind a whole-game analysis for minutes. An engine that
+    raised is discarded rather than reused."""
 
-    def __init__(self, size: int = 2) -> None:
+    def __init__(self, size: int | None = None, wait: float | None = None) -> None:
+        settings = get_settings()
+        self.size = settings.engine_pool_size if size is None else size
+        self.wait = settings.engine_wait_seconds if wait is None else wait
         self._idle: list[Engine] = []
+        self._busy: set[Engine] = set()
         self._lock = threading.Lock()
-        self._slots = threading.BoundedSemaphore(size)
+        self._slots = threading.BoundedSemaphore(self.size)
 
     @contextmanager
-    def borrow(self) -> Iterator[Engine]:
-        self._slots.acquire()
+    def borrow(self, wait: float | None = None) -> Iterator[Engine]:
+        if not self._slots.acquire(timeout=self.wait if wait is None else wait):
+            raise EngineBusy
         try:
             with self._lock:
                 engine = self._idle.pop() if self._idle else None
             if engine is None:
                 engine = Engine()
+            with self._lock:
+                self._busy.add(engine)
             try:
                 yield engine
             except BaseException:
+                with self._lock:
+                    self._busy.discard(engine)
                 engine.close()
                 raise
             with self._lock:
+                self._busy.discard(engine)
                 self._idle.append(engine)
         finally:
             self._slots.release()
 
     def close(self) -> None:
+        """Quit every engine, including one that is checked out: at shutdown an engine left in a
+        worker thread would otherwise keep its process alive."""
         with self._lock:
-            engines, self._idle = self._idle, []
+            engines = [*self._idle, *self._busy]
+            self._idle, self._busy = [], set()
         for engine in engines:
             engine.close()
 

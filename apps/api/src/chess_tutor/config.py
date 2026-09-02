@@ -15,7 +15,14 @@ class Settings(BaseSettings):
     engine_depth: int = 16
     engine_multipv: int = 3
     engine_threads: int = 2
+    """Threads and Hash change what a search returns, so they are part of the engine's cache
+    identity (services.analysis.cache_name). Only a single-threaded search is reproducible;
+    tests pin this to 1 so their expectations are stable."""
     engine_hash_mb: int = 256
+    engine_pool_size: int = 2
+    """Engine processes that may run at once. A whole-game analysis holds one for its duration."""
+    engine_wait_seconds: float = 30.0
+    """How long a caller waits for a free engine before the request is refused with 503."""
 
     anthropic_api_key: str | None = None
     anthropic_model: str = "claude-opus-5"

@@ -10,8 +10,28 @@ from httpx import ASGITransport, AsyncClient
 _TEST_DB = os.path.join(tempfile.mkdtemp(prefix="chess-tutor-test-"), f"test_{os.getpid()}.db")
 os.environ["DATABASE_URL"] = f"sqlite+aiosqlite:///{_TEST_DB}"
 
+# Stockfish's search is only reproducible single-threaded: with the production default of two
+# threads the move ordering below rank 1 changes between runs, which made engine tests that read
+# the second or third line flaky. Set before the settings object exists so every engine process
+# this test session starts is pinned; the fixture below covers a settings object built earlier.
+os.environ["ENGINE_THREADS"] = "1"
+
 from chess_tutor import db  # noqa: E402
+from chess_tutor import engine as engine_mod  # noqa: E402
 from chess_tutor.api import app  # noqa: E402
+from chess_tutor.config import get_settings  # noqa: E402
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _deterministic_engine() -> Iterator[None]:
+    """One engine thread for the whole session, so multipv ranks 2+ are reproducible."""
+    settings = get_settings()
+    previous = settings.engine_threads
+    settings.engine_threads = 1
+    engine_mod.pool.close()  # discard any process started with the previous setting
+    yield
+    engine_mod.pool.close()
+    settings.engine_threads = previous
 
 
 @pytest.fixture(autouse=True)

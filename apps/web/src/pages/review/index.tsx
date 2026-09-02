@@ -4,6 +4,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../../api/client';
 import type { Color, GameAnalysis, GameDetail, Score } from '../../api/types';
 import { Board } from '../../components/Board';
+import { getUsername } from '../../lib/user';
 import { Controls } from './Controls';
 import { EvalBar } from './EvalBar';
 import { MoveList } from './MoveList';
@@ -115,10 +116,12 @@ export default function ReviewPage() {
 
   const savePuzzle = useCallback(async () => {
     if (gameId === null) return;
-    setToast('퍼즐을 만드는 중');
+    setToast('이 게임 전체에서 퍼즐을 만드는 중');
     try {
-      const puzzles = await api.training.generate(gameId);
-      setToast(puzzles.length ? `퍼즐 ${puzzles.length}개를 저장했습니다. 훈련 탭에서 풀 수 있습니다.` : '이 게임에서 만들 퍼즐이 없습니다.');
+      const puzzles = await api.training.generate(gameId, getUsername());
+      setToast(puzzles.length
+        ? `이 게임에서 퍼즐 ${puzzles.length}개를 저장했습니다. 훈련 탭에서 풀 수 있습니다.`
+        : '이 게임에서 새로 만들 퍼즐이 없습니다.');
     } catch (e) { setToast(`퍼즐 저장 실패 · ${errorText(e)}`); }
   }, [gameId]);
 

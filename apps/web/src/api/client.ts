@@ -50,8 +50,11 @@ export const api = {
   },
 
   openings: {
-    map: (username: string, color: T.Color, depth = 12) =>
-      get<T.OpeningMap>(`/openings/map?username=${encodeURIComponent(username)}&color=${color}&depth=${depth}`),
+    /** `minGames` prunes server-side; the API requires >= 1, so 0 ("show everything") is sent as 1. */
+    map: (username: string, color: T.Color, depth = 12, minGames = 1) =>
+      get<T.OpeningMap>(
+        `/openings/map?username=${encodeURIComponent(username)}&color=${color}&depth=${depth}&min_games=${Math.max(1, Math.trunc(minGames) || 0)}`,
+      ),
     heatmap: (username: string, color: T.Color, piece: string, throughMove = 15) =>
       get<T.PieceHeatmap>(`/openings/heatmap?username=${encodeURIComponent(username)}&color=${color}&piece=${piece}&through_move=${throughMove}`),
     breaks: (username: string, color: T.Color, structure?: string) =>
@@ -60,7 +63,9 @@ export const api = {
 
   training: {
     due: (username?: string) => get<T.PuzzleOut[]>(`/training/puzzles/due${username ? `?username=${encodeURIComponent(username)}` : ''}`),
-    generate: (gameId: number) => post<T.PuzzleOut[]>(`/training/puzzles/from-game/${gameId}`),
+    /** Cuts puzzles from the whole game, not one ply. Without a username the puzzles have no owner. */
+    generate: (gameId: number, username?: string | null) =>
+      post<T.PuzzleOut[]>(`/training/puzzles/from-game/${gameId}${username ? `?username=${encodeURIComponent(username)}` : ''}`),
     attempt: (puzzleId: number, correct: boolean, seconds: number) =>
       post<T.PuzzleOut>(`/training/puzzles/${puzzleId}/attempt`, { correct, seconds }),
   },

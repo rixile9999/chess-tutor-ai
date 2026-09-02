@@ -65,7 +65,7 @@ export function ExplanationPanel({ review, ply, rating, boardFen, preview, onPre
 
       <VerifyRow explanation={explanation}>
         <Link className="btn btn-primary" to={trainingHref(boardFen, rating)}><IconPlay /> 이 국면에서 이어 두기{maiaLabel(rating)}</Link>
-        <button type="button" className="btn btn-ghost" onClick={onSavePuzzle}><IconSave /> 퍼즐로 저장</button>
+        <button type="button" className="btn btn-ghost" onClick={onSavePuzzle}><IconSave /> 이 게임에서 퍼즐 만들기</button>
       </VerifyRow>
     </>
   );

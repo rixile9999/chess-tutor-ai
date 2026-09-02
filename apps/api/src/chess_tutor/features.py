@@ -63,8 +63,8 @@ class SideFeatures(BaseModel):
     """Squares reachable by knights, bishops, rooks and queens, excluding own pieces and
     squares guarded by enemy pawns."""
     outposts: list[str] = []
-    """Own minor pieces on a pawn-protected square in the enemy half that no enemy pawn can
-    ever attack."""
+    """Own minor pieces on a pawn-protected square on the 4th to 6th rank from this side's
+    point of view that no enemy pawn can ever attack."""
     bishop_pair: bool = False
     space: int = 0
     """Squares in the enemy half occupied or attacked by this side."""
@@ -273,21 +273,28 @@ def _files_of(squares: list[str]) -> str:
     return ",".join(sorted({sq[0] for sq in squares}))
 
 
+def _doubled_extra(side: SideFeatures) -> int:
+    """Pawns that are one too many on their file: three c-pawns count as two, so the number
+    reads like the isolated and backward counts instead of counting files."""
+    return len(side.doubled_pawns) - len({sq[0] for sq in side.doubled_pawns})
+
+
 def _pawn_weaknesses(side: SideFeatures) -> list[str]:
     parts: list[str] = []
     if side.isolated_pawns:
         parts.append(f"고립 {_files_of(side.isolated_pawns)}폰 {len(side.isolated_pawns)}")
     doubled_files = sorted({sq[0] for sq in side.doubled_pawns})
     if doubled_files:
-        parts.append(f"이중 {','.join(doubled_files)}폰 {len(doubled_files)}")
+        # the count is extra pawns, the same unit as the isolated and backward counts next
+        # to it and the same number _pawn_score subtracts
+        parts.append(f"이중 {','.join(doubled_files)}폰 {_doubled_extra(side)}")
     if side.backward_pawns:
         parts.append(f"후진 {_files_of(side.backward_pawns)}폰 {len(side.backward_pawns)}")
     return parts
 
 
 def _pawn_score(side: SideFeatures) -> float:
-    doubled_extra = len(side.doubled_pawns) - len({sq[0] for sq in side.doubled_pawns})
-    weak = len(side.isolated_pawns) + doubled_extra + len(side.backward_pawns)
+    weak = len(side.isolated_pawns) + _doubled_extra(side) + len(side.backward_pawns)
     return -weak - 0.5 * max(0, side.pawn_islands - 1)
 
 

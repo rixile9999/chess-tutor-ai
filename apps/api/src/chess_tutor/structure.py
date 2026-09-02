@@ -39,6 +39,12 @@ STRUCTURE_NAMES: dict[str, str] = {
 
 MIN_SPAN_PLIES = 4
 
+MIN_STRUCTURE_PAWNS = 6
+"""Total pawns needed before a named structure is claimed."""
+
+GENERIC_KEYS = frozenset({"closed_center", "open_center"})
+"""Rules that only describe the central files; they still hold once the pieces are gone."""
+
 
 @dataclass(frozen=True)
 class Match:
@@ -317,13 +323,27 @@ def _info(key: str, match: Match) -> schemas.StructureInfo:
     )
 
 
+def _has_middlegame_material(board: chess.Board) -> bool:
+    """Whether a named structure can be claimed at all. The named rules describe middlegames
+    and the plans attached to them talk about knights, bishops and rooks, so both sides need
+    a piece besides the king and the board needs enough pawns for the placement to be a
+    structure rather than an accident of an endgame."""
+    if chess.popcount(board.pawns) < MIN_STRUCTURE_PAWNS:
+        return False
+    pieces = board.occupied & ~board.pawns & ~board.kings
+    return all(bool(pieces & board.occupied_co[color]) for color in chess.COLORS)
+
+
 def classify(board: chess.Board) -> schemas.StructureInfo:
     pawns = Pawns(board.pieces(chess.PAWN, chess.WHITE), board.pieces(chess.PAWN, chess.BLACK))
     mirrored = Pawns(
         chess.SquareSet(chess.flip_vertical(int(pawns.black))),
         chess.SquareSet(chess.flip_vertical(int(pawns.white))),
     )
+    middlegame = _has_middlegame_material(board)
     for key, rule in RULES:
+        if not middlegame and key not in GENERIC_KEYS:
+            continue
         match = rule(pawns)
         if match is not None:
             return _info(key, match)

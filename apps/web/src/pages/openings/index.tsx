@@ -24,7 +24,10 @@ export default function OpeningsPage() {
   const [piece, setPiece] = useState<string>(() => defaultPiece('white'));
   const [selected, setSelected] = useState<OpeningNode | null>(null);
 
-  const mapQ = useQuery(() => (username ? api.openings.map(username, color, depth) : null), [username, color, depth]);
+  const mapQ = useQuery(
+    () => (username ? api.openings.map(username, color, depth, minGames) : null),
+    [username, color, depth, minGames],
+  );
   const heatQ = useQuery(() => (username ? api.openings.heatmap(username, color, piece, THROUGH_MOVE) : null), [username, color, piece]);
   const breaksQ = useQuery(() => (username ? api.openings.breaks(username, color) : null), [username, color]);
 
@@ -45,7 +48,8 @@ export default function OpeningsPage() {
 
   const map = mapQ.data;
   const total = map?.total_games ?? 0;
-  const noGames = !!map && (total === 0 || (map.nodes ?? []).length === 0);
+  // The API answers 404 when the user has no game with this colour, which is an empty state, not an error.
+  const noGames = mapQ.status === 404 || (!!map && (total === 0 || (map.nodes ?? []).length === 0));
   const rootNode = useMemo(() => map?.nodes?.find((n) => n.id === map.root) ?? null, [map]);
   const rootName = rootNode?.name?.trim() || null;
   const subtitle = username
@@ -118,14 +122,14 @@ export default function OpeningsPage() {
             </div>
           ) : mapQ.loading ? (
             <div className="op-state"><div className="op-spinner" /><div>오프닝 지도를 만드는 중</div></div>
-          ) : mapQ.error ? (
-            <ErrorState message={mapQ.error} status={mapQ.status} onRetry={mapQ.reload} />
-          ) : map && noGames ? (
+          ) : noGames ? (
             <div className="op-state">
               <div className="op-state-title">{COLOR_LABEL[color]}으로 둔 기보가 아직 없습니다</div>
-              <div>기보를 가져오면 {COLOR_LABEL[color]} 레퍼토리 지도를 그립니다.</div>
+              <div>기보를 가져오면 {COLOR_LABEL[color]} 레퍼토리 지도를 그립니다. 다른 색으로 두었다면 위에서 색을 바꿔 보세요.</div>
               <Link to="/games?import=1" className="btn btn-primary" style={{ height: 32 }}>기보 가져오기</Link>
             </div>
+          ) : mapQ.error ? (
+            <ErrorState message={mapQ.error} status={mapQ.status} onRetry={mapQ.reload} />
           ) : map ? (
             <>
               <OpeningDag map={map} color={color} minGames={minGames} selectedId={selected?.id ?? null} onSelect={setSelected} />
@@ -160,6 +164,8 @@ export default function OpeningsPage() {
               <div className="op-state compact">사용자명을 입력하면 표시됩니다.</div>
             ) : heatQ.loading ? (
               <div className="op-state compact"><div className="op-spinner" /></div>
+            ) : heatQ.status === 404 ? (
+              <div className="op-state compact">{COLOR_LABEL[color]}으로 둔 기보가 아직 없습니다.</div>
             ) : heatQ.error ? (
               <ErrorState compact message={heatQ.error} status={heatQ.status} onRetry={heatQ.reload} />
             ) : (
@@ -181,6 +187,8 @@ export default function OpeningsPage() {
               <div className="op-state compact">사용자명을 입력하면 표시됩니다.</div>
             ) : breaksQ.loading ? (
               <div className="op-state compact"><div className="op-spinner" /></div>
+            ) : breaksQ.status === 404 ? (
+              <div className="op-state compact">{COLOR_LABEL[color]}으로 둔 기보가 아직 없습니다.</div>
             ) : breaksQ.error ? (
               <ErrorState compact message={breaksQ.error} status={breaksQ.status} onRetry={breaksQ.reload} />
             ) : (

@@ -41,6 +41,10 @@ BRANCH_PLIES = 3
 """Plies shown per branch: the reply, the follow-up, the next reply."""
 SETTLE_PLIES = 8
 """Material for a branch label is read after at most this many plies, once exchanges settle."""
+MATE_WON = "메이트 승리"
+"""Branch label when the line ends in mate delivered by the side the label is written for."""
+MATE_LOST = "메이트"
+"""Branch label when that side is the one being mated."""
 LINE_PLIES = 6
 NOTE_GAP = 1.0
 """The 'why not X' note needs the second-best punishment to be this much worse (pawns)."""
@@ -137,13 +141,16 @@ def settle(
 def outcome_label(
     board: chess.Board, moves: list[chess.Move], score: schemas.Score, mover: chess.Color
 ) -> str:
-    """Korean label for what a line costs `mover` (the side to move in `board`): mate, the
-    material lost once exchanges settle, else the evaluation from the mover's side."""
+    """Korean label for how a line ends for `mover` (the side to move in `board`): mate either
+    way, the material lost once exchanges settle, else the evaluation from the mover's side.
+
+    Material is only meaningful when the line does not end in mate delivered by `mover`: a
+    queen sacrifice that mates costs nothing, whatever the material count says."""
     end, biggest = settle(board, moves)
-    if end.is_checkmate() and end.turn == mover:
-        return "메이트"
-    if score.mate is not None and (score.mate > 0) != (mover == chess.WHITE):
-        return "메이트"
+    if end.is_checkmate():
+        return MATE_LOST if end.turn == mover else MATE_WON
+    if score.mate is not None:
+        return MATE_WON if (score.mate > 0) == (mover == chess.WHITE) else MATE_LOST
     lost = _material(board, mover) - _material(end, mover)
     if biggest >= PIECE_VALUE[chess.QUEEN] and lost >= 3:
         return "퀸 상실"
@@ -232,30 +239,38 @@ async def refutation_of(
 
 
 def alternatives_of(
-    board: chess.Board, lines_before: list[schemas.EngineLine], color: schemas.Color
+    board: chess.Board,
+    lines_before: list[schemas.EngineLine],
+    color: schemas.Color,
+    played_uci: str | None = None,
 ) -> list[schemas.Alternative]:
-    """Top two engine moves before the played move, the best one flagged, each with a why."""
+    """Top two engine moves other than the played one, the best of them flagged, each with a
+    why. The panel says '대신 두었어야 할 수', so the move the user played never belongs here."""
     out: list[schemas.Alternative] = []
     if not lines_before or not lines_before[0].pv:
         return out
     best_eval = lines_before[0].score
-    for index, line in enumerate(lines_before[:2]):
-        if not line.pv:
-            continue
+    candidates = [
+        line
+        for line in lines_before
+        if line.pv and not (played_uci and line.pv_uci and line.pv_uci[0] == played_uci)
+    ]
+    for index, line in enumerate(candidates[:2]):
         moves = _moves(board, line)
         try:
-            why = reasoning.explain_alternative(
+            why, claims = reasoning.explain_alternative(
                 board, line.pv[0], moves, line.score, best_eval, color
             )
         except ValueError:
-            why = ""
+            why, claims = "", []
         out.append(
             schemas.Alternative(
                 san=line.pv[0],
                 eval=line.score,
                 line=line.pv[1 : LINE_PLIES + 1],
-                is_best=index == 0,
+                is_best=index == 0 and line is lines_before[0],
                 why=why,
+                claims=claims,
             )
         )
     return out
@@ -412,7 +427,13 @@ def arrows_of(
                 )
     if lines_before and lines_before[0].pv_uci:
         best = chess.Move.from_uci(lines_before[0].pv_uci[0])
-        if best != played:
+        # The good arrow is a move from the position *before* the played move, but the panel
+        # draws it on fen_after. Skip it when its origin no longer holds a piece of the mover,
+        # which is exactly when the arrow would start on an empty or foreign square.
+        after = chess.Board(move.fen_after)
+        origin = after.piece_at(best.from_square)
+        drawable = origin is not None and origin.color == _color(move.color)
+        if best != played and drawable:
             arrows.append(
                 schemas.Arrow(
                     orig=chess.square_name(best.from_square),
@@ -538,7 +559,7 @@ async def compute_move_review(
     if move.classification in PUNISHABLE:
         refutation, fen_punished, note_line = await refutation_of(move, lines_after, depth)
 
-    alternatives = alternatives_of(board, lines_before, move.color)
+    alternatives = alternatives_of(board, lines_before, move.color, move.uci)
     comparison = comparison_of(board, move, lines_before, lines_after)
     played_motifs = [_motif_out(m) for m in detect(board, played)]
     try:

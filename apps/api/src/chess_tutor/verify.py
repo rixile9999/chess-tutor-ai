@@ -11,7 +11,9 @@ from typing import Literal
 import chess
 from pydantic import BaseModel
 
-ClaimKind = Literal["attacks", "defends", "is_check", "piece_on", "square_empty", "legal_move"]
+ClaimKind = Literal[
+    "attacks", "defends", "is_check", "checkmate", "piece_on", "square_empty", "legal_move"
+]
 
 
 class Claim(BaseModel):
@@ -53,6 +55,8 @@ def verify(claim: Claim) -> Verdict:
                 )
             case "is_check":
                 holds = board.is_check()
+            case "checkmate":
+                holds = board.is_checkmate()
             case "piece_on":
                 piece = board.piece_at(_square(claim.subject))
                 holds = piece is not None and piece.symbol() == claim.object

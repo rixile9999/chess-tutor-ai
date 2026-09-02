@@ -78,8 +78,8 @@ export function StrategyPanel({ review, strategy, ply, userColor, rating, boardF
       {(review.arrows ?? []).length > 0 || (review.highlights ?? []).length > 0 ? (
         <div className="rv-legend">
           <span><i />좋은 계획, 브레이크</span>
-          <span><i className="dashed" />상대의 계획, 위협</span>
-          {(review.highlights ?? []).length > 0 && <span><i className="box" />구조를 정의하는 폰</span>}
+          <span><i className="thick" />상대의 계획, 위협</span>
+          {(review.highlights ?? []).length > 0 && <span><i className="mark" />방금 둔 수</span>}
         </div>
       ) : null}
 
@@ -131,7 +131,7 @@ export function StrategyPanel({ review, strategy, ply, userColor, rating, boardF
 
       <VerifyRow explanation={review.explanation}>
         <Link className="btn btn-primary" to={trainingHref(boardFen, rating)}><IconPlay /> 이 국면에서 이어 두기{maiaLabel(rating)}</Link>
-        <button type="button" className="btn btn-ghost" onClick={onSavePuzzle}><IconSave /> 퍼즐로 저장</button>
+        <button type="button" className="btn btn-ghost" onClick={onSavePuzzle}><IconSave /> 이 게임에서 퍼즐 만들기</button>
       </VerifyRow>
     </>
   );

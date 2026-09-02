@@ -15,7 +15,7 @@ import asyncio
 import io
 import logging
 import math
-from collections.abc import Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 
 import chess
@@ -27,7 +27,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from chess_tutor import models, schemas
 from chess_tutor.config import get_settings
 from chess_tutor.db import session_factory
-from chess_tutor.engine import Engine, Line, pool
+from chess_tutor.engine import Engine, EngineBusy, Line, pool
 from chess_tutor.jobs import runner
 from chess_tutor.openings import classify_game, lookup
 
@@ -54,11 +54,26 @@ WIN_PROB_K = 0.00368208
 EVAL_CLAMP = 10.0
 """eval_series is clamped to +-10 pawns so the chart stays readable around forced mates."""
 
+MATE_STEP_CP = 100
+"""Centipawns a mate loses per move of distance when it is turned into a score, the convention
+services/maia.py already uses. Mate in 1 therefore outscores mate in 12, and a delivered mate
+(MATE_CP) outscores every announced mate."""
+
+CONFIRM_DEPTH_BONUS = 6
+"""Extra plies for the confirmation search of a move that looks like a mistake or a blunder.
+`eval_before` and `eval_after` come from two different searches, so at the base depth a move
+that opens a forced win one ply beyond the horizon reads as a loss. Re-searching both positions
+deeper resolves it: on 15.Bxd7+ of the Opera game the depth-12 loss is 0.170 (blunder), +4 still
+gives 0.112 (mistake) and +6 gives 0.021 (inaccuracy), matching the depth-20 verdict."""
+
 # win-probability loss thresholds, checked in order
 _BEST = 0.005
 _GOOD = 0.02
 _INACCURACY = 0.06
 _MISTAKE = 0.15
+
+_SUSPECT: tuple[schemas.Classification, ...] = ("mistake", "blunder")
+"""Labels harsh enough to be worth a deeper look before they are reported."""
 
 
 def job_key(game_id: int) -> str:
@@ -68,21 +83,32 @@ def job_key(game_id: int) -> str:
 # ---------- pure arithmetic ----------
 
 
+def mate_cp(mate: int) -> int:
+    """Centipawn stand-in for `mate` moves away, from White's point of view. Distance is kept so
+    that a shorter mate scores higher; the value stays far enough out that win_prob is 1 or 0 to
+    within 1e-8, which is what every consumer of a mate score expects."""
+    distance = min(abs(mate), 50) * MATE_STEP_CP
+    return (MATE_CP - distance) * (1 if mate > 0 else -1)
+
+
 def win_prob(score: schemas.Score, color: schemas.Color = "white") -> float:
     """Probability (0..1) that `color` wins, from a score given from White's point of view."""
-    if score.mate is not None:
-        white_wins = score.mate > 0
-        return 1.0 if white_wins == (color == "white") else 0.0
-    cp = score.cp or 0
+    cp = mate_cp(score.mate) if score.mate is not None else (score.cp or 0)
+    cp = max(-MATE_CP, min(MATE_CP, cp))
     if color == "black":
         cp = -cp
     return 1.0 / (1.0 + math.exp(-WIN_PROB_K * cp))
 
 
 def win_prob_loss(before: schemas.Score, after: schemas.Score, color: schemas.Color) -> float:
-    """Drop in the mover's win probability from the best line before the move to the best line
-    after it. Never negative: a move cannot do better than the engine's own best line, and
-    small depth artefacts should not turn into a bonus."""
+    """Drop in the mover's win probability from the position before the move to the value of the
+    move that was played. Never negative: small depth artefacts should not turn into a bonus.
+
+    Both scores must come from the same search effort. `build_analysis` takes `after` from the
+    parent's own MultiPV line for the played move when the engine returned one, and confirms a
+    harsh verdict with a deeper search of both positions, because a score for the child position
+    searched to the same depth is effectively one ply deeper than the parent's and their
+    difference is not a property of the move."""
     return max(0.0, win_prob(before, color) - win_prob(after, color))
 
 
@@ -143,19 +169,17 @@ def analyse_board(
     depth: int,
     multipv: int,
     engine: Engine | None = None,
-    game: object | None = None,
 ) -> list[schemas.EngineLine]:
     """Top lines for one position, White's point of view. Uses the shared pool when no engine is
-    given. A finished position yields one line with an empty pv. `game` lets the positions of one
-    game share the engine's transposition table (see Engine.analyse)."""
+    given. A finished position yields one line with an empty pv."""
     terminal = terminal_score(board)
     if terminal is not None:
         return [schemas.EngineLine(rank=1, score=terminal, pv=[], pv_uci=[])]
     if engine is None:
         with pool.borrow() as borrowed:
-            raw = borrowed.analyse(board, depth=depth, multipv=multipv, game=game)
+            raw = borrowed.analyse(board, depth=depth, multipv=multipv)
     else:
-        raw = engine.analyse(board, depth=depth, multipv=multipv, game=game)
+        raw = engine.analyse(board, depth=depth, multipv=multipv)
     lines = [_to_engine_line(board, line) for line in raw]
     if not lines:
         raise RuntimeError(f"engine returned no lines for {board.fen()}")
@@ -176,21 +200,30 @@ def analyse_position(
 def analyse_boards(
     boards: Iterable[chess.Board], depth: int, multipv: int, engine: Engine | None = None
 ) -> list[list[schemas.EngineLine]]:
-    """Analyse many positions (one game) with a single engine process and one table."""
+    """Analyse many positions (one game) with a single engine process. Each search still starts
+    from a cleared table (Engine.analyse), so a line does not depend on the positions analysed
+    before it and may be cached under (fen, engine, depth, multipv) alone."""
     boards = list(boards)
-    game = object()
     if engine is None:
         with pool.borrow() as borrowed:
-            return [analyse_board(b, depth, multipv, borrowed, game) for b in boards]
-    return [analyse_board(b, depth, multipv, engine, game) for b in boards]
+            return [analyse_board(b, depth, multipv, borrowed) for b in boards]
+    return [analyse_board(b, depth, multipv, engine) for b in boards]
+
+
+def cache_name(name: str) -> str:
+    """Cache identity of an engine: its UCI name plus the options that change the search. Threads
+    and Hash are not part of the position, but they change the lines a search returns, so two
+    configurations must not read each other's cached rows."""
+    settings = get_settings()
+    return f"{name}-t{settings.engine_threads}-h{settings.engine_hash_mb}"
 
 
 def engine_name() -> str:
-    """Name used as the cache key, e.g. 'stockfish-18'. Starts an engine the first time."""
+    """Name used as the cache key, e.g. 'stockfish-18-t1-h256'. Starts an engine the first time."""
     global _engine_name
     if _engine_name is None:
         with pool.borrow() as engine:
-            _engine_name = engine.name
+            _engine_name = cache_name(engine.name)
     return _engine_name
 
 
@@ -332,14 +365,35 @@ def _book_flags(start: chess.Board, plies: list[Ply]) -> list[bool]:
 
 # ---------- game analysis ----------
 
+Confirm = Callable[[str, str], tuple[schemas.Score, schemas.Score] | None]
+"""Deeper second opinion on one ply: given (fen_before, fen_after) it returns the two scores of
+a deeper search of both positions, or None when it cannot run."""
+
+
+def played_line(lines: Iterable[schemas.EngineLine], uci: str) -> schemas.EngineLine | None:
+    """The line among the position's own MultiPV lines that starts with `uci`, if the engine
+    returned one. Its score is what the same search thought the played move was worth, so it can
+    be compared with the position's score without mixing depths."""
+    for line in lines:
+        if line.pv_uci and line.pv_uci[0] == uci:
+            return line
+    return None
+
 
 def build_analysis(
     start: chess.Board,
     plies: list[Ply],
     lines_by_fen: Mapping[str, list[schemas.EngineLine]],
+    confirm: Confirm | None = None,
 ) -> tuple[schemas.AnalysisSummary, list[schemas.MoveAnalysis]]:
     """Classify every ply from engine lines only. `lines_by_fen` must cover the start position
-    and the position after every ply."""
+    and the position after every ply.
+
+    The value of the played move comes from the position's own MultiPV line for it when the
+    engine returned one, and from the search of the resulting position otherwise. A verdict of
+    mistake or blunder from either number is put to `confirm`, a deeper search of both
+    positions, and the deeper answer is the one reported: at a fixed depth the two searches sit
+    one ply apart and a combination that wins just past the horizon reads as a loss."""
     book = _book_flags(start, plies)
     moves: list[schemas.MoveAnalysis] = []
     eval_series = [clamp_pawns(lines_by_fen[start.fen()][0].score)]
@@ -350,13 +404,19 @@ def build_analysis(
     for i, ply in enumerate(plies):
         lines = lines_by_fen[ply.fen_before]
         eval_before = lines[0].score
-        eval_after = lines_by_fen[ply.fen_after][0].score
-        eval_series.append(clamp_pawns(eval_after))
+        child = lines_by_fen[ply.fen_after][0].score
+        line = played_line(lines, ply.uci)
+        eval_after = line.score if line is not None else child
         best_san = lines[0].pv[0] if lines[0].pv else None
         best_uci = lines[0].pv_uci[0] if lines[0].pv_uci else None
         loss = win_prob_loss(eval_before, eval_after, ply.color)
-        if ply.uci == best_uci:
-            loss = 0.0
+        suspect = max(loss, win_prob_loss(eval_before, child, ply.color))
+        if confirm is not None and classify_loss(suspect) in _SUSPECT:
+            deeper = confirm(ply.fen_before, ply.fen_after)
+            if deeper is not None:
+                eval_before, eval_after = deeper
+                loss = win_prob_loss(eval_before, eval_after, ply.color)
+        eval_series.append(clamp_pawns(eval_after))
         classification: schemas.Classification
         if book[i]:
             classification = "book"
@@ -397,28 +457,65 @@ def build_analysis(
     return summary, moves
 
 
+Cached = Mapping[tuple[int, int], Mapping[str, list[schemas.EngineLine]]]
+"""Engine lines already known, grouped by the (depth, multipv) they were computed at."""
+
+Fresh = dict[tuple[int, int], dict[str, list[schemas.EngineLine]]]
+
+
+def _confirmer(depth: int, multipv: int, engine: Engine, known: Cached, fresh: Fresh) -> Confirm:
+    """Second opinion on one ply at `depth`, single line. Results land in `fresh` under their own
+    (depth, multipv) key so they are cached like any other line and a re-analysis reuses them."""
+    key = (depth, multipv)
+    have = dict(known.get(key, {}))
+    new = fresh.setdefault(key, {})
+
+    def score(fen: str) -> schemas.Score:
+        lines = have.get(fen) or new.get(fen)
+        if lines is None:
+            lines = analyse_board(chess.Board(fen), depth, multipv, engine)
+            new[fen] = lines
+        return lines[0].score
+
+    def confirm(fen_before: str, fen_after: str) -> tuple[schemas.Score, schemas.Score]:
+        return score(fen_before), score(fen_after)
+
+    return confirm
+
+
+def _analyze_with(
+    engine: Engine, pgn: str, depth: int, multipv: int, known: Cached
+) -> tuple[schemas.AnalysisSummary, list[schemas.MoveAnalysis], Fresh]:
+    start, plies = walk_pgn(pgn)
+    fens = [start.fen()] + [p.fen_after for p in plies]
+    lines_by_fen: dict[str, list[schemas.EngineLine]] = dict(known.get((depth, multipv), {}))
+    missing = [fen for fen in dict.fromkeys(fens) if fen not in lines_by_fen]
+    fresh: Fresh = {}
+    if missing:
+        results = analyse_boards((chess.Board(fen) for fen in missing), depth, multipv, engine)
+        computed = dict(zip(missing, results, strict=True))
+        fresh[(depth, multipv)] = computed
+        lines_by_fen.update(computed)
+    confirm = _confirmer(depth + CONFIRM_DEPTH_BONUS, 1, engine, known, fresh)
+    summary, moves = build_analysis(start, plies, lines_by_fen, confirm)
+    summary.multipv = multipv
+    return summary, moves, fresh
+
+
 def _analyze(
     pgn: str,
     depth: int,
     multipv: int,
     engine: Engine | None,
-    known: Mapping[str, list[schemas.EngineLine]] | None,
-) -> tuple[
-    schemas.AnalysisSummary, list[schemas.MoveAnalysis], dict[str, list[schemas.EngineLine]]
-]:
+    known: Cached | None,
+) -> tuple[schemas.AnalysisSummary, list[schemas.MoveAnalysis], Fresh]:
     """Walk the game, analyse the positions not in `known`, classify. The third value holds the
-    lines that were freshly computed, for the caller to cache."""
-    start, plies = walk_pgn(pgn)
-    fens = [start.fen()] + [p.fen_after for p in plies]
-    lines_by_fen: dict[str, list[schemas.EngineLine]] = dict(known or {})
-    missing = [fen for fen in dict.fromkeys(fens) if fen not in lines_by_fen]
-    fresh: dict[str, list[schemas.EngineLine]] = {}
-    if missing:
-        results = analyse_boards((chess.Board(fen) for fen in missing), depth, multipv, engine)
-        fresh = dict(zip(missing, results, strict=True))
-        lines_by_fen.update(fresh)
-    summary, moves = build_analysis(start, plies, lines_by_fen)
-    return summary, moves, fresh
+    lines that were freshly computed, for the caller to cache. One engine serves the whole game,
+    including the deeper confirmation searches."""
+    if engine is not None:
+        return _analyze_with(engine, pgn, depth, multipv, known or {})
+    with pool.borrow() as borrowed:
+        return _analyze_with(borrowed, pgn, depth, multipv, known or {})
 
 
 def analyze_game(
@@ -429,14 +526,13 @@ def analyze_game(
     known: Mapping[str, list[schemas.EngineLine]] | None = None,
 ) -> tuple[schemas.AnalysisSummary, list[schemas.MoveAnalysis]]:
     """Sync, engine only: analyse every position of the game and classify each move.
-    `known` lets a caller pass lines it already has (the cache) so they are not recomputed."""
+    `known` lets a caller pass lines it already has (the cache) at `depth`/`multipv` so they are
+    not recomputed."""
     settings = get_settings()
+    depth = depth or settings.engine_depth
+    multipv = multipv or settings.engine_multipv
     summary, moves, _ = _analyze(
-        game.pgn,
-        depth or settings.engine_depth,
-        multipv or settings.engine_multipv,
-        engine,
-        known,
+        game.pgn, depth, multipv, engine, {(depth, multipv): known} if known else None
     )
     return summary, moves
 
@@ -508,7 +604,8 @@ async def run_analysis(
             name = await asyncio.to_thread(engine_name)
         except RuntimeError as exc:
             row = await reset_analysis(session, game_id, depth, "stockfish", status="failed")
-            row.error = f"엔진을 찾을 수 없습니다: {exc}"
+            missing = f"엔진을 찾을 수 없습니다: {exc}"
+            row.error = str(exc) if isinstance(exc, EngineBusy) else missing
             await session.commit()
             return to_game_analysis(row)
         row = await reset_analysis(session, game_id, depth, name, status="running")
@@ -517,11 +614,13 @@ async def run_analysis(
     try:
         start, plies = walk_pgn(pgn)
         fens = [start.fen()] + [p.fen_after for p in plies]
+        keys = [(depth, multipv), (depth + CONFIRM_DEPTH_BONUS, 1)]
         async with factory() as session:
-            known = await _cached_lines(session, fens, name, depth, multipv)
+            known: Fresh = {key: await _cached_lines(session, fens, name, *key) for key in keys}
         summary, moves, fresh = await asyncio.to_thread(_analyze, pgn, depth, multipv, None, known)
         async with factory() as session:
-            await _store_lines(session, fresh, name, depth, multipv)
+            for (fresh_depth, fresh_multipv), entries in fresh.items():
+                await _store_lines(session, entries, name, fresh_depth, fresh_multipv)
     except Exception as exc:  # noqa: BLE001 - recorded on the row, the job must not die silently
         log.exception("analysis of game %s failed", game_id)
         async with factory() as session:
@@ -549,22 +648,46 @@ def submit_analysis(game_id: int, depth: int | None = None, multipv: int | None 
     return key
 
 
+def answers(row: models.Analysis, depth: int | None, multipv: int | None) -> bool:
+    """Whether a finished row answers this request. A caller that asked for a depth or a MultiPV
+    width gets exactly that or a new run: the parameter is documented on /review and /analysis,
+    and silently serving a shallower analysis is what made it look like it did nothing. A caller
+    that asked for neither takes whatever is stored."""
+    if depth is not None and row.depth != depth:
+        return False
+    stored = (row.summary or {}).get("multipv", 0)
+    return not (multipv is not None and stored != multipv)
+
+
+async def _stored(
+    game_id: int, depth: int | None, multipv: int | None
+) -> schemas.GameAnalysis | None:
+    async with session_factory()() as session:
+        row = await get_analysis_row(session, game_id)
+        if row is not None and row.status == "done" and answers(row, depth, multipv):
+            return to_game_analysis(row)
+    return None
+
+
 async def get_or_analyze(
     game_id: int, depth: int | None = None, multipv: int | None = None
 ) -> schemas.GameAnalysis:
-    """Stored analysis when it is done; otherwise analyse now and return the result. Other
-    modules (review, profile, puzzles) call this and can rely on getting a finished analysis or a
-    row whose status is 'failed' with an error."""
-    async with session_factory()() as session:
-        row = await get_analysis_row(session, game_id)
-        if row is not None and row.status == "done":
-            return to_game_analysis(row)
+    """Stored analysis when it is done and was computed for this depth and width; otherwise
+    analyse now and return the result. Other modules (review, profile, puzzles) call this and can
+    rely on getting a finished analysis, a row whose status is 'failed' with an error, or a
+    'running' row when another caller's analysis of the same game is still going."""
+    stored = await _stored(game_id, depth, multipv)
+    if stored is not None:
+        return stored
     key = job_key(game_id)
     job = runner.get(key)
     if job is not None and job.status in ("pending", "running"):
-        await runner.wait(key, timeout=600.0)
-        async with session_factory()() as session:
-            row = await get_analysis_row(session, game_id)
-            if row is not None and row.status == "done":
-                return to_game_analysis(row)
+        try:
+            await runner.wait(key, timeout=600.0)
+        except TimeoutError:
+            # Still running: report that rather than starting a second analysis of the same game.
+            return await get_analysis(game_id)
+        stored = await _stored(game_id, depth, multipv)
+        if stored is not None:
+            return stored
     return await run_analysis(game_id, depth, multipv)

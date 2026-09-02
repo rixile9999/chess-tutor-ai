@@ -27,6 +27,25 @@ const TABS: { key: ImportTab; label: string }[] = [
 
 const SOURCE_LABEL: Record<ImportTab, string> = { pgn: 'PGN', chesscom: 'chess.com', lichess: 'lichess' };
 
+/**
+ * One Korean sentence describing an import. `errors` holds the games the parser rejected and they
+ * are also counted in `skipped`, so "이미 저장됨" is skipped minus errors: a rejected PGN must never
+ * be reported as an already saved game.
+ */
+export function importSummary(result: ImportResult, source: ImportTab): string {
+  const failed = result.errors.length;
+  const already = Math.max(0, result.skipped - failed);
+  if (result.imported > 0) {
+    const tail = already > 0 ? ` ${already}판은 이미 있어 건너뛰었습니다.` : '';
+    const bad = failed > 0 ? ` ${failed}판은 읽지 못했습니다.` : '';
+    return `${SOURCE_LABEL[source]}에서 ${result.imported}판을 새로 저장했습니다.${tail}${bad}`;
+  }
+  if (failed > 0 && already > 0) return `새로 저장한 기보가 없습니다. ${already}판은 이미 있고, ${failed}판은 읽지 못했습니다.`;
+  if (failed > 0) return `새로 저장한 기보가 없습니다. ${failed}판을 읽지 못했습니다.`;
+  if (already > 0) return '새 기보가 없습니다. 모두 이미 저장된 기보입니다.';
+  return '가져올 기보를 찾지 못했습니다.';
+}
+
 function clampInt(value: string | number, min: number, max: number, fallback: number): number {
   const n = Math.trunc(Number(value));
   if (!Number.isFinite(n)) return fallback;
@@ -56,6 +75,7 @@ export function ImportPanel({ username, onImported, onClose }: Props) {
         skipped: raw?.skipped ?? 0,
         game_ids: Array.isArray(raw?.game_ids) ? raw.game_ids : [],
         user_id: raw?.user_id ?? null,
+        errors: Array.isArray(raw?.errors) ? raw.errors.filter((m): m is string => typeof m === 'string') : [],
       };
       setState({ kind: 'ok', result, source });
       onImported(result, usedUsername);
@@ -235,17 +255,18 @@ export function ImportPanel({ username, onImported, onClose }: Props) {
 
       {state.kind === 'ok' && (
         <div className="games-import-result" role="status">
-          <IconCheck className="games-ok" />
+          {state.result.errors.length > 0 ? <IconAlert className="games-bad" /> : <IconCheck className="games-ok" />}
           <span className="badge badge-good">가져옴 {state.result.imported}</span>
           <span className="badge badge-neutral">건너뜀 {state.result.skipped}</span>
-          <span className="muted">
-            {state.result.imported > 0
-              ? `${SOURCE_LABEL[state.source]}에서 ${state.result.imported}판을 새로 저장했습니다.`
-              : state.result.skipped > 0
-                ? '새 기보가 없습니다. 모두 이미 저장된 기보입니다.'
-                : '가져올 기보를 찾지 못했습니다.'}
-            {state.result.skipped > 0 && state.result.imported > 0 ? ` ${state.result.skipped}판은 이미 있어 건너뛰었습니다.` : ''}
-          </span>
+          {state.result.errors.length > 0 && (
+            <span className="badge badge-bad">읽지 못함 {state.result.errors.length}</span>
+          )}
+          <span className="muted">{importSummary(state.result, state.source)}</span>
+          {state.result.errors.length > 0 && (
+            <ul className="games-import-errors">
+              {state.result.errors.map((message, i) => <li key={`${i}-${message}`}>{message}</li>)}
+            </ul>
+          )}
         </div>
       )}
       {state.kind === 'error' && (

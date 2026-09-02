@@ -77,6 +77,17 @@ def test_passed_doubled_and_backward_pawns() -> None:
     assert backward.black.backward_pawns == ["d6"]
 
 
+def test_doubled_row_counts_extra_pawns_like_the_score() -> None:
+    # Three c-pawns are two pawns too many on one file: the row says 2, not "one file".
+    f = static_features(chess.Board("4k3/8/8/8/2P5/2P5/2PP4/4K3 w - - 0 1"))
+    row = next(r for r in summarize_features(f, "white") if r.feature == LABEL_PAWNS)
+    assert f.white.doubled_pawns == ["c2", "c3", "c4"]
+    assert row.a == "이중 c폰 2, 폰 섬 1"
+    black = static_features(chess.Board("4k3/2pp4/2p5/2p5/8/8/8/4K3 w - - 0 1"))
+    black_row = next(r for r in summarize_features(black, "black") if r.feature == LABEL_PAWNS)
+    assert black_row.a == "이중 c폰 2, 폰 섬 1"
+
+
 def test_outpost_requires_pawn_support_and_no_pawn_lever() -> None:
     # Sveshnikov-style d5 knight: e4 supports it and no black c/e pawn can ever chase it.
     board = chess.Board("r2qkb1r/5ppp/p2p4/1p1Np3/4P3/8/PPP2PPP/R2QKB1R w KQkq - 0 1")

@@ -100,8 +100,9 @@ button.rv-mv:hover { border-color: var(--line-strong); background: rgba(43, 38, 
 .rv-legend { display: flex; gap: 16px; flex-wrap: wrap; }
 .rv-legend span { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink-2); }
 .rv-legend i { display: inline-block; width: 18px; height: 0; border-top: 3px solid var(--good); }
-.rv-legend i.dashed { border-top-style: dashed; border-top-color: var(--bad); }
-.rv-legend i.box { width: 14px; height: 14px; border: 2.5px solid var(--ink); border-radius: 3px; }
+/* Dashed arrows are drawn as a thicker line (see review/shared arrowShapes), so the swatch matches that. */
+.rv-legend i.thick { border-top-width: 5px; border-top-color: var(--bad); }
+.rv-legend i.mark { width: 13px; height: 13px; border: 2.5px solid var(--ink-3); border-radius: 50%; }
 .rv-two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
 .rv-plan { display: flex; flex-direction: column; gap: 2px; padding: 8px 0; border-bottom: 1px solid var(--line); }
 .rv-plan-title { display: flex; align-items: center; gap: 8px; font-size: 13.5px; font-weight: 600; }

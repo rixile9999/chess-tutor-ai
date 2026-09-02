@@ -26,7 +26,7 @@ import chess
 from pydantic import BaseModel
 
 from chess_tutor.config import get_settings
-from chess_tutor.motifs import PIECE_KOREAN, detect
+from chess_tutor.motifs import PIECE_KOREAN
 from chess_tutor.schemas import (
     Alternative,
     Classification,
@@ -62,6 +62,8 @@ SOURCE_KO: dict[str, str] = {"maia": "Maia 예측", "engine": "엔진 기반 추
 _SQUARE_MENTION = re.compile(r"[a-h][1-8]")
 """A square name anywhere in a sentence (no word boundaries: Korean particles and piece
 letters sit right next to it, as in 'Rd1이')."""
+_QUOTED = re.compile(r"'[^']*'")
+"""Quoted plan titles from the knowledge base ('...d5 브레이크'): names, not board claims."""
 _SAN_PREFIX = re.compile(r"^[^:]{1,12}:\s*")
 
 
@@ -111,8 +113,8 @@ class Sentence:
     text: str
     claims: list[Claim] = field(default_factory=list)
     unresolved: int = 0
-    """Claims that could not be mapped to a board (or a board fact stated with no claim at
-    all). They count as failed, so such a sentence never passes."""
+    """Claims that could not be mapped to a board. They count as failed, so such a sentence
+    never passes. Squares the claims do not cover are counted the same way by the gate."""
 
 
 # ---------- Korean helpers ----------
@@ -213,6 +215,36 @@ def _piece_claim(board: chess.Board, square: str) -> Claim | None:
     return Claim(kind="piece_on", fen=board.fen(), subject=square, object=piece.symbol())
 
 
+def _claimed_squares(claims: list[Claim]) -> set[str]:
+    """Squares a sentence's claims put on the board: the subject/object of every claim plus
+    both ends of every legal_move SAN (playing 'Nxf6+' is a statement about d5 and f6)."""
+    out: set[str] = set()
+    for claim in claims:
+        for value in (claim.subject, claim.object):
+            if value in chess.SQUARE_NAMES:
+                out.add(str(value))
+        if claim.kind != "legal_move" or claim.object is None:
+            continue
+        try:
+            board = chess.Board(claim.fen)
+            move = board.parse_san(claim.object)
+        except ValueError:
+            continue
+        out.add(chess.square_name(move.from_square))
+        out.add(chess.square_name(move.to_square))
+    return out
+
+
+def unclaimed_squares(text: str, claims: list[Claim]) -> int:
+    """How many squares a sentence names that none of its claims covers.
+
+    A sentence that says 'Rd1이 d7을 노립니다' with no attacks claim states a board fact the
+    verifier never sees, so it counts as failed. The rule applies to both writers: a template
+    sentence with a forgotten claim is no more checkable than an LLM one."""
+    named = set(_SQUARE_MENTION.findall(_QUOTED.sub("", text)))
+    return len(named - _claimed_squares(claims))
+
+
 def _line_kind(a: chess.Square, b: chess.Square) -> str:
     if chess.square_file(a) == chess.square_file(b):
         return f"{chess.FILE_NAMES[chess.square_file(a)]}파일"
@@ -226,15 +258,20 @@ def _line_kind(a: chess.Square, b: chess.Square) -> str:
 
 def _lead_sentences(facts: ReviewFacts) -> list[Sentence]:
     out: list[Sentence] = []
+    natural_holds = False
     if facts.natural_reason:
-        out.append(Sentence(facts.natural_reason, list(facts.natural_claims)))
+        natural = Sentence(facts.natural_reason, list(facts.natural_claims))
+        natural_holds = _holds(natural)
+        out.append(natural)
     refutation = facts.refutation
     if refutation is not None and refutation.main_line and facts.fen_punished:
-        geometry = _discovery_geometry(facts)
+        # '자연스러운 반응이지만' only makes sense after the sentence it refers back to, and
+        # that sentence is dropped when its own claims fail.
+        geometry = _discovery_geometry(facts, natural_holds)
         if geometry is not None:
             out.append(geometry)
         else:
-            opener = "자연스러운 반응이지만" if facts.natural_reason else "하지만"
+            opener = "자연스러운 반응이지만" if natural_holds else "하지만"
             out.append(
                 Sentence(
                     f"{opener} {josa(refutation.main_line[0], '이')} 있습니다. "
@@ -243,25 +280,43 @@ def _lead_sentences(facts: ReviewFacts) -> list[Sentence]:
                     [Claim(kind="legal_move", fen=facts.fen_after, object=refutation.main_line[0])],
                 )
             )
-    else:
-        out.append(Sentence(_eval_sentence(facts)))
+    elif not (facts.natural_reason and chess.Board(facts.fen_after).is_checkmate()):
+        out.append(_eval_sentence(facts))
     return out
 
 
-def _eval_sentence(facts: ReviewFacts) -> str:
-    text = f"이 수 뒤 평가는 {fmt_score(facts.eval_after)}입니다."
+def _eval_text(facts: ReviewFacts) -> str:
+    """The evaluation in one clause. A delivered mate is stored as ±100 pawns, and
+    '이 수 뒤 평가는 +100.0입니다' is a number no position ever has."""
+    if chess.Board(facts.fen_after).is_checkmate():
+        return "이 수로 체크메이트입니다."
+    return f"이 수 뒤 평가는 {fmt_score(facts.eval_after)}입니다."
+
+
+def _eval_sentence(facts: ReviewFacts) -> Sentence:
+    text = _eval_text(facts)
+    if text.endswith("체크메이트입니다."):
+        return Sentence(text, [Claim(kind="checkmate", fen=facts.fen_after)])
+    claims: list[Claim] = []
     if facts.classification == "best":
-        text += " 엔진 최선 수와 같습니다."
+        # The deeper confirmation search can score the played move at least as well as the
+        # MultiPV best of the shallow search, so 'best' does not imply the same move.
+        if facts.best_san and facts.best_san != facts.san:
+            text += f" 엔진 최선 {josa(facts.best_san, '과')} 차이가 없습니다."
+            claims.append(Claim(kind="legal_move", fen=facts.fen_before, object=facts.best_san))
+        else:
+            text += " 엔진 최선 수와 같습니다."
     elif facts.classification == "book":
         text += " 오프닝 책에 있는 수입니다."
     elif facts.classification == "forced":
         text += " 둘 수 있는 유일한 수였습니다."
     elif facts.best_san and facts.best_san != facts.san:
         text += f" 엔진 최선은 {facts.best_san}입니다."
-    return text
+        claims.append(Claim(kind="legal_move", fen=facts.fen_before, object=facts.best_san))
+    return Sentence(text, claims)
 
 
-def _discovery_geometry(facts: ReviewFacts) -> Sentence | None:
+def _discovery_geometry(facts: ReviewFacts, natural_holds: bool = False) -> Sentence | None:
     """'Qd7이 Rd1과 같은 d파일에 놓입니다. 지금은 Nd5가 사이를 가리고 있을 뿐입니다.'
     Built from a discovered-attack motif of the punishing move: attacker, target and the
     square the punishing piece leaves. Every square named becomes a claim."""
@@ -292,13 +347,31 @@ def _discovery_geometry(facts: ReviewFacts) -> Sentence | None:
                 Claim(kind="square_empty", fen=facts.fen_after, subject=chess.square_name(sq))
             )
     claims.append(Claim(kind="attacks", fen=facts.fen_punished, subject=attacker, object=target))
-    opener = "자연스러운 반응이지만," if facts.natural_reason else "하지만"
+    opener = "자연스러운 반응이지만," if natural_holds else "하지만"
     text = (
         f"{opener} {josa(piece_label(before, target), '이')} "
         f"{josa(piece_label(before, attacker), '과')} 같은 {_line_kind(a_sq, t_sq)}에 놓입니다. "
         f"지금은 {josa(piece_label(before, blocker), '이')} 사이를 가리고 있을 뿐입니다."
     )
     return Sentence(text, claims)
+
+
+def _threat_claims(fen: str, mating_san: str) -> list[Claim]:
+    """'X mates if the opponent passes': the move is legal after a null move and the position
+    it reaches is checkmate. An empty list when the SAN does not fit, so the sentence fails."""
+    board = chess.Board(fen)
+    if board.is_check() or board.is_game_over():
+        return []
+    board.push(chess.Move.null())
+    passed = board.fen()
+    try:
+        board.push_san(mating_san)
+    except ValueError:
+        return [Claim(kind="legal_move", fen=passed, object=mating_san)]
+    return [
+        Claim(kind="legal_move", fen=passed, object=mating_san),
+        Claim(kind="checkmate", fen=board.fen()),
+    ]
 
 
 def _motif_sentence(facts: ReviewFacts, motif: MotifOut) -> Sentence | None:
@@ -350,6 +423,14 @@ def _motif_sentence(facts: ReviewFacts, motif: MotifOut) -> Sentence | None:
             text = f"{label}: {head} 포크로 {josa(joined, '을')} 동시에 공격합니다.{check_tail}"
         case "pin" | "skewer" if len(targets) == 2:
             attacks(motif.attacker, targets[0])
+            # The piece behind and the empty squares between are what make it a pin, so they
+            # are claimed too; the attacks claim alone leaves half the sentence unchecked.
+            behind_claim = _piece_claim(after, targets[1])
+            if behind_claim is not None:
+                claims.append(behind_claim)
+            front_sq, behind_sq = (chess.parse_square(t) for t in targets)
+            for sq in chess.SquareSet(chess.between(front_sq, behind_sq)):
+                claims.append(Claim(kind="square_empty", fen=fen, subject=chess.square_name(sq)))
             a, front, behind = named(motif.attacker), named(targets[0]), named(targets[1])
             if motif.kind == "pin":
                 text = (
@@ -394,6 +475,10 @@ def _motif_sentence(facts: ReviewFacts, motif: MotifOut) -> Sentence | None:
             claim = _piece_claim(after, motif.attacker)
             if claim is not None:
                 claims.append(claim)
+            # The mate is a threat: it is the mover's move in a position where the opponent
+            # is to move, so it is claimed on the position after a pass, which is what
+            # 'threatens mate' means. parse_san ignores the '#', hence the checkmate claim.
+            claims.extend(_threat_claims(fen, motif.line[0]))
             text = f"{label}: {motif.line[0]} 메이트를 위협합니다.{check_tail}"
         case _:
             if motif.attacker != motif.mover or not targets:
@@ -412,37 +497,73 @@ def _main_line_sentence(facts: ReviewFacts) -> Sentence | None:
     return Sentence(f"이어지는 수순: {text}.", claims)
 
 
+BRANCH_SENTENCES = 2
+"""Branches put in prose. Three near-identical '…로 끝납니다' lines is the repetition a reader
+notices; the rest of the branches stay in the payload for the move list."""
+
+
 def _branch_sentences(facts: ReviewFacts) -> list[Sentence]:
     assert facts.refutation is not None
     out: list[Sentence] = []
     if not facts.fen_punished:
         return out
     board = chess.Board(facts.fen_punished)
-    for branch in facts.refutation.branches:
-        if not branch.moves:
+    mover = board.turn
+    main = facts.refutation.main_line
+    branches = facts.refutation.branches
+    for branch in branches:
+        if len(out) >= BRANCH_SENTENCES or not branch.moves:
             continue
+        if list(branch.moves) == main[1 : 1 + len(branch.moves)]:
+            continue  # the main-line sentence already showed exactly this
+        # '같은 결과' points at the first branch; when that one was not printed, say the
+        # outcome itself instead of referring back to a sentence the reader never saw.
+        result = branches[0].result if not out else branch.result
         reply = move_label(facts.fen_punished, branch.moves[0])
         claims = [Claim(kind="legal_move", fen=facts.fen_punished, object=branch.moves[0])]
         probe = board.copy()
         try:
             probe.push_san(branch.moves[0])
         except ValueError:
-            out.append(Sentence(f"{reply}: {branch.result}.", claims))
+            out.append(Sentence(f"{reply}: {result}.", claims))
             continue
         rest, rest_claims = numbered_line(probe.fen(), branch.moves[1:])
         claims.extend(rest_claims)
-        if rest:
-            text = f"{reply}에는 {josa(rest, '이')} 있어 {josa(branch.result, '로')} 끝납니다."
+        end = _replay(probe, branch.moves[1:])
+        if end is not None and end.is_checkmate() and end.turn != mover:
+            # The side that played branch.moves[0] is the one mating, so the usual 'X에는 Y가
+            # 있어' framing (Y refutes X) would invert the line as well as mislabel it.
+            claims.append(Claim(kind="checkmate", fen=end.fen()))
+            text = (
+                f"{reply}: {josa(rest, '로')} 메이트를 만듭니다." if rest else f"{reply}: 메이트."
+            )
+        elif rest:
+            text = f"{reply}에는 {josa(rest, '이')} 있어 {josa(result, '로')} 끝납니다."
         else:
-            text = f"{reply}: {josa(branch.result, '로')} 끝납니다."
+            text = f"{reply}: {josa(result, '로')} 끝납니다."
         out.append(Sentence(text, claims))
     return out
+
+
+def _replay(board: chess.Board, sans: list[str]) -> chess.Board | None:
+    probe = board.copy()
+    for san in sans:
+        try:
+            probe.push_san(san)
+        except ValueError:
+            return None
+    return probe
 
 
 def _note_sentence(facts: ReviewFacts) -> Sentence | None:
     if facts.refutation is None or not facts.refutation.note:
         return None
     claims: list[Claim] = []
+    if facts.refutation.main_line:
+        # The note names the punishment it recommends as well as the one it rejects.
+        claims.append(
+            Claim(kind="legal_move", fen=facts.fen_after, object=facts.refutation.main_line[0])
+        )
     if len(facts.note_line) >= 2:
         board = chess.Board(facts.fen_after)
         claims.append(Claim(kind="legal_move", fen=facts.fen_after, object=facts.note_line[0]))
@@ -454,37 +575,32 @@ def _note_sentence(facts: ReviewFacts) -> Sentence | None:
     return Sentence(facts.refutation.note, claims)
 
 
+def _guessed_alternative_claims(
+    facts: ReviewFacts, board: chess.Board, alt: Alternative
+) -> list[Claim]:
+    """Claims for an Alternative that carries none of its own (a payload built before
+    explain_alternative returned them): the move itself and the piece it takes."""
+    claims = [Claim(kind="legal_move", fen=facts.fen_before, object=alt.san)]
+    try:
+        move = board.parse_san(alt.san)
+    except ValueError:
+        return claims
+    if board.is_capture(move) and not board.is_en_passant(move):
+        claim = _piece_claim(board, chess.square_name(move.to_square))
+        if claim is not None:
+            claims.append(claim)
+    return claims
+
+
 def _alternative_sentences(facts: ReviewFacts) -> list[Sentence]:
     out: list[Sentence] = []
     board = chess.Board(facts.fen_before)
     for alt in facts.alternatives:
         if alt.san == facts.san:
             continue
-        claims = [Claim(kind="legal_move", fen=facts.fen_before, object=alt.san)]
-        try:
-            move = board.parse_san(alt.san)
-        except ValueError:
-            out.append(Sentence(alt.san, claims))
-            continue
-        if board.is_capture(move) and not board.is_en_passant(move):
-            claim = _piece_claim(board, chess.square_name(move.to_square))
-            if claim is not None:
-                claims.append(claim)
-        after = board.copy()
-        after.push(move)
-        for motif in detect(board, move):
-            if motif.kind in ("fork", "discovered_attack", "hanging_piece", "pin", "skewer"):
-                for t in motif.targets[:2]:
-                    claims.append(
-                        Claim(
-                            kind="attacks",
-                            fen=after.fen(),
-                            subject=chess.square_name(motif.attacker),
-                            object=chess.square_name(t),
-                        )
-                    )
-        if alt.line:
-            claims.append(Claim(kind="legal_move", fen=after.fen(), object=alt.line[0]))
+        # reasoning.explain_alternative writes the prose and hands over a claim for every
+        # fact in it, so the two cannot drift; the fallback below only covers old payloads.
+        claims = list(alt.claims) or _guessed_alternative_claims(facts, board, alt)
         tag = "엔진 최선" if alt.is_best else "차선"
         why = (
             _SAN_PREFIX.sub("", alt.why, count=1) if alt.why.startswith(f"{alt.san}:") else alt.why
@@ -550,7 +666,11 @@ def _strategy_sentence(facts: ReviewFacts) -> Sentence | None:
     text = text.rstrip(".") + "."
     if facts.structure_name:
         text = f"구조는 {facts.structure_name}입니다. " + text
-    return Sentence(text, [Claim(kind="legal_move", fen=facts.fen_before, object=facts.san)])
+    claims = [Claim(kind="legal_move", fen=facts.fen_before, object=facts.san)]
+    if facts.best_san and facts.best_san in text:
+        # The note can recommend the engine move ('엔진 최선 Nxd5는 계획 ...의 수입니다').
+        claims.append(Claim(kind="legal_move", fen=facts.fen_before, object=facts.best_san))
+    return Sentence(text, claims)
 
 
 def _body_sentences(facts: ReviewFacts) -> list[Sentence]:
@@ -595,6 +715,13 @@ def _verdicts(claims: list[Claim]) -> list[Verdict]:
     return out
 
 
+def _holds(sentence: Sentence) -> bool:
+    """Whether this sentence would survive the gate on its own."""
+    if sentence.unresolved or unclaimed_squares(sentence.text, sentence.claims):
+        return False
+    return all(verdict.holds for verdict in _verdicts(sentence.claims))
+
+
 def _gate(
     facts: ReviewFacts,
     head: str,
@@ -602,7 +729,8 @@ def _gate(
     body: list[Sentence],
     source: Literal["llm", "template"],
 ) -> Explanation:
-    """Verify every claim, drop sentences with a failing one, count the rest."""
+    """Verify every claim, drop sentences with a failing one or with a board fact no claim
+    covers, and count the rest. The fallback lead goes through the same check."""
     kept_lead: list[str] = []
     kept_body: list[str] = []
     kept_claims: list[Claim] = []
@@ -612,16 +740,22 @@ def _gate(
     for group, kept in ((lead, kept_lead), (body, kept_body)):
         for sentence in group:
             verdicts = _verdicts(sentence.claims)
-            total += len(verdicts) + sentence.unresolved
+            missing = sentence.unresolved + unclaimed_squares(sentence.text, sentence.claims)
+            total += len(verdicts) + missing
             holding += sum(1 for v in verdicts if v.holds)
-            if sentence.unresolved or not all(v.holds for v in verdicts):
+            if missing or not all(v.holds for v in verdicts):
                 dropped += 1
                 continue
             kept.append(sentence.text)
             kept_claims.extend(sentence.claims)
+    if not kept_lead:
+        # Every lead sentence failed. What is left is the evaluation itself, which is engine
+        # data rather than a board fact, so it needs no claim; the best-move clause of
+        # _eval_sentence does need one and is not repeated here.
+        kept_lead.append(_eval_text(facts))
     return Explanation(
         headline=head,
-        lead=" ".join(kept_lead) or _eval_sentence(facts),
+        lead=" ".join(kept_lead),
         sentences=kept_body,
         claims=kept_claims,
         verified=total > 0 and dropped == 0,
@@ -649,10 +783,12 @@ LLM_SYSTEM = "\n".join(
         "3. 문장마다 그 문장이 기대는 보드 사실을 claims로 나열합니다. 검증기가 각 claim을 "
         "보드와 대조하고, 하나라도 틀리면 그 문장은 출력되지 않습니다.",
         "   - kind: attacks(subject 칸의 기물이 object 칸을 공격), defends(같은 색 기물 보호), "
-        "is_check(그 국면이 체크), piece_on(subject 칸에 object 기물 기호, 백은 대문자 흑은 "
-        "소문자), square_empty, legal_move(object가 그 국면에서 둘 수 있는 SAN)",
-        "   - position: JSON의 positions 키 중 하나(before, after, punished 등). 칸과 기물 "
-        "이름이 나오는 문장에는 반드시 claims가 있어야 합니다.",
+        "is_check(그 국면이 체크), checkmate(그 국면이 체크메이트), piece_on(subject 칸에 "
+        "object 기물 기호, 백은 대문자 흑은 소문자), square_empty, "
+        "legal_move(object가 그 국면에서 둘 수 있는 SAN)",
+        "   - position: JSON의 positions 키 중 하나(before, after, punished 등). 문장에 나오는 "
+        "칸은 모두 그 문장의 claims가 덮어야 합니다(claim의 subject/object이거나 legal_move SAN이 "
+        "지나는 칸). 덮이지 않은 칸이 하나라도 있으면 그 문장은 버려집니다.",
         "4. 사람 수준에서 설명하기 어려운 엔진 수는 컴퓨터 수라고 부릅니다"
         "(human.computer_move가 true일 때만).",
         "5. 계획은 폰 구조 단위로 말합니다(structure_name, strategy_note가 있을 때만).",
@@ -688,8 +824,9 @@ def _sanitize(text: str) -> str:
 
 
 def _resolve(facts: ReviewFacts, text: str, claims: list[LLMClaim]) -> Sentence:
-    """Map position keys to FENs. A claim on an unknown position, or a sentence that names
-    squares without any claim, counts as unresolved and the sentence is dropped."""
+    """Map position keys to FENs. A claim on an unknown position counts as unresolved and the
+    sentence is dropped; squares the surviving claims do not cover are caught by the gate,
+    which applies the same rule to template sentences."""
     text = _sanitize(text)
     resolved: list[Claim] = []
     unresolved = 0
@@ -699,8 +836,6 @@ def _resolve(facts: ReviewFacts, text: str, claims: list[LLMClaim]) -> Sentence:
             unresolved += 1
             continue
         resolved.append(Claim(kind=claim.kind, fen=fen, subject=claim.subject, object=claim.object))
-    if not claims and _SQUARE_MENTION.search(text):
-        unresolved = 1
     return Sentence(text, resolved, unresolved=unresolved)
 
 

@@ -5,22 +5,30 @@ const FILES = 'abcdefgh';
 
 export interface PieceOption { code: string; label: string }
 
-/** Piece codes: piece letter + starting square, e.g. 'bf8' = the bishop that starts on f8 (colour comes from the colour toggle). */
+const colorLetter = (color: Color) => (color === 'white' ? 'w' : 'b');
+const homeRank = (color: Color) => (color === 'white' ? '1' : '8');
+
+/**
+ * Piece codes follow the API contract: colour letter (w/b) + starting square, e.g. 'bf8' is the
+ * black bishop that starts on f8. See services/openings_map.py `parse_piece`; the square must
+ * hold a piece of that colour in the starting position, so the rank follows the colour.
+ */
 export function pieceOptions(color: Color): PieceOption[] {
-  const r = color === 'white' ? '1' : '8';
+  const c = colorLetter(color);
+  const r = homeRank(color);
   const side = color === 'white' ? '백' : '흑';
-  const defs: [string, string, string][] = [
-    ['b', 'f', '비숍'], ['b', 'c', '비숍'], ['n', 'g', '나이트'], ['n', 'b', '나이트'],
-    ['q', 'd', '퀸'], ['r', 'a', '룩'], ['r', 'h', '룩'], ['k', 'e', '킹'],
+  const defs: [string, string][] = [
+    ['f', '비숍'], ['c', '비숍'], ['g', '나이트'], ['b', '나이트'],
+    ['d', '퀸'], ['a', '룩'], ['h', '룩'], ['e', '킹'],
   ];
-  return defs.map(([p, f, name]) => ({ code: `${p}${f}${r}`, label: `${side} ${f}${r} ${name}` }));
+  return defs.map(([f, name]) => ({ code: `${c}${f}${r}`, label: `${side} ${f}${r} ${name}` }));
 }
-export function defaultPiece(color: Color): string { return color === 'white' ? 'bf1' : 'bf8'; }
-/** Keep the same piece when the colour flips (f8 bishop <-> f1 bishop). */
+export function defaultPiece(color: Color): string { return `${colorLetter(color)}f${homeRank(color)}`; }
+/** Keep the same piece when the colour flips (f8 bishop <-> f1 bishop): swap both colour and rank. */
 export function mirrorPiece(code: string, color: Color): string {
-  const opts = pieceOptions(color);
-  const want = code.slice(0, 2) + (color === 'white' ? '1' : '8');
-  return opts.some((o) => o.code === want) ? want : defaultPiece(color);
+  const file = code.slice(1, 2);
+  const want = `${colorLetter(color)}${file}${homeRank(color)}`;
+  return pieceOptions(color).some((o) => o.code === want) ? want : defaultPiece(color);
 }
 
 type Props = { data: PieceHeatmap | null; color: Color; size?: number };

@@ -8,13 +8,17 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 
 import chess
+import pytest
 from httpx import AsyncClient
 from sqlalchemy import func, select
 
 from chess_tutor import db
 from chess_tutor.models import Analysis, Game, Puzzle, PuzzleAttempt, User
 from chess_tutor.schemas import Classification, EngineLine, MoveAnalysis, Score
+from chess_tutor.services import analysis as analysis_svc
+from chess_tutor.services import profile as profile_svc
 from chess_tutor.services import puzzles as svc
+from chess_tutor.services import users as user_svc
 
 # Black grabs a2 with the rook that guarded the back rank; White mates in two.
 BACK_RANK_BEFORE = "r2q2k1/1p3ppp/8/8/8/8/P3QPPP/4R1K1 b - - 0 30"
@@ -127,12 +131,18 @@ def replay(fen: str, ucis: list[str]) -> chess.Board:
     return board
 
 
-async def store_game(moves: list[MoveAnalysis], status: str = "done", user_id=None) -> int:
+async def store_game(
+    moves: list[MoveAnalysis],
+    status: str = "done",
+    user_id=None,
+    user_color: str | None = None,
+) -> int:
     async with db.session_factory()() as session:
         game = Game(
             source="pgn", source_id=f"g-{moves[0].ply}", pgn="*", white="w", black="b", result="*"
         )
         game.user_id = user_id
+        game.user_color = user_color
         session.add(game)
         await session.flush()
         session.add(
@@ -146,6 +156,36 @@ async def store_game(moves: list[MoveAnalysis], status: str = "done", user_id=No
         return game.id
 
 
+async def make_user(username: str, platform: str = "chesscom") -> int:
+    """Accounts are made by an import, never by a query parameter, so tests make their own."""
+    async with db.session_factory()() as session:
+        user = User(username=username, platform=platform)
+        session.add(user)
+        await session.commit()
+        return user.id
+
+
+def stored_lines(*move_lists: list[MoveAnalysis]) -> dict[str, list[EngineLine]]:
+    """What a deeper engine would answer if it still agreed with the stored analysis."""
+    return {m.fen_before: list(m.lines) for moves in move_lists for m in moves if m.lines}
+
+
+def patch_engine(
+    monkeypatch: pytest.MonkeyPatch, lines_by_fen: dict[str, list[EngineLine]]
+) -> list[tuple[str, int | None]]:
+    """Stand in for the verification engine; returns the (fen, depth) it was asked about."""
+    calls: list[tuple[str, int | None]] = []
+
+    async def get_lines(
+        fen: str, depth: int | None = None, multipv: int | None = None
+    ) -> list[EngineLine]:
+        calls.append((fen, depth))
+        return lines_by_fen.get(fen, [])
+
+    monkeypatch.setattr(analysis_svc, "get_lines", get_lines)
+    return calls
+
+
 # ---------- cutting puzzles (pure) ----------
 
 
@@ -156,7 +196,9 @@ def test_back_rank_blunder_becomes_mate_puzzle() -> None:
     assert puzzle.fen == error.fen_after
     assert svc.orientation_of(puzzle.fen) == "white"
     assert puzzle.solution == ["e2e8", "d8e8", "e1e8"]
-    assert puzzle.motif == "fork"  # the queen check hits d8 and g8
+    # Qe8+ hits Qd8 and Kg8, but Black's only reply takes the queen: it is a deflection
+    # sacrifice, not a fork, and no detector claims a motif for it.
+    assert puzzle.motif is None
     assert puzzle.ply == 60
     assert replay(puzzle.fen, puzzle.solution).is_checkmate()
 
@@ -186,7 +228,7 @@ def test_black_solver_gets_black_orientation() -> None:
     assert puzzle is not None
     assert svc.orientation_of(puzzle.fen) == "black"
     assert puzzle.solution == ["e7e1", "d1e1", "e8e1"]
-    assert puzzle.motif == "fork"
+    assert puzzle.motif is None  # mirrored deflection sacrifice, see the test above
     assert replay(puzzle.fen, puzzle.solution).is_checkmate()
 
 
@@ -250,6 +292,57 @@ def test_cut_puzzles_needs_the_following_ply() -> None:
     assert len(svc.cut_puzzles(back_rank_moves() + qd7_moves())) == 2
 
 
+def test_only_the_opponents_errors_become_puzzles() -> None:
+    """The solver punishes the error, so a puzzle cut from the owner's own blunder would hand
+    them the other colour and ask them to punish themselves."""
+    moves = back_rank_moves()  # Black errs with Rxa2, White punishes
+    assert moves[0].color == "black"
+
+    assert svc.cut_puzzles(moves, user_color="black") == []
+    (mine,) = svc.cut_puzzles(moves, user_color="white")
+    assert svc.orientation_of(mine.fen) == "white"
+
+    # A game with no known colour still yields every error, as before.
+    assert len(svc.cut_puzzles(moves)) == 1
+
+
+def test_user_color_of_falls_back_to_the_player_names() -> None:
+    game = Game(source="pgn", pgn="*", white="Duke", black="rival", result="*")
+    assert svc.user_color_of(game, "duke") == "white"
+    assert svc.user_color_of(game, " RIVAL ") == "black"
+    assert svc.user_color_of(game, "someone") is None
+    assert svc.user_color_of(game, None) is None
+    game.user_color = "black"
+    assert svc.user_color_of(game, "duke") == "black"  # the stored colour wins
+
+
+# ---------- verification (pure) ----------
+
+
+def test_verify_depth_never_drops_below_the_floor() -> None:
+    assert svc.verify_depth(8) == svc.VERIFY_DEPTH
+    assert svc.verify_depth(None) == svc.VERIFY_DEPTH
+    assert svc.verify_depth(24) == 24
+
+
+def test_verified_drops_what_a_deeper_look_contradicts() -> None:
+    error, reply = back_rank_moves()
+    puzzle = svc.cut_puzzle(error, reply)
+    assert puzzle is not None
+    board = chess.Board(puzzle.fen)
+
+    assert svc.verified(puzzle, [reply.lines[0]])  # the engine still says Qe8+
+
+    # The stored first move is not the best move: this is how a knight recapture that walks
+    # into mate in two was once served to the user as the answer.
+    assert not svc.verified(puzzle, [_line(board, ["Kf1"], Score(cp=30))])
+    # The solver is the one getting mated, so there is nothing to punish.
+    assert not svc.verified(puzzle, [_line(board, BACK_RANK_MATE, Score(mate=-2))])
+    # Nothing the engine can speak to is trusted.
+    assert not svc.verified(puzzle, [])
+    assert not svc.verified(puzzle, [EngineLine(rank=1, score=Score(cp=0), pv=[], pv_uci=[])])
+
+
 # ---------- spaced repetition (pure) ----------
 
 
@@ -288,6 +381,8 @@ def test_sm2_ease_is_bounded() -> None:
 
 
 async def test_generate_dedupes_the_same_position_per_user() -> None:
+    await make_user("rixile", platform="local")
+    await make_user("guest", platform="local")
     game_id = await store_game(back_rank_moves())
     async with db.session_factory()() as session:
         game = await session.get(Game, game_id)
@@ -311,6 +406,44 @@ async def test_generate_dedupes_the_same_position_per_user() -> None:
         assert len(await svc.due_puzzles(session)) == 2
 
 
+async def test_one_name_is_one_user_across_training_and_profile() -> None:
+    """'Duke' and 'duke' used to be two accounts: the profile counted the puzzles of both while
+    the training screen, matching the case exactly, showed none of them."""
+    duke_id = await make_user("duke", platform="chesscom")
+    game_id = await store_game(back_rank_moves())
+    async with db.session_factory()() as session:
+        game = await session.get(Game, game_id)
+        assert game is not None
+        created = await svc.generate_from_game(session, game, back_rank_moves(), username="Duke")
+        assert [p.user_id for p in created] == [duke_id]
+
+        # No second account was minted from the query parameter.
+        rows = (await session.execute(select(User))).scalars().all()
+        assert [(u.username, u.platform) for u in rows] == [("duke", "chesscom")]
+
+        # Training and the profile now count the same deck, whatever case the name arrives in.
+        assert [p.id for p in await svc.due_puzzles(session, username="DUKE")] == [created[0].id]
+        assert (await svc.training_summary(session, username="duke")).due_puzzles == 1
+        found = await profile_svc.find_users(session, "Duke")
+        assert (
+            await profile_svc.due_puzzle_count(session, [u.id for u in found], svc.now_utc()) == 1
+        )
+
+        with pytest.raises(user_svc.UserNotFound):
+            await svc.generate_from_game(session, game, back_rank_moves(), username="ghost")
+    async with db.session_factory()() as session:
+        assert (await session.execute(select(func.count()).select_from(User))).scalar_one() == 1
+
+
+async def test_generate_skips_the_owners_own_blunder() -> None:
+    """Black plays Rxa2 and the deck belongs to Black: nothing to solve as White."""
+    game_id = await store_game(back_rank_moves(), user_color="black")
+    async with db.session_factory()() as session:
+        game = await session.get(Game, game_id)
+        assert game is not None
+        assert await svc.generate_from_game(session, game, back_rank_moves()) == []
+
+
 async def test_generate_defaults_to_the_games_owner() -> None:
     async with db.session_factory()() as session:
         session.add(User(username="owner", platform="chesscom"))
@@ -330,15 +463,21 @@ async def test_generate_defaults_to_the_games_owner() -> None:
 # ---------- HTTP ----------
 
 
-async def test_from_game_flow_and_attempts(aclient: AsyncClient) -> None:
+async def test_from_game_flow_and_attempts(
+    aclient: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    await make_user("me")
     game_id = await store_game(back_rank_moves())
+    calls = patch_engine(monkeypatch, stored_lines(back_rank_moves()))
 
     res = await aclient.post(f"/training/puzzles/from-game/{game_id}", params={"username": "me"})
     assert res.status_code == 200, res.text
     (out,) = res.json()
+    # The candidate was re-checked, never below the floor even though the row says depth 16.
+    assert calls == [(out["fen"], svc.VERIFY_DEPTH)]
     assert out["orientation"] == "white"
     assert out["solution"] == ["e2e8", "d8e8", "e1e8"]
-    assert out["motif"] == "fork"
+    assert out["motif"] is None
     assert out["source_game_id"] == game_id and out["source_ply"] == 60
     assert out["reps"] == 0 and out["interval_days"] == 0.0
     assert datetime.fromisoformat(out["due_at"]) <= _now() + timedelta(seconds=1)
@@ -357,7 +496,7 @@ async def test_from_game_flow_and_attempts(aclient: AsyncClient) -> None:
     summary = await aclient.get("/training/summary", params={"username": "me"})
     assert summary.json() == {
         "due_puzzles": 1,
-        "motif_sets": [{"kind": "fork", "count": 1}],
+        "motif_sets": [],
         "studies": [],
     }
 
@@ -394,7 +533,11 @@ async def test_from_game_flow_and_attempts(aclient: AsyncClient) -> None:
         assert puzzle is not None and puzzle.lapses == 1 and puzzle.ease == 2.4
 
 
-async def test_summary_counts_motifs_across_games(aclient: AsyncClient) -> None:
+async def test_summary_counts_motifs_across_games(
+    aclient: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    await make_user("me")
+    patch_engine(monkeypatch, stored_lines(back_rank_moves(), qd7_moves()))
     for moves in (back_rank_moves(), qd7_moves()):
         game_id = await store_game(moves)
         res = await aclient.post(
@@ -403,10 +546,8 @@ async def test_summary_counts_motifs_across_games(aclient: AsyncClient) -> None:
         assert res.status_code == 200 and len(res.json()) == 1
     summary = (await aclient.get("/training/summary", params={"username": "me"})).json()
     assert summary["due_puzzles"] == 2
-    assert summary["motif_sets"] == [
-        {"kind": "discovered_attack", "count": 1},
-        {"kind": "fork", "count": 1},
-    ]
+    # only the Qd7 puzzle carries a motif; the back-rank sacrifice is tagged with none
+    assert summary["motif_sets"] == [{"kind": "discovered_attack", "count": 1}]
 
 
 async def test_from_game_requires_a_completed_analysis(aclient: AsyncClient) -> None:
@@ -425,6 +566,48 @@ async def test_from_game_requires_a_completed_analysis(aclient: AsyncClient) -> 
             await session.execute(select(Game.id).where(Game.source_id == "bare"))
         ).scalar_one()
     assert (await aclient.post(f"/training/puzzles/from-game/{bare_id}")).status_code == 409
+
+
+async def test_from_game_rejects_an_unknown_username(aclient: AsyncClient) -> None:
+    """A query parameter no longer mints an account whose deck the profile would count and the
+    training screen would never show."""
+    game_id = await store_game(back_rank_moves())
+    res = await aclient.post(f"/training/puzzles/from-game/{game_id}", params={"username": "ghost"})
+    assert res.status_code == 404
+    assert "사용자" in res.json()["detail"]
+    async with db.session_factory()() as session:
+        assert (await session.execute(select(func.count()).select_from(User))).scalar_one() == 0
+
+
+async def test_from_game_drops_a_puzzle_the_engine_contradicts(
+    aclient: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The stored line came from whatever depth the game was analysed at. When a deeper look
+    names a different best move, the candidate is dropped instead of taught."""
+    await make_user("me")
+    game_id = await store_game(back_rank_moves())
+    fen = back_rank_moves()[0].fen_after
+    patch_engine(monkeypatch, {fen: [_line(chess.Board(fen), ["Kf1"], Score(cp=30))]})
+
+    res = await aclient.post(f"/training/puzzles/from-game/{game_id}", params={"username": "me"})
+    assert res.status_code == 200, res.text
+    assert res.json() == []
+    async with db.session_factory()() as session:
+        assert (await session.execute(select(func.count()).select_from(Puzzle))).scalar_one() == 0
+
+
+async def test_from_game_reports_a_missing_engine(
+    aclient: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    await make_user("me")
+    game_id = await store_game(back_rank_moves())
+
+    async def no_engine(*_args: object, **_kwargs: object) -> list[EngineLine]:
+        raise RuntimeError("Stockfish not found")
+
+    monkeypatch.setattr(analysis_svc, "get_lines", no_engine)
+    res = await aclient.post(f"/training/puzzles/from-game/{game_id}", params={"username": "me"})
+    assert res.status_code == 503 and "엔진" in res.json()["detail"]
 
 
 async def test_unknown_puzzle_is_404(aclient: AsyncClient) -> None:

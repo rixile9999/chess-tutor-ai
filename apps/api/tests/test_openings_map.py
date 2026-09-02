@@ -291,6 +291,43 @@ def test_break_structure_filter_uses_classifier_when_available(
     assert sum(unfiltered["…d5"].histogram) == 2
 
 
+def test_break_structure_filter_with_the_real_classifier() -> None:
+    """The same filter driven by chess_tutor.structure instead of a stand-in module.
+
+    At move STRUCTURE_MOVE five of the six games are 볼레스랍스키 홀 and the third (which met
+    ...d5 on move 11) has an open centre, so each key selects a different subset and a
+    structure these games never reach empties every histogram."""
+    from chess_tutor.structure import classify
+
+    keys = []
+    for sans, _ in GAMES:
+        board = chess.Board()
+        for san in sans.split()[: 2 * om.STRUCTURE_MOVE]:
+            board.push_san(san)
+        keys.append(classify(board).key)
+    assert keys == ["boleslavsky_hole"] * 2 + ["open_center"] + ["boleslavsky_hole"] * 3
+
+    empty = {t.label: t for t in om.break_timing(game_rows(), "black", structure="iqp")}
+    assert all(sum(t.histogram) == 0 for t in empty.values())
+    assert all(t.my_avg is None for t in empty.values())
+
+    boleslavsky = {
+        t.label: t for t in om.break_timing(game_rows(), "black", structure="boleslavsky_hole")
+    }
+    assert boleslavsky["…b5"].histogram[0] == 1 and boleslavsky["…b5"].histogram[1] == 4
+    # Only the ...d5 of the fourth game survives; the third game is the open-centre one.
+    assert sum(boleslavsky["…d5"].histogram) == 1
+    assert boleslavsky["…d5"].histogram[13 - 10] == 1
+    assert boleslavsky["…d5"].my_avg == pytest.approx(13.0)
+
+    open_center = {
+        t.label: t for t in om.break_timing(game_rows(), "black", structure="open_center")
+    }
+    assert sum(open_center["…b5"].histogram) == 0
+    assert open_center["…d5"].histogram[11 - 10] == 1
+    assert open_center["…d5"].my_avg == pytest.approx(11.0)
+
+
 # ---------- HTTP ----------
 
 
@@ -364,8 +401,12 @@ async def test_breaks_endpoint(aclient: AsyncClient) -> None:
     assert len(body) == 11 and all(len(t["histogram"]) == 21 for t in body)
     d5 = next(t for t in body if t["label"] == "…d5")
     assert d5["my_avg"] == pytest.approx(12.0)
-    # An unknown structure is ignored while the classifier module does not exist.
+    # The classifier is real, so a structure these Sicilians never reach filters every game out:
+    # the response still carries all 11 breaks, with empty histograms.
     res = await aclient.get(
         "/openings/breaks", params={"username": "tester", "color": "black", "structure": "iqp"}
     )
-    assert res.status_code == 200 and len(res.json()) == 11
+    assert res.status_code == 200
+    filtered = res.json()
+    assert len(filtered) == 11
+    assert all(sum(t["histogram"]) == 0 and t["my_avg"] is None for t in filtered)

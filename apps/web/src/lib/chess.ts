@@ -46,6 +46,19 @@ export function sideToMove(fen: string): 'white' | 'black' {
   return fen.split(' ')[1] === 'b' ? 'black' : 'white';
 }
 
+/**
+ * 1-based ply of the move that produced this position, from the FEN's own side-to-move and
+ * fullmove counter. null for the starting position or an unreadable FEN.
+ */
+export function plyOfFen(fen: string): number | null {
+  const parts = fen.trim().split(/\s+/);
+  const turn = parts[1];
+  const full = Number(parts[5]);
+  if ((turn !== 'w' && turn !== 'b') || !Number.isInteger(full) || full < 1) return null;
+  const played = (full - 1) * 2 + (turn === 'w' ? 1 : 2) - 1;
+  return played >= 1 ? played : null;
+}
+
 export function applyUci(fen: string, uci: string): { fen: string; san: string } | null {
   try {
     const c = new Chess(fen);

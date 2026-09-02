@@ -32,3 +32,9 @@ design/chess-tutor-mockup.html
 
 # Local databases
 apps/api/*.db
+
+# Playwright MCP artifacts and ad-hoc screenshots
+.playwright-mcp/
+/*.jpeg
+/*.png
+.coverage
