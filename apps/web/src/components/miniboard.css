@@ -1,0 +1,12 @@
+.miniboard { display: grid; border-radius: 3px; overflow: hidden; box-shadow: 0 0 0 1px rgba(43, 38, 34, 0.3); }
+.mb-sq { position: relative; }
+.mb-sq.light { background: var(--board-light); }
+.mb-sq.dark { background: var(--board-dark); }
+.mb-sq.hl::after { content: ''; position: absolute; inset: 0; background: rgba(36, 120, 166, 0.45); }
+.mb-piece { position: absolute; inset: 0; background-size: 100%; background-repeat: no-repeat; }
+/* cburnett sprites are provided by chessground.cburnett.css as .cg-wrap piece.white.king etc.; we inline the
+   same data URIs via the classes below so no chessground instance is needed. */
+.mb-piece.wK { background-image: var(--wK); } .mb-piece.wQ { background-image: var(--wQ); } .mb-piece.wR { background-image: var(--wR); }
+.mb-piece.wB { background-image: var(--wB); } .mb-piece.wN { background-image: var(--wN); } .mb-piece.wP { background-image: var(--wP); }
+.mb-piece.bK { background-image: var(--bK); } .mb-piece.bQ { background-image: var(--bQ); } .mb-piece.bR { background-image: var(--bR); }
+.mb-piece.bB { background-image: var(--bB); } .mb-piece.bN { background-image: var(--bN); } .mb-piece.bP { background-image: var(--bP); }

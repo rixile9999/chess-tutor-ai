@@ -1,0 +1,4 @@
+.board { border-radius: 4px; overflow: hidden; box-shadow: 0 0 0 1px rgba(43, 38, 34, 0.25); }
+.board cg-board { background-color: var(--board-dark); }
+/* Arrow brushes used by the review payload: good / bad / ink (see api/types Arrow). */
+.board .cg-shapes g.good line, .board .cg-shapes g.good polygon { stroke: var(--good); fill: var(--good); }
