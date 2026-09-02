@@ -34,8 +34,9 @@ jobs:
       - run: uv run ruff format --check src tests
       - run: uv run ruff check src tests
       - run: uv run mypy src
-      - run: uv run pytest -q
-        timeout-minutes: 12
+      # -v and a per-test timeout so a runner-only hang names the test instead of eating the job.
+      - run: uv run pytest -v --timeout=180 --durations=15
+        timeout-minutes: 15
 
   web:
     runs-on: ubuntu-latest
