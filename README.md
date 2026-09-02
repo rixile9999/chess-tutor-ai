@@ -19,11 +19,13 @@ apps/web   Vite · React 19 · TypeScript · chessground
 ```bash
 brew install stockfish
 
-cd apps/api && uv sync --all-groups && uv run pytest
-uv run uvicorn chess_tutor.api:app --reload
+cd apps/api && uv sync --all-groups && uv run pytest -q     # Maia-2까지: --extra maia
+uv run uvicorn chess_tutor.api:app --reload                 # http://localhost:8000/docs
 
-cd ../web && pnpm install && pnpm dev
+cd ../web && pnpm install && pnpm dev                       # http://localhost:5173
 ```
+
+첫 화면에서 PGN을 붙여 넣거나 chess.com/lichess 아이디로 기보를 가져온 뒤 분석 → 리뷰 → 프로필 → 오프닝 지도 → 트레이닝 순으로 쓴다. 엔진 분석은 Stockfish만 있으면 되고, `ANTHROPIC_API_KEY`(LLM 언어화)와 Maia-2 가중치는 없어도 템플릿·Stockfish 폴백으로 동작한다. 자세한 명령은 [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md) 6절.
 
 ## 원칙
 

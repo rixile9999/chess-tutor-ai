@@ -4,6 +4,7 @@ defined by the pydantic models in schemas.py."""
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy import (
     JSON,
@@ -60,7 +61,7 @@ class Game(Base):
     opening_name: Mapped[str | None] = mapped_column(String(128), nullable=True)
     user_color: Mapped[str | None] = mapped_column(String(8), nullable=True)  # white | black
     ply_count: Mapped[int] = mapped_column(Integer, default=0)
-    headers: Mapped[dict] = mapped_column(JSON, default=dict)
+    headers: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
     analysis: Mapped[Analysis | None] = relationship(back_populates="game", uselist=False)
@@ -82,8 +83,8 @@ class Analysis(Base):
         String(16), default="pending"
     )  # pending|running|done|failed
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
-    summary: Mapped[dict] = mapped_column(JSON, default=dict)  # schemas.AnalysisSummary
-    moves: Mapped[list] = mapped_column(JSON, default=list)  # list[schemas.MoveAnalysis]
+    summary: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)  # AnalysisSummary
+    moves: Mapped[list[Any]] = mapped_column(JSON, default=list)  # list[MoveAnalysis]
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
 
@@ -98,7 +99,7 @@ class MoveReview(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     game_id: Mapped[int] = mapped_column(ForeignKey("games.id"))
     ply: Mapped[int] = mapped_column(Integer)
-    payload: Mapped[dict] = mapped_column(JSON, default=dict)  # schemas.MoveReviewOut
+    payload: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)  # MoveReviewOut
     verified: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
@@ -113,7 +114,7 @@ class EngineCache(Base):
     engine: Mapped[str] = mapped_column(String(64))
     depth: Mapped[int] = mapped_column(Integer)
     multipv: Mapped[int] = mapped_column(Integer)
-    lines: Mapped[list] = mapped_column(JSON, default=list)  # list[schemas.EngineLine]
+    lines: Mapped[list[Any]] = mapped_column(JSON, default=list)  # list[EngineLine]
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
     __table_args__ = (
@@ -129,7 +130,7 @@ class Puzzle(Base):
     game_id: Mapped[int | None] = mapped_column(ForeignKey("games.id"), nullable=True)
     ply: Mapped[int | None] = mapped_column(Integer, nullable=True)
     fen: Mapped[str] = mapped_column(String(128))
-    solution: Mapped[list] = mapped_column(JSON, default=list)  # uci moves, solver first
+    solution: Mapped[list[Any]] = mapped_column(JSON, default=list)  # uci, solver first
     motif: Mapped[str | None] = mapped_column(String(32), nullable=True)
     source: Mapped[str] = mapped_column(String(16), default="own")  # own | lichess
     # spaced repetition (SM-2)

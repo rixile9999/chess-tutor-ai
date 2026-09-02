@@ -1,0 +1,234 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e5]: 체스 튜터
+    - generic [ref=e47]:
+      - generic [ref=e48]: 게임 리뷰
+      - generic [ref=e49]: 10+0 · 2026-08-29 · 흑 · 1-0
+      - generic [ref=e50]: 상대 1548
+    - link "기보 가져오기" [ref=e7] [cursor=pointer]:
+      - /url: /games?import=1
+  - generic [ref=e8]:
+    - navigation [ref=e9]:
+      - link "기보" [ref=e10] [cursor=pointer]:
+        - /url: /games
+      - link "리뷰" [ref=e14] [cursor=pointer]:
+        - /url: /review
+      - link "오프닝" [ref=e19] [cursor=pointer]:
+        - /url: /openings
+      - link "프로필" [ref=e26] [cursor=pointer]:
+        - /url: /profile
+      - link "훈련" [ref=e31] [cursor=pointer]:
+        - /url: /training
+    - main [ref=e37]:
+      - generic [ref=e38]:
+        - generic [ref=e43]:
+          - generic [ref=e44]:
+            - generic "평가 +6.3 (백 기준)" [ref=e344]: "+6.3"
+            - generic [ref=e56]:
+              - generic:
+                - generic: "1"
+                - generic: "2"
+                - generic: "3"
+                - generic: "4"
+                - generic: "5"
+                - generic: "6"
+                - generic: "7"
+                - generic: "8"
+              - generic:
+                - generic: a
+                - generic: b
+                - generic: c
+                - generic: d
+                - generic: e
+                - generic: f
+                - generic: g
+                - generic: h
+          - generic [ref=e58]:
+            - button "첫 수" [ref=e59] [cursor=pointer]
+            - button "이전" [ref=e62] [cursor=pointer]
+            - button "다음" [ref=e65] [cursor=pointer]
+            - button "마지막" [ref=e68] [cursor=pointer]
+            - generic [ref=e71]:
+              - generic [ref=e74]: 11. Bxb5+
+              - generic [ref=e345]: · 흑 차례
+            - button "보드 뒤집기" [ref=e346] [cursor=pointer]
+          - generic [ref=e79]:
+            - generic [ref=e80]:
+              - generic [ref=e81]: 기보
+              - generic "필리도르 디펜스 · 책 이탈 3.d4 · 1-0 (17수)" [ref=e82]
+            - generic [ref=e83]:
+              - generic [ref=e84]: "0."
+              - button "시작 국면" [ref=e85] [cursor=pointer]
+            - generic [ref=e87]:
+              - generic [ref=e88]: "1."
+              - button "e4 책" [ref=e89] [cursor=pointer]:
+                - generic [ref=e90]: e4
+                - generic [ref=e91]: 책
+              - button "e5 책" [ref=e92] [cursor=pointer]:
+                - generic [ref=e93]: e5
+                - generic [ref=e94]: 책
+            - generic [ref=e95]:
+              - generic [ref=e96]: "2."
+              - button "Nf3 책" [ref=e97] [cursor=pointer]:
+                - generic [ref=e98]: Nf3
+                - generic [ref=e99]: 책
+              - button "d6 책" [ref=e100] [cursor=pointer]:
+                - generic [ref=e101]: d6
+                - generic [ref=e102]: 책
+            - generic [ref=e103]:
+              - generic [ref=e104]: "3."
+              - button "d4 최선" [ref=e105] [cursor=pointer]:
+                - generic [ref=e106]: d4
+                - generic [ref=e107]: 최선
+              - button "Bg4 실수" [ref=e108] [cursor=pointer]:
+                - generic [ref=e109]: Bg4
+                - generic [ref=e110]: 실수
+            - generic [ref=e111]:
+              - generic [ref=e112]: "4."
+              - button "dxe5 최선" [ref=e113] [cursor=pointer]:
+                - generic [ref=e114]: dxe5
+                - generic [ref=e115]: 최선
+              - button "Bxf3 좋음" [ref=e116] [cursor=pointer]:
+                - generic [ref=e117]: Bxf3
+                - generic [ref=e118]: 좋음
+            - generic [ref=e119]:
+              - generic [ref=e120]: "5."
+              - button "Qxf3 최선" [ref=e121] [cursor=pointer]:
+                - generic [ref=e122]: Qxf3
+                - generic [ref=e123]: 최선
+              - button "dxe5 좋음" [ref=e124] [cursor=pointer]:
+                - generic [ref=e125]: dxe5
+                - generic [ref=e126]: 좋음
+            - generic [ref=e127]:
+              - generic [ref=e128]: "6."
+              - button "Bc4 최선" [ref=e129] [cursor=pointer]:
+                - generic [ref=e130]: Bc4
+                - generic [ref=e131]: 최선
+              - button "Nf6 좋음" [ref=e132] [cursor=pointer]:
+                - generic [ref=e133]: Nf6
+                - generic [ref=e134]: 좋음
+            - generic [ref=e135]:
+              - generic [ref=e136]: "7."
+              - button "Qb3 최선" [ref=e137] [cursor=pointer]:
+                - generic [ref=e138]: Qb3
+                - generic [ref=e139]: 최선
+              - button "Qe7 블런더" [ref=e140] [cursor=pointer]:
+                - generic [ref=e141]: Qe7
+                - generic [ref=e142]: 블런더
+            - generic [ref=e143]:
+              - generic [ref=e144]: "8."
+              - button "Nc3 최선" [ref=e145] [cursor=pointer]:
+                - generic [ref=e146]: Nc3
+                - generic [ref=e147]: 최선
+              - button "c6 좋음" [ref=e148] [cursor=pointer]:
+                - generic [ref=e149]: c6
+                - generic [ref=e150]: 좋음
+            - generic [ref=e151]:
+              - generic [ref=e152]: "9."
+              - button "Bg5 최선" [ref=e153] [cursor=pointer]:
+                - generic [ref=e154]: Bg5
+                - generic [ref=e155]: 최선
+              - button "b5 부정확" [ref=e156] [cursor=pointer]:
+                - generic [ref=e157]: b5
+                - generic [ref=e158]: 부정확
+            - generic [ref=e159]:
+              - generic [ref=e160]: "10."
+              - button "Nxb5 최선" [ref=e161] [cursor=pointer]:
+                - generic [ref=e162]: Nxb5
+                - generic [ref=e163]: 최선
+              - button "cxb5 좋음" [ref=e164] [cursor=pointer]:
+                - generic [ref=e165]: cxb5
+                - generic [ref=e166]: 좋음
+            - generic [ref=e167]:
+              - generic [ref=e168]: "11."
+              - button "Bxb5+ 최선" [ref=e169] [cursor=pointer]:
+                - generic [ref=e170]: Bxb5+
+                - generic [ref=e171]: 최선
+              - button "Nbd7 블런더" [ref=e172] [cursor=pointer]:
+                - generic [ref=e173]: Nbd7
+                - generic [ref=e174]: 블런더
+            - generic [ref=e175]:
+              - generic [ref=e176]: "12."
+              - button "O-O-O 최선" [ref=e177] [cursor=pointer]:
+                - generic [ref=e178]: O-O-O
+                - generic [ref=e179]: 최선
+              - button "Rd8 강제" [ref=e180] [cursor=pointer]:
+                - generic [ref=e181]: Rd8
+                - generic [ref=e182]: 강제
+            - generic [ref=e183]:
+              - generic [ref=e184]: "13."
+              - button "Rxd7 최선" [ref=e185] [cursor=pointer]:
+                - generic [ref=e186]: Rxd7
+                - generic [ref=e187]: 최선
+              - button "Rxd7 좋음" [ref=e188] [cursor=pointer]:
+                - generic [ref=e189]: Rxd7
+                - generic [ref=e190]: 좋음
+            - generic [ref=e191]:
+              - generic [ref=e192]: "14."
+              - button "Rd1 최선" [ref=e193] [cursor=pointer]:
+                - generic [ref=e194]: Rd1
+                - generic [ref=e195]: 최선
+              - button "Qe6 좋음" [ref=e196] [cursor=pointer]:
+                - generic [ref=e197]: Qe6
+                - generic [ref=e198]: 좋음
+            - generic [ref=e199]:
+              - generic [ref=e200]: "15."
+              - button "Bxd7+ 최선" [ref=e201] [cursor=pointer]:
+                - generic [ref=e202]: Bxd7+
+                - generic [ref=e203]: 최선
+              - button "Nxd7 좋음" [ref=e204] [cursor=pointer]:
+                - generic [ref=e205]: Nxd7
+                - generic [ref=e206]: 좋음
+            - generic [ref=e207]:
+              - generic [ref=e208]: "16."
+              - button "Qb8+ 최선" [ref=e209] [cursor=pointer]:
+                - generic [ref=e210]: Qb8+
+                - generic [ref=e211]: 최선
+              - button "Nxb8 좋음" [ref=e212] [cursor=pointer]:
+                - generic [ref=e213]: Nxb8
+                - generic [ref=e214]: 좋음
+            - generic [ref=e215]:
+              - generic [ref=e216]: "17."
+              - button "Rd8# 최선" [ref=e217] [cursor=pointer]:
+                - generic [ref=e218]: Rd8#
+                - generic [ref=e219]: 최선
+          - generic [ref=e220]:
+            - generic [ref=e221]:
+              - generic [ref=e222]: 평가 추이
+              - generic "11.Bxb5+에서 +6.3 → +6.3" [ref=e349]
+            - img "평가 추이" [ref=e224] [cursor=pointer]:
+              - generic "7…Qe7 블런더" [ref=e227]
+              - generic "11…Nbd7 블런더" [ref=e228]
+        - generic [ref=e229]:
+          - tablist [ref=e230]:
+            - tab "이 수의 설명" [ref=e231] [cursor=pointer]
+            - tab "전략과 계획" [ref=e232] [cursor=pointer]
+            - tab "국면 특징" [active] [selected] [ref=e233] [cursor=pointer]
+          - generic [ref=e433]:
+            - generic [ref=e434]:
+              - generic [ref=e435]: 국면 특징
+              - generic [ref=e436]: 폰 구조, 기물 활동, 킹 안전 같은 항목을 두 국면에서 비교
+            - table [ref=e437]:
+              - rowgroup [ref=e438]:
+                - row [ref=e439]:
+                  - columnheader "항목" [ref=e440]
+                  - columnheader "A" [ref=e441]
+                  - columnheader "B" [ref=e442]
+                  - columnheader "차이" [ref=e443]
+              - rowgroup [ref=e444]:
+                - row [ref=e445]:
+                  - cell "폰 구조" [ref=e446]
+                  - cell "e5 폰이 고립" [ref=e447]
+                  - cell "e4 폰이 지원됨" [ref=e448]
+                  - cell "-0.6" [ref=e449]
+                - row [ref=e450]:
+                  - cell "기물 활동" [ref=e451]
+                  - cell "Nf6, Qe7만 나옴" [ref=e452]
+                  - cell "Bc4, Qb3, Bg5 모두 활동" [ref=e453]
+                  - cell "-1.4" [ref=e454]
+                - row [ref=e455]:
+                  - cell "킹 안전" [ref=e456]
+                  - cell "캐슬링 못 함" [ref=e457]
+                  - cell "O-O-O 가능" [ref=e458]
+                  - cell [ref=e459]
+            - paragraph [ref=e460]: 차이는 양수일수록 A 쪽에 유리합니다.

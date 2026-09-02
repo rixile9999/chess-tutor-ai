@@ -95,34 +95,45 @@ PGN/API 임포트
 - 프론트 골격, chessground 보드, API 호출
 - CI, 라이선스, 문서
 
-### M1 근거 있는 게임 리뷰 (MVP)
-- PGN 임포트, Chess.com·Lichess API 임포트
-- Stockfish 분석 파이프라인 + 캐시
-- 실수 분류(최선/좋음/부정확/실수/블런더)
-- 모티프 탐지기 확장: 핀, 스큐어, 수비수 제거, 과부하, 백랭크, 트랩. Lichess 퍼즐 DB로 정밀도·재현율 측정
-- 정적 특징 계산(폰 구조, 킹 안전, 활동성, 열린 파일, 아웃포스트) — python-chess 자체 구현
-- 분기점 비교, 특징 차이표
-- 언어화 + 검증기 연결
-- 리뷰 화면(목업 1번) 구현
-- 완료 기준: `PLAN.md`의 예시 1·2가 해결됨. 검증 통과율 측정 가능
+상태 표기: **완료** = 코드·테스트·화면이 있고 통합 테스트를 통과. **부분** = 동작하지만 완료 기준의 일부가 남음. 2026-09-02 통합 기준.
 
-### M2 Maia
-- Maia-2 로드, 레이팅별 수 분포
-- "자연스러운 수 vs 정답" 대비, 컴퓨터 수 판정, 설명 난이도 조절
-- 스파링(국면 이어 두기)
+### M1 근거 있는 게임 리뷰 (MVP) — 완료
+- PGN 임포트(`services/games.py`), Chess.com·Lichess API 임포트(`services/importers.py`, respx 목 테스트). `POST /games/import/{pgn,chesscom,lichess}`
+- Stockfish 분석 파이프라인 + 캐시(`services/analysis.py`, `engine_cache` 테이블: FEN+엔진+깊이+MultiPV 키). 프로세스 내 잡 러너(`jobs.py`), `POST /analysis/{id}` → `GET /analysis/{id}` 폴링
+- 실수 분류 7종(book/best/good/inaccuracy/mistake/blunder/forced), 승률 손실 기준. 정확도는 lichess 곡선
+- 모티프 탐지기 10종(`motifs.py`): 디스커버드 어택, 포크, 핀, 스큐어, 무방비 기물, 수비수 제거, 과부하, 백랭크, 기물 트랩, 메이트 위협
+- 정적 특징(`features.py`), 분기점 비교·특징 차이표·반사실(`services/reasoning.py`)
+- 언어화(`services/verbalize.py`): 템플릿이 기본. `ANTHROPIC_API_KEY`가 있으면 LLM(structured output)이 문장+Claim을 내고, 검증기에 실패한 문장은 템플릿으로 대체. 리뷰 응답에 `verified_claims/total_claims`가 실린다
+- 리뷰 화면(`apps/web/src/pages/review`): 보드·화살표·수 목록·평가 스파크라인·설명/특징/전략 패널
+- 남은 것: Lichess 퍼즐 DB로 탐지기 정밀도·재현율 측정(미착수). 게임을 다시 분석해도 `move_reviews` 캐시는 깊이·레이팅 키로만 무효화된다
 
-### M3 전략 계층
-- 폰 구조 분류 체계 고정 → 분류기 → 수작업 라벨 테스트셋(수백 국면)
-- 계획 지식베이스(구조 5개부터) + PV 계획 추출 + 매칭
-- 반사실 검증
-- 전략 탭(목업 2번)
+### M2 Maia — 완료
+- Maia-2 지연 로드(`services/maia.py`, `uv sync --extra maia`). 패키지·가중치가 없으면 레이팅 조건부 Stockfish 소프트맥스 → 균등 분포 순으로 폴백하고 응답의 `source`에 어느 백엔드였는지 적는다
+- 리뷰의 `human` 뷰: 레이팅별 수 확률, 플레이한 수의 확률, 컴퓨터 수 판정(최선수 확률 3% 미만), 자연스러운 이유(Claim 포함)
+- 스파링 `POST /maia/move`, 분포 `POST /maia/probs`, 상태 `GET /maia/status`. 트레이닝 화면의 스파링 탭
+- 남은 것: 설명 난이도 조절은 `rating` 파라미터가 사람 뷰에만 반영되고 문장 수준은 바꾸지 않는다. Maia-3 평가 미착수
 
-### M4 개인화
-- 전체 기보 임포트, 프로필, 약점 리포트(목업 3번)
-- 내 기보 퍼즐 + 간격 반복, 레퍼토리 구멍
+### M3 전략 계층 — 부분
+- 폰 구조 분류 체계 15종 + unclassified(`structure.py`), 계획 지식베이스 14구조·114계획(`services/plans.py`), PV 계획 추출(`PlanSketch`)과 매칭, 반사실 검증(`services/reasoning.py`)
+- 전략 탭(`pages/review/StrategyPanel.tsx`): 구조·타임라인·계획·내 수·반사실·개인 기록
+- 남은 것: 수작업 라벨 테스트셋(수백 국면)은 없다. 현재 구조 테스트는 대표 국면 13개. 계획 지식베이스는 검토된 적 없는 초안이다
 
-### M5 시각화
-- 오프닝 지도(목업 4번): 오버레이 DAG + 보드 스냅샷, 기물 목적지 히트맵, 브레이크 타임라인
+### M4 개인화 — 완료
+- 전체 기보 임포트, 프로필 리포트 `GET /profile/{username}`(`services/profile.py`): 단계별 정확도(레이팅대 기준선 대비), 구조별 성적과 브레이크 타이밍, 놓친 모티프, 시간 압박 블런더율, 레퍼토리 구멍. 프로필 화면(`pages/profile`)
+- 내 기보 퍼즐 + SM-2 간격 반복(`services/puzzles.py`): `POST /training/puzzles/from-game/{id}`, `GET /training/puzzles/due`, `POST /training/puzzles/{id}/attempt`, `GET /training/summary`. 트레이닝 화면(`pages/training`)
+- 남은 것: 레이팅대 기준선(`profile.BASELINES`)은 자리표시자 값이라 Lichess DB로 측정해야 한다. 구조 스터디는 제목만 나온다
+
+### M5 시각화 — 완료
+- 오프닝 지도 `GET /openings/map`(`services/openings_map.py`): 국면 키 DAG(전위 병합), 이탈점·타비야 표시, `LICHESS_TOKEN`이 있으면 Lichess 익스플로러 마스터 오버레이. 화면은 d3 DAG + 미니보드 스냅샷
+- 기물 목적지 히트맵 `GET /openings/heatmap`, 브레이크 타임라인 `GET /openings/breaks`(브레이크 11종)
+- 남은 것: 마스터 오버레이는 토큰 없이는 꺼져 있다(월간 DB 자체 집계 미착수)
+
+### 통합 상태 (2026-09-02)
+- 백엔드: `ruff format`·`ruff check`·`mypy --strict` 통과, pytest 204개 약 10초(엔진 테스트는 깊이 ≤ 8). `tests/test_e2e.py`가 TestClient로 임포트 → 분석 → 리뷰 → 프로필 → 오프닝 지도 → 퍼즐 → 스파링을 한 번에 돈다
+- 웹: `pnpm lint`, `tsc --noEmit`, `pnpm build` 통과. 라우트 `/games`, `/review/:gameId/:ply`, `/profile/:username`, `/openings`, `/training`
+- 실서버 스모크: uvicorn 기동 후 `/health`, `/docs`와 위 흐름 전부 200. Maia-2 가중치가 있으면 사람 뷰와 스파링의 `source`가 `maia`로 나온다
+- CI(`.github/workflows/ci.yml`): API는 ruff format/check → mypy → pytest, 웹은 eslint → build. Stockfish가 없는 러너에서는 엔진 테스트가 건너뛰어진다
+- 알려진 간극: Alembic 마이그레이션 없음(`create_all`). 웹 단위 테스트(vitest) 없음. 엔진 `Threads=2`라 깊이 8의 차선 PV는 실행마다 조금 달라질 수 있다(같은 프로세스 안의 이전 탐색에는 더 이상 영향받지 않는다: 탐색마다 `ucinewgame`)
 
 ---
 
@@ -134,20 +145,22 @@ brew install stockfish            # macOS
 
 # 백엔드
 cd apps/api
-uv sync --all-groups
-uv run pytest
+uv sync --all-groups              # Maia-2까지: uv sync --all-groups --extra maia
+uv run ruff format src tests && uv run ruff check src tests
+uv run pytest -q                  # 약 10초, Stockfish 필요
 uv run uvicorn chess_tutor.api:app --reload   # http://localhost:8000/docs
 
 # 프론트엔드
 cd apps/web
 pnpm install
+pnpm lint && pnpm exec tsc --noEmit && pnpm build
 pnpm dev                          # http://localhost:5173, /api → 8000 프록시
 
-# DB (M1부터)
-docker compose up -d db
+# DB: 기본은 apps/api/chess_tutor.db (SQLite). Postgres를 쓰려면
+docker compose up -d db           # 그리고 .env의 DATABASE_URL
 ```
 
-환경 변수는 `.env.example` 참고. `STOCKFISH_PATH`가 없으면 엔진 테스트는 건너뛴다.
+환경 변수는 `.env.example` 참고. `STOCKFISH_PATH`가 없으면 PATH의 `stockfish`를 찾고, 그것도 없으면 엔진 테스트는 건너뛴다. `ANTHROPIC_API_KEY`가 없으면 설명은 템플릿으로만 나온다. Maia-2 가중치는 첫 사용 때 `~/.cache/chess-tutor/maia2`에 내려받는다(`MAIA_MODEL_DIR`로 변경).
 
 ---
 

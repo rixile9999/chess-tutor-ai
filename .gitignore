@@ -29,3 +29,6 @@ design/chess-tutor-mockup.html
 
 # TypeScript incremental build info
 *.tsbuildinfo
+
+# Local databases
+apps/api/*.db

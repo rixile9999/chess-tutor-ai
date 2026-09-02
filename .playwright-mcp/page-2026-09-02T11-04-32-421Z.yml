@@ -1,0 +1,39 @@
+- generic [ref=f6e3]:
+  - banner [ref=f6e4]:
+    - generic [ref=f6e5]: 체스 튜터
+    - generic [ref=f6e7]: 프로필
+    - link "기보 가져오기" [ref=f6e9] [cursor=pointer]:
+      - /url: /games?import=1
+  - generic [ref=f6e10]:
+    - navigation [ref=f6e11]:
+      - link "기보" [ref=f6e12] [cursor=pointer]:
+        - /url: /games
+      - link "리뷰" [ref=f6e16] [cursor=pointer]:
+        - /url: /review
+      - link "오프닝" [ref=f6e21] [cursor=pointer]:
+        - /url: /openings
+      - link "프로필" [ref=f6e28] [cursor=pointer]:
+        - /url: /profile
+      - link "훈련" [ref=f6e33] [cursor=pointer]:
+        - /url: /training
+    - main [ref=f6e39]:
+      - generic [ref=f6e40]:
+        - generic [ref=f6e41]:
+          - heading "약점 리포트" [level=2] [ref=f6e42]
+          - generic [ref=f6e43]: 최근 60일
+          - group "기간" [ref=f6e45]:
+            - button "30일" [ref=f6e46] [cursor=pointer]
+            - button "60일" [pressed] [ref=f6e47] [cursor=pointer]
+            - button "90일" [ref=f6e48] [cursor=pointer]
+        - generic [ref=f6e49]:
+          - heading "누구의 리포트를 볼까요?" [level=3] [ref=f6e54]
+          - paragraph [ref=f6e55]: chess.com 또는 Lichess 아이디를 입력하면 가져온 기보를 바탕으로 약점 리포트를 만듭니다. 아이디는 이 브라우저에 기억됩니다.
+          - generic [ref=f6e56]:
+            - textbox "사용자 아이디" [active] [ref=f6e57]:
+              - /placeholder: chess.com 아이디
+            - button "리포트 보기" [disabled] [ref=f6e58]
+          - paragraph [ref=f6e59]:
+            - text: 아직 기보가 없다면
+            - link "기보 가져오기" [ref=f6e60] [cursor=pointer]:
+              - /url: /games?import=1
+            - text: 부터 시작하세요.

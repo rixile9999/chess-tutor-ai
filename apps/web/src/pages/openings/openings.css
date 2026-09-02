@@ -1,0 +1,98 @@
+/* 오프닝 지도 page. Uses the shared tokens in src/tokens.css and classes in src/app/shell.css. */
+.op-page { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.op-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.op-title { font-family: var(--font-display); font-size: 26px; font-weight: 700; letter-spacing: -0.02em; }
+.op-sub { font-size: 13px; color: var(--ink-2); }
+.op-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+/* controls */
+.op-seg { display: inline-flex; height: 24px; border: 1px solid var(--line-strong); border-radius: 999px; overflow: hidden; background: var(--surface); }
+.op-seg button { height: 100%; padding: 0 11px; border: none; background: transparent; font: inherit; font-size: 12px; font-weight: 500; color: var(--ink-2); cursor: pointer; }
+.op-seg button.on { background: var(--ink); color: var(--paper); font-weight: 600; }
+.op-chip-btn { cursor: pointer; font-family: inherit; }
+.op-chip-btn.on { border-color: var(--ink); color: var(--ink); font-weight: 600; }
+.op-chip-input { padding-right: 6px; }
+.op-chip-input input { width: 40px; border: none; background: transparent; font-family: var(--font-mono); font-size: 12px; color: var(--ink); text-align: right; outline: none; }
+.op-chip-input input::-webkit-outer-spin-button, .op-chip-input input::-webkit-inner-spin-button { margin-left: 2px; }
+.op-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--good); }
+.op-user { gap: 6px; }
+.op-user .op-icon-btn { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border: none; background: transparent; color: var(--ink-3); cursor: pointer; padding: 0; border-radius: 4px; }
+.op-user .op-icon-btn:hover { color: var(--ink); background: rgba(43, 38, 34, 0.08); }
+.op-select { height: 24px; border-radius: 999px; border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink-2); font: inherit; font-size: 12px; font-weight: 500; padding: 0 8px; cursor: pointer; }
+.op-user-form { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.op-input { height: 32px; padding: 0 10px; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--surface); font: inherit; font-size: 13px; color: var(--ink); min-width: 220px; }
+.op-input:focus { outline: 2px solid var(--good-bg); border-color: var(--good); }
+
+/* layout */
+.op-grid { display: grid; grid-template-columns: minmax(0, 1fr) 420px; gap: 16px; align-items: start; }
+@media (max-width: 1180px) { .op-grid { grid-template-columns: minmax(0, 1fr); } }
+.op-card { padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.op-card-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-height: 24px; }
+.op-card-head .op-grow { flex: 1; }
+.op-side { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+
+/* states */
+.op-state { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; min-height: 200px; text-align: center; color: var(--ink-2); font-size: 13px; padding: 16px; }
+.op-state .op-state-title { font-family: var(--font-display); font-size: 16px; font-weight: 700; color: var(--ink); }
+.op-state.compact { min-height: 120px; }
+.op-spinner { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--line-strong); border-top-color: var(--ink); animation: op-spin 0.9s linear infinite; }
+@keyframes op-spin { to { transform: rotate(360deg); } }
+
+/* DAG */
+.op-dag-viewport { position: relative; height: clamp(440px, calc(100vh - 300px), 720px); overflow: hidden; border-radius: 8px; cursor: grab; touch-action: none; background: radial-gradient(circle, var(--line) 1px, transparent 1.2px) 0 0 / 18px 18px; }
+.op-dag-viewport:active { cursor: grabbing; }
+.op-dag-inner { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; }
+.op-dag-svg { position: absolute; left: 0; top: 0; display: block; overflow: visible; }
+.op-node { position: absolute; box-sizing: border-box; padding: 8px 8px 6px; border-radius: 8px; background: var(--surface); border: 1px solid var(--line-strong); display: flex; flex-direction: column; align-items: center; gap: 5px; cursor: pointer; }
+.op-node:hover { box-shadow: 0 2px 8px rgba(43, 38, 34, 0.12); }
+.op-node.tabiya { border: 1.5px solid var(--ink); background: rgba(43, 38, 34, 0.06); }
+.op-node.dev { border: 1.5px solid var(--bad); background: var(--bad-bg); }
+.op-node.master { border-style: dashed; }
+.op-node.sel { box-shadow: 0 0 0 2px var(--good); }
+.op-node-label { display: flex; align-items: baseline; gap: 6px; width: 100%; justify-content: center; min-width: 0; }
+.op-node-text { font-size: 11.5px; line-height: 1.2; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.op-node.dev .op-node-text { color: var(--bad); }
+.op-node-count { font-size: 10.5px; color: var(--ink-3); flex-shrink: 0; }
+.op-node-note { position: absolute; font-size: 11.5px; line-height: 1.4; color: var(--ink-2); pointer-events: none; }
+.op-node-note b { color: var(--ink); }
+.op-dag-tools { position: absolute; right: 8px; top: 8px; display: flex; gap: 4px; }
+.op-tool { width: 28px; height: 28px; border-radius: 6px; border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; }
+.op-tool:hover { background: var(--paper); }
+.op-detail { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-2); min-height: 22px; }
+.op-detail .mv { color: var(--ink); }
+
+/* legend */
+.op-legend { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; font-size: 12px; color: var(--ink-2); padding-top: 10px; border-top: 1px solid var(--line); }
+.op-legend .item { display: inline-flex; align-items: center; gap: 6px; }
+.op-sw-line { width: 22px; height: 0; border-top: 6px solid var(--ink-3); border-radius: 3px; }
+.op-sw { width: 12px; height: 12px; border-radius: 3px; }
+.op-sw-dash { width: 22px; height: 0; border-top: 2px dashed var(--ink-3); }
+.op-sw-tab { width: 14px; height: 14px; border-radius: 3px; background: var(--ink); }
+.op-sw-dev { width: 14px; height: 14px; border-radius: 3px; border: 1.5px solid var(--bad); background: var(--bad-bg); box-sizing: border-box; }
+
+/* heatmap */
+.op-heat-row { display: flex; gap: 14px; align-items: flex-start; }
+.op-board { display: grid; grid-template-columns: repeat(8, 1fr); grid-template-rows: repeat(8, 1fr); border-radius: 4px; overflow: hidden; box-shadow: 0 0 0 1px rgba(43, 38, 34, 0.3); flex-shrink: 0; }
+.op-sq { position: relative; }
+.op-sq.light { background: var(--board-light); }
+.op-sq.dark { background: var(--board-dark); }
+.op-sq-heat { position: absolute; inset: 0; }
+.op-coord { position: absolute; font-size: 10px; font-weight: 600; line-height: 1; }
+.op-sq.light .op-coord { color: var(--board-dark); }
+.op-sq.dark .op-coord { color: var(--board-light); }
+.op-coord.rank { top: 2px; left: 3px; }
+.op-coord.file { bottom: 2px; right: 3px; }
+.op-heat-list { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; padding-top: 4px; }
+.op-heat-item { display: flex; justify-content: space-between; font-size: 12.5px; }
+.op-heat-note { font-size: 12.5px; line-height: 1.5; margin-top: 6px; color: var(--ink-2); }
+
+/* pawn breaks */
+.op-hist-list { display: flex; flex-direction: column; gap: 10px; }
+.op-hist { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 10px; align-items: center; }
+.op-hist svg { max-width: 100%; }
+.op-keys { display: inline-flex; align-items: center; gap: 10px; white-space: nowrap; }
+.op-key { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--ink-2); }
+.op-key-mine { width: 2px; height: 12px; background: var(--ink); }
+.op-key-master { width: 0; height: 12px; border-left: 2px dashed var(--ink-3); }
+.op-error { display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: var(--bad); flex-wrap: wrap; }
+.op-link-btn { border: none; background: transparent; color: var(--good); font: inherit; font-size: 12.5px; cursor: pointer; padding: 0; text-decoration: underline; }

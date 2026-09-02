@@ -1,0 +1,18 @@
+- generic [ref=f1e3]:
+  - banner [ref=f1e4]:
+    - generic [ref=f1e5]: 체스 튜터
+    - link "기보 가져오기" [ref=f1e7] [cursor=pointer]:
+      - /url: /games?import=1
+  - generic [ref=f1e8]:
+    - navigation [ref=f1e9]:
+      - link "기보" [ref=f1e10] [cursor=pointer]:
+        - /url: /games
+      - link "리뷰" [ref=f1e14] [cursor=pointer]:
+        - /url: /review
+      - link "오프닝" [ref=f1e19] [cursor=pointer]:
+        - /url: /openings
+      - link "프로필" [ref=f1e26] [cursor=pointer]:
+        - /url: /profile
+      - link "훈련" [ref=f1e31] [cursor=pointer]:
+        - /url: /training
+    - main [ref=f1e37]

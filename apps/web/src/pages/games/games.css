@@ -1,0 +1,114 @@
+/* 기보 page. Uses the tokens from src/tokens.css and the shared classes from src/app/shell.css. */
+
+.games-page { display: flex; flex-direction: column; gap: 16px; }
+
+/* ---------- header ---------- */
+.games-head { display: flex; align-items: center; gap: 14px; min-height: 40px; flex-wrap: wrap; }
+.games-title { font-family: var(--font-display); font-size: 26px; font-weight: 700; letter-spacing: -0.02em; margin: 0; line-height: 1.2; }
+.games-sub { font-size: 13px; align-self: flex-end; padding-bottom: 3px; }
+.games-user { cursor: pointer; font-family: var(--font-ui); height: 28px; }
+.games-user:hover { border-color: var(--ink); color: var(--ink); }
+.games-userform { display: flex; gap: 8px; align-items: center; }
+
+/* ---------- controls ---------- */
+.games-input {
+  height: 32px; padding: 0 10px; border: 1px solid var(--line-strong); border-radius: 8px;
+  background: var(--surface); color: var(--ink); font: inherit; font-size: 13px; min-width: 0; box-sizing: border-box;
+}
+.games-input::placeholder { color: var(--ink-3); }
+.games-input:focus { outline: none; border-color: var(--ink); box-shadow: 0 0 0 3px rgba(43, 38, 34, 0.08); }
+.games-input:disabled { opacity: 0.6; }
+.games-input-num { width: 76px; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.games-inputgroup { display: inline-flex; align-items: center; gap: 6px; }
+.games-suffix { font-size: 13px; color: var(--ink-2); }
+.games-btn-sm { height: 32px; padding: 0 12px; }
+.games-btn-xs { height: 28px; padding: 0 10px; font-size: 12.5px; gap: 6px; }
+.games-page .btn:disabled { opacity: 0.55; cursor: default; }
+.games-page .btn-ghost:not(:disabled):hover { background: rgba(43, 38, 34, 0.05); }
+.games-page .btn-primary:not(:disabled):hover { background: #1d1a17; }
+.games-iconbtn {
+  width: 32px; height: 32px; border-radius: 8px; border: 1px solid transparent; background: transparent; color: var(--ink-3);
+  display: inline-flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0;
+}
+.games-iconbtn:hover { color: var(--ink); border-color: var(--line-strong); }
+
+/* ---------- import panel ---------- */
+.games-import { padding: 12px 22px 16px; display: flex; flex-direction: column; gap: 14px; }
+.games-import-head { display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--line); }
+.games-tabs { display: flex; flex: 1; min-width: 0; }
+.games-tab {
+  height: 36px; display: flex; align-items: center; padding: 0 4px; margin-right: 22px; margin-bottom: -1px;
+  font-size: 14px; font-weight: 500; color: var(--ink-3); font-family: var(--font-ui);
+  border: none; border-bottom: 2px solid transparent; background: transparent; cursor: pointer;
+}
+.games-tab:hover { color: var(--ink-2); }
+.games-tab[aria-selected='true'] { font-weight: 700; color: var(--ink); border-bottom-color: var(--ink); }
+.games-form { display: flex; flex-direction: column; gap: 10px; }
+.games-row { display: flex; gap: 14px; align-items: flex-end; flex-wrap: wrap; }
+.games-field { display: flex; flex-direction: column; gap: 5px; }
+.games-field-user { width: 280px; max-width: 100%; }
+.games-field-user .games-input { width: 100%; }
+.games-textarea {
+  width: 100%; min-height: 150px; padding: 10px 12px; border: 1px solid var(--line-strong); border-radius: 8px;
+  background: var(--surface); font-family: var(--font-mono); font-size: 12.5px; line-height: 1.5; color: var(--ink);
+  resize: vertical; box-sizing: border-box;
+}
+.games-textarea::placeholder { color: var(--ink-3); }
+.games-textarea:focus { outline: none; border-color: var(--ink); box-shadow: 0 0 0 3px rgba(43, 38, 34, 0.08); }
+.games-hint { font-size: 12.5px; color: var(--ink-2); line-height: 1.5; max-width: 560px; align-self: center; }
+.games-import-result {
+  display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 8px;
+  border: 1px solid var(--line); background: var(--paper); font-size: 13px; flex-wrap: wrap;
+}
+.games-import-result.bad { background: var(--bad-bg); border-color: transparent; color: var(--bad); }
+.games-ok { color: var(--good); }
+.games-bad { color: var(--bad); }
+
+/* ---------- list ---------- */
+.games-list { display: flex; flex-direction: column; }
+.games-list-head { display: flex; align-items: center; gap: 10px; padding: 14px 18px 10px; flex-wrap: wrap; }
+.games-table-wrap { overflow-x: auto; }
+.games-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.games-table th {
+  text-align: left; padding: 6px 10px; font-size: 11.5px; font-weight: 600; color: var(--ink-3);
+  border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); white-space: nowrap;
+}
+.games-table td { padding: 7px 10px; border-bottom: 1px solid var(--line); vertical-align: middle; white-space: nowrap; }
+.games-table tbody tr:last-child td { border-bottom: none; }
+.games-table tbody tr:hover td { background: rgba(43, 38, 34, 0.03); }
+.games-table th:first-child, .games-table td:first-child { padding-left: 18px; }
+.games-table th:last-child, .games-table td:last-child { padding-right: 18px; text-align: right; }
+.games-color { display: inline-flex; align-items: center; gap: 6px; }
+.games-swatch { display: inline-block; width: 12px; height: 12px; border-radius: 3px; box-shadow: inset 0 0 0 1px rgba(43, 38, 34, 0.35); }
+.games-swatch.white { background: #f8f3ea; }
+.games-swatch.black { background: var(--ink); }
+.games-opp { display: inline-flex; align-items: baseline; gap: 6px; }
+.games-opp-name { font-weight: 500; max-width: 180px; overflow: hidden; text-overflow: ellipsis; }
+.games-result { display: inline-flex; align-items: center; gap: 8px; }
+.games-badge-sm { height: 20px; padding: 0 7px; font-size: 11.5px; }
+.games-badge-none { border: 1px dashed var(--line-strong); background: transparent; font-weight: 600; }
+.games-tc { height: 22px; }
+.games-opening { display: inline-flex; align-items: baseline; gap: 6px; max-width: 280px; overflow: hidden; text-overflow: ellipsis; }
+.games-eco { flex-shrink: 0; }
+.games-actions { display: inline-flex; gap: 6px; justify-content: flex-end; }
+.games-rowerr { max-width: 220px; overflow: hidden; text-overflow: ellipsis; color: var(--bad); font-size: 11.5px; line-height: 1.3; margin-top: 3px; }
+.games-more { display: flex; justify-content: center; padding: 10px; border-top: 1px solid var(--line); }
+
+/* ---------- states ---------- */
+.games-error { display: flex; align-items: center; gap: 12px; margin: 0 18px 16px; padding: 12px 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--paper); font-size: 13px; }
+.games-error-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.games-error-text .muted { font-size: 12.5px; word-break: break-word; }
+.games-empty { padding: 36px 18px 40px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 10px; border-top: 1px solid var(--line); }
+.games-empty-board { display: grid; grid-template-columns: repeat(4, 14px); border-radius: 3px; overflow: hidden; box-shadow: 0 0 0 1px rgba(43, 38, 34, 0.25); margin-bottom: 4px; }
+.games-empty-board span { width: 14px; height: 14px; }
+.games-empty-board .light { background: var(--board-light); }
+.games-empty-board .dark { background: var(--board-dark); }
+.games-empty-title { font-family: var(--font-display); font-size: 17px; font-weight: 700; }
+.games-empty p { margin: 0; color: var(--ink-2); max-width: 480px; font-size: 13.5px; line-height: 1.65; }
+.games-empty-actions { display: flex; gap: 8px; margin-top: 6px; }
+.games-skel { padding: 8px 18px 14px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 12px; }
+.games-skel-row { display: grid; grid-template-columns: 84px 40px 1.2fr 56px 96px 1.6fr 76px 150px; gap: 12px; align-items: center; }
+.games-skel-row span { display: block; height: 12px; border-radius: 4px; background: rgba(43, 38, 34, 0.07); }
+
+.games-spin { animation: games-spin 0.9s linear infinite; }
+@keyframes games-spin { to { transform: rotate(360deg); } }

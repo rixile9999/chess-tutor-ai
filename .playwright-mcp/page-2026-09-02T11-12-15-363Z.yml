@@ -1,0 +1,308 @@
+- generic [ref=f2e3]:
+  - banner [ref=f2e4]:
+    - generic [ref=f2e5]: 체스 튜터
+    - generic [ref=f2e47]:
+      - generic [ref=f2e48]: 게임 리뷰
+      - generic [ref=f2e49]: 10+0 · 2026-08-29 · 흑 · 1-0
+      - generic [ref=f2e50]: 상대 1548
+    - link "기보 가져오기" [ref=f2e7] [cursor=pointer]:
+      - /url: /games?import=1
+  - generic [ref=f2e8]:
+    - navigation [ref=f2e9]:
+      - link "기보" [ref=f2e10] [cursor=pointer]:
+        - /url: /games
+      - link "리뷰" [ref=f2e14] [cursor=pointer]:
+        - /url: /review
+      - link "오프닝" [ref=f2e19] [cursor=pointer]:
+        - /url: /openings
+      - link "프로필" [ref=f2e26] [cursor=pointer]:
+        - /url: /profile
+      - link "훈련" [ref=f2e31] [cursor=pointer]:
+        - /url: /training
+    - main [ref=f2e37]:
+      - generic [ref=f2e38]:
+        - generic [ref=f2e43]:
+          - generic [ref=f2e44]:
+            - generic "평가 +5.5 (백 기준)" [ref=f2e51]: "+5.5"
+            - generic [ref=f2e56]:
+              - generic:
+                - generic: "1"
+                - generic: "2"
+                - generic: "3"
+                - generic: "4"
+                - generic: "5"
+                - generic: "6"
+                - generic: "7"
+                - generic: "8"
+              - generic:
+                - generic: a
+                - generic: b
+                - generic: c
+                - generic: d
+                - generic: e
+                - generic: f
+                - generic: g
+                - generic: h
+          - generic [ref=f2e58]:
+            - button "첫 수" [ref=f2e59] [cursor=pointer]
+            - button "이전" [ref=f2e62] [cursor=pointer]
+            - button "다음" [ref=f2e65] [cursor=pointer]
+            - button "마지막" [ref=f2e68] [cursor=pointer]
+            - generic [ref=f2e71]:
+              - generic [ref=f2e72]: 7… Qe7
+              - generic [ref=f2e73]: · 백 차례
+            - button "보드 뒤집기" [ref=f2e74] [cursor=pointer]
+          - generic [ref=f2e77]:
+            - generic [ref=f2e78]:
+              - generic [ref=f2e79]: 기보
+              - generic "필리도르 디펜스 · 책 이탈 3.d4 · 1-0 (17수)" [ref=f2e80]
+            - generic [ref=f2e81]:
+              - generic [ref=f2e82]: "0."
+              - button "시작 국면" [ref=f2e83] [cursor=pointer]
+            - generic [ref=f2e85]:
+              - generic [ref=f2e86]: "1."
+              - button "e4 책" [ref=f2e87] [cursor=pointer]:
+                - generic [ref=f2e88]: e4
+                - generic [ref=f2e89]: 책
+              - button "e5 책" [ref=f2e90] [cursor=pointer]:
+                - generic [ref=f2e91]: e5
+                - generic [ref=f2e92]: 책
+            - generic [ref=f2e93]:
+              - generic [ref=f2e94]: "2."
+              - button "Nf3 책" [ref=f2e95] [cursor=pointer]:
+                - generic [ref=f2e96]: Nf3
+                - generic [ref=f2e97]: 책
+              - button "d6 책" [ref=f2e98] [cursor=pointer]:
+                - generic [ref=f2e99]: d6
+                - generic [ref=f2e100]: 책
+            - generic [ref=f2e101]:
+              - generic [ref=f2e102]: "3."
+              - button "d4 최선" [ref=f2e103] [cursor=pointer]:
+                - generic [ref=f2e104]: d4
+                - generic [ref=f2e105]: 최선
+              - button "Bg4 실수" [ref=f2e106] [cursor=pointer]:
+                - generic [ref=f2e107]: Bg4
+                - generic [ref=f2e108]: 실수
+            - generic [ref=f2e109]:
+              - generic [ref=f2e110]: "4."
+              - button "dxe5 최선" [ref=f2e111] [cursor=pointer]:
+                - generic [ref=f2e112]: dxe5
+                - generic [ref=f2e113]: 최선
+              - button "Bxf3 좋음" [ref=f2e114] [cursor=pointer]:
+                - generic [ref=f2e115]: Bxf3
+                - generic [ref=f2e116]: 좋음
+            - generic [ref=f2e117]:
+              - generic [ref=f2e118]: "5."
+              - button "Qxf3 최선" [ref=f2e119] [cursor=pointer]:
+                - generic [ref=f2e120]: Qxf3
+                - generic [ref=f2e121]: 최선
+              - button "dxe5 좋음" [ref=f2e122] [cursor=pointer]:
+                - generic [ref=f2e123]: dxe5
+                - generic [ref=f2e124]: 좋음
+            - generic [ref=f2e125]:
+              - generic [ref=f2e126]: "6."
+              - button "Bc4 최선" [ref=f2e127] [cursor=pointer]:
+                - generic [ref=f2e128]: Bc4
+                - generic [ref=f2e129]: 최선
+              - button "Nf6 좋음" [ref=f2e130] [cursor=pointer]:
+                - generic [ref=f2e131]: Nf6
+                - generic [ref=f2e132]: 좋음
+            - generic [ref=f2e133]:
+              - generic [ref=f2e134]: "7."
+              - button "Qb3 최선" [ref=f2e135] [cursor=pointer]:
+                - generic [ref=f2e136]: Qb3
+                - generic [ref=f2e137]: 최선
+              - button "Qe7 블런더" [ref=f2e138] [cursor=pointer]:
+                - generic [ref=f2e139]: Qe7
+                - generic [ref=f2e140]: 블런더
+            - generic [ref=f2e141]:
+              - generic [ref=f2e142]: "8."
+              - button "Nc3 최선" [ref=f2e143] [cursor=pointer]:
+                - generic [ref=f2e144]: Nc3
+                - generic [ref=f2e145]: 최선
+              - button "c6 좋음" [ref=f2e146] [cursor=pointer]:
+                - generic [ref=f2e147]: c6
+                - generic [ref=f2e148]: 좋음
+            - generic [ref=f2e149]:
+              - generic [ref=f2e150]: "9."
+              - button "Bg5 최선" [ref=f2e151] [cursor=pointer]:
+                - generic [ref=f2e152]: Bg5
+                - generic [ref=f2e153]: 최선
+              - button "b5 부정확" [ref=f2e154] [cursor=pointer]:
+                - generic [ref=f2e155]: b5
+                - generic [ref=f2e156]: 부정확
+            - generic [ref=f2e157]:
+              - generic [ref=f2e158]: "10."
+              - button "Nxb5 최선" [ref=f2e159] [cursor=pointer]:
+                - generic [ref=f2e160]: Nxb5
+                - generic [ref=f2e161]: 최선
+              - button "cxb5 좋음" [ref=f2e162] [cursor=pointer]:
+                - generic [ref=f2e163]: cxb5
+                - generic [ref=f2e164]: 좋음
+            - generic [ref=f2e165]:
+              - generic [ref=f2e166]: "11."
+              - button "Bxb5+ 최선" [ref=f2e167] [cursor=pointer]:
+                - generic [ref=f2e168]: Bxb5+
+                - generic [ref=f2e169]: 최선
+              - button "Nbd7 블런더" [ref=f2e170] [cursor=pointer]:
+                - generic [ref=f2e171]: Nbd7
+                - generic [ref=f2e172]: 블런더
+            - generic [ref=f2e173]:
+              - generic [ref=f2e174]: "12."
+              - button "O-O-O 최선" [ref=f2e175] [cursor=pointer]:
+                - generic [ref=f2e176]: O-O-O
+                - generic [ref=f2e177]: 최선
+              - button "Rd8 강제" [ref=f2e178] [cursor=pointer]:
+                - generic [ref=f2e179]: Rd8
+                - generic [ref=f2e180]: 강제
+            - generic [ref=f2e181]:
+              - generic [ref=f2e182]: "13."
+              - button "Rxd7 최선" [ref=f2e183] [cursor=pointer]:
+                - generic [ref=f2e184]: Rxd7
+                - generic [ref=f2e185]: 최선
+              - button "Rxd7 좋음" [ref=f2e186] [cursor=pointer]:
+                - generic [ref=f2e187]: Rxd7
+                - generic [ref=f2e188]: 좋음
+            - generic [ref=f2e189]:
+              - generic [ref=f2e190]: "14."
+              - button "Rd1 최선" [ref=f2e191] [cursor=pointer]:
+                - generic [ref=f2e192]: Rd1
+                - generic [ref=f2e193]: 최선
+              - button "Qe6 좋음" [ref=f2e194] [cursor=pointer]:
+                - generic [ref=f2e195]: Qe6
+                - generic [ref=f2e196]: 좋음
+            - generic [ref=f2e197]:
+              - generic [ref=f2e198]: "15."
+              - button "Bxd7+ 최선" [ref=f2e199] [cursor=pointer]:
+                - generic [ref=f2e200]: Bxd7+
+                - generic [ref=f2e201]: 최선
+              - button "Nxd7 좋음" [ref=f2e202] [cursor=pointer]:
+                - generic [ref=f2e203]: Nxd7
+                - generic [ref=f2e204]: 좋음
+            - generic [ref=f2e205]:
+              - generic [ref=f2e206]: "16."
+              - button "Qb8+ 최선" [ref=f2e207] [cursor=pointer]:
+                - generic [ref=f2e208]: Qb8+
+                - generic [ref=f2e209]: 최선
+              - button "Nxb8 좋음" [ref=f2e210] [cursor=pointer]:
+                - generic [ref=f2e211]: Nxb8
+                - generic [ref=f2e212]: 좋음
+            - generic [ref=f2e213]:
+              - generic [ref=f2e214]: "17."
+              - button "Rd8# 최선" [ref=f2e215] [cursor=pointer]:
+                - generic [ref=f2e216]: Rd8#
+                - generic [ref=f2e217]: 최선
+          - generic [ref=f2e218]:
+            - generic [ref=f2e219]:
+              - generic [ref=f2e220]: 평가 추이
+              - generic "7…Qe7에서 +2.0 → +5.5" [ref=f2e221]
+            - img "평가 추이" [ref=f2e222] [cursor=pointer]:
+              - generic "7…Qe7 블런더" [ref=f2e225]
+              - generic "11…Nbd7 블런더" [ref=f2e226]
+        - generic [ref=f2e227]:
+          - tablist [ref=f2e228]:
+            - tab "이 수의 설명" [selected] [ref=f2e229] [cursor=pointer]
+            - tab "전략과 계획" [ref=f2e230] [cursor=pointer]
+            - tab "국면 특징" [ref=f2e231] [cursor=pointer]
+          - generic [ref=f2e232]:
+            - generic [ref=f2e233]: 7… Qe7
+            - generic [ref=f2e234]: 블런더
+            - generic [ref=f2e235]: +2.0 → +5.5
+            - generic "비숍이 공격받자 퀸으로 지키는 것이 가장 먼저 눈에 들어오는 수입니다." [ref=f2e236]: 1400-1600 구간의 34%가 두는 수
+          - paragraph [ref=f2e237]: Qe7로 비숍을 지켰습니다. 자연스러운 반응이지만, 퀸이 d파일에 서면서 Rd1과 같은 선에 놓입니다. 지금은 나이트가 사이를 가리고 있을 뿐입니다.
+          - paragraph [ref=f2e238]: 체크를 주면서 비켜서는 순간 룩이 퀸을 겨냥합니다.
+          - paragraph [ref=f2e239]: 왜 자연스러운가. 비숍이 공격받자 퀸으로 지키는 것이 가장 먼저 눈에 들어오는 수입니다.
+          - generic [ref=f2e240]:
+            - generic [ref=f2e241]:
+              - generic [ref=f2e242]: 무슨 일이 일어나는가
+              - generic [ref=f2e243]: 반박 수순 · 클릭하면 보드에 재생
+            - generic [ref=f2e245]:
+              - button "8. Nc3" [ref=f2e246] [cursor=pointer]
+              - button "c6" [ref=f2e247] [cursor=pointer]
+              - button "9. Bg5" [ref=f2e248] [cursor=pointer]
+            - table [ref=f2e249]:
+              - rowgroup [ref=f2e250]:
+                - row [ref=f2e251]:
+                  - cell [ref=f2e252]:
+                    - generic [ref=f2e253]:
+                      - button "8… c6" [ref=f2e254] [cursor=pointer]
+                      - button "9. Bg5" [ref=f2e255] [cursor=pointer]
+                  - cell "퀸 상실 · 퀸과 나이트 교환 · +5.5" [ref=f2e256]:
+                    - text: 퀸 상실 · 퀸과 나이트 교환
+                    - generic [ref=f2e257]: · +5.5
+                - row [ref=f2e258]:
+                  - cell [ref=f2e259]:
+                    - generic [ref=f2e260]:
+                      - button "8. Nbd7" [ref=f2e261] [cursor=pointer]
+                      - button "Bxf6" [ref=f2e262] [cursor=pointer]
+                  - cell "같은 결과 · 킹 앞 폰까지 무너짐 · +6.0" [ref=f2e263]:
+                    - text: 같은 결과 · 킹 앞 폰까지 무너짐
+                    - generic [ref=f2e264]: · +6.0
+            - generic [ref=f2e265]:
+              - generic [ref=f2e266]: 모티프
+              - generic "Bg5 → f6" [ref=f2e267]: 핀
+              - generic "Rd1 → d7" [ref=f2e268]: 디스커버드 어택 · 체크
+              - generic "Nc3 → e7, f6" [ref=f2e269]: 포크
+            - generic [ref=f2e270]: 왜 Nc3가 아니라 다른 수가 아닌가. 퀸이 체크를 잡으면서 d파일도 벗어납니다. f6는 퀸이 닿지 않는 칸이라 같은 수법이 통합니다.
+          - generic [ref=f2e272]:
+            - generic [ref=f2e273]:
+              - generic [ref=f2e274]: 대신 두었어야 할 수
+              - generic [ref=f2e275]: 엔진 최선수는 이 구간에서 거의 나오지 않는 수
+            - generic [ref=f2e276]:
+              - generic [ref=f2e277]:
+                - generic [ref=f2e278]:
+                  - button "7… Nbd7" [ref=f2e279] [cursor=pointer]
+                  - generic [ref=f2e280]: 최선
+                - generic [ref=f2e281]: "+2.0"
+                - generic [ref=f2e282]:
+                  - generic [ref=f2e283]:
+                    - button "8. Bb5" [ref=f2e284] [cursor=pointer]
+                    - button "Rc8" [ref=f2e285] [cursor=pointer]
+                    - button "9. Bxd7+" [ref=f2e286] [cursor=pointer]
+                  - generic [ref=f2e287]: d5 나이트를 없애면 e7과 f6 위협이 함께 사라집니다.
+                  - generic [ref=f2e288]: 사람 12%
+              - generic [ref=f2e289]:
+                - button "7… Nc6" [ref=f2e291] [cursor=pointer]
+                - generic [ref=f2e292]: "+2.4"
+                - generic [ref=f2e293]:
+                  - generic [ref=f2e294]:
+                    - button "8. Bb5" [ref=f2e295] [cursor=pointer]
+                    - button "Rc8" [ref=f2e296] [cursor=pointer]
+                    - button "9. Bc4" [ref=f2e297] [cursor=pointer]
+                  - generic [ref=f2e298]: 나이트는 없앴지만 백 d5 통과폰이 생기고 퀸이 쫓깁니다.
+          - generic [ref=f2e299]:
+            - generic [ref=f2e300]:
+              - generic [ref=f2e301]: 왜 Nbd7가 Nc6보다 나은가
+              - generic [ref=f2e302]: 분기점 · 8. 이후 국면 비교
+              - button "분기 국면 보기" [ref=f2e303] [cursor=pointer]
+            - table [ref=f2e304]:
+              - rowgroup [ref=f2e305]:
+                - row [ref=f2e306]:
+                  - columnheader "항목" [ref=f2e307]
+                  - columnheader "Nbd7 후" [ref=f2e308]
+                  - columnheader "Nc6 후" [ref=f2e309]
+                  - columnheader "차이" [ref=f2e310]
+              - rowgroup [ref=f2e311]:
+                - row [ref=f2e312]:
+                  - cell "폰 구조" [ref=f2e313]
+                  - cell "e6 폰이 남아 d5 폰을 곧 교환" [ref=f2e314]
+                  - cell "백 d5 통과폰(고립)이 고정" [ref=f2e315]
+                  - cell "+0.4" [ref=f2e316]
+                - row [ref=f2e317]:
+                  - cell "기물 활동" [ref=f2e318]
+                  - cell "Be7과 Rf8이 d파일로 나옴" [ref=f2e319]
+                  - cell "Qc6가 폰에 쫓겨 템포 손실" [ref=f2e320]
+                  - cell "+0.8" [ref=f2e321]
+                - row [ref=f2e322]:
+                  - cell "킹 안전" [ref=f2e323]
+                  - cell "변화 없음" [ref=f2e324]
+                  - cell "변화 없음" [ref=f2e325]
+                  - cell "0" [ref=f2e326]
+            - paragraph [ref=f2e327]: 첫 대안이 기물 활동에서 앞섭니다.
+          - generic [ref=f2e328]:
+            - generic [ref=f2e329]: 검증됨 · 문장 속 7개 주장(칸·기물·공격 관계)이 보드와 일치
+            - generic [ref=f2e334]:
+              - link "이 국면에서 이어 두기 · Maia 1600" [ref=f2e335] [cursor=pointer]:
+                - /url: /training?fen=rn2kb1r%2Fppp1qppp%2F5n2%2F4p3%2F2B1P3%2F1Q6%2FPPP2PPP%2FRNB1K2R%20w%20KQkq%20-%204%208&rating=1560
+              - button "퍼즐로 저장" [active] [ref=f2e338] [cursor=pointer]
+        - status [ref=f2e342]: 퍼즐 2개를 저장했습니다. 훈련 탭에서 풀 수 있습니다.

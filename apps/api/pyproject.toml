@@ -51,3 +51,7 @@ asyncio_mode = "auto"
 [tool.mypy]
 python_version = "3.12"
 strict = true
+
+[[tool.mypy.overrides]]
+module = ["maia2", "maia2.*"]
+ignore_missing_imports = true

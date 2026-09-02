@@ -76,6 +76,8 @@ class ImportResult(BaseModel):
     skipped: int
     game_ids: list[int]
     user_id: int | None = None
+    errors: list[str] = []
+    """One Korean sentence per game that was skipped because it could not be read."""
 
 
 # ---------- engine analysis ----------
@@ -148,6 +150,12 @@ class MotifOut(BaseModel):
     targets: list[str]
     with_check: bool
     safe: bool
+    line: list[str] = []
+    """SAN moves after the move that show the threat (e.g. the mating move)."""
+    label: str = ""
+    """Korean name of the motif kind (motifs.KOREAN_NAMES)."""
+    description: str = ""
+    """Short Korean phrase built from the squares above (motifs.describe)."""
 
 
 class Branch(BaseModel):
@@ -201,6 +209,11 @@ class HumanView(BaseModel):
     natural_reason: str | None = None
     computer_move: bool = False
     """True when the engine's best move is one humans at this rating essentially never find."""
+    source: Literal["maia", "engine", "random"] | None = None
+    """Which backend produced move_probs: Maia-2, the rating-conditioned engine fallback, or
+    uniform sampling when neither is available."""
+    claims: list[Claim] = []
+    """Board facts natural_reason was built from, in verifier form."""
 
 
 class Explanation(BaseModel):
@@ -262,6 +275,23 @@ class StrategyView(BaseModel):
     """Personal record in this structure: games, win_rate, avg_break_move ..."""
 
 
+class PlanSketch(BaseModel):
+    """What one engine line does for the side to move, read off the PV (layer 3)."""
+
+    side: Color
+    piece_destinations: dict[str, str] = {}
+    """'Nf6' (piece letter + start square) -> final square reached in the line."""
+    pawn_breaks: list[str] = []
+    """SAN of pawn advances that attack or run into an enemy pawn."""
+    exchanges: list[str] = []
+    """'Nxd5 exd5' pairs: a capture and the immediate recapture on the same square."""
+    king_moves: list[str] = []
+    plies: int = 0
+    """How many PV plies were read."""
+    summary: str = ""
+    """Korean, built only from the fields above."""
+
+
 class Arrow(BaseModel):
     orig: str
     dest: str
@@ -300,6 +330,12 @@ class PhaseAccuracy(BaseModel):
     delta_opening: float | None = None
     delta_middlegame: float | None = None
     delta_endgame: float | None = None
+    opening_moves: int = 0
+    middlegame_moves: int = 0
+    endgame_moves: int = 0
+    """How many of the user's moves each accuracy was averaged over (0 means no data)."""
+    baseline_band: str | None = None
+    """Rating band the deltas are measured against, e.g. '1400-1600'."""
 
 
 class StructureStat(BaseModel):
@@ -308,6 +344,12 @@ class StructureStat(BaseModel):
     games: int
     win_rate: float
     avg_loss_cp: float
+    wins: int = 0
+    losses: int = 0
+    break_label: str | None = None
+    """The user's most frequent pawn break in this structure (openings_map.BREAKS label)."""
+    avg_break_move: float | None = None
+    """Average move number of that break over the games where it happened."""
 
 
 class MotifMiss(BaseModel):
@@ -320,6 +362,7 @@ class TimeStats(BaseModel):
     blunder_rate_over_30s: float
     baseline: float = 0.09
     moves_under_30s: int = 0
+    moves_over_30s: int = 0
 
 
 class TrainingSummary(BaseModel):
@@ -444,3 +487,20 @@ class SparringMoveResponse(BaseModel):
     uci: str
     probs: dict[str, float] = {}
     source: Literal["maia", "engine", "random"]
+
+
+class MoveProbsResponse(BaseModel):
+    rating: int
+    move_probs: dict[str, float] = {}
+    """SAN -> probability over legal moves at this rating, highest first."""
+    source: Literal["maia", "engine", "random"]
+
+
+class MaiaStatus(BaseModel):
+    maia2_available: bool
+    """The maia2 package is installed and enabled (weights load lazily on first use)."""
+    backend: Literal["maia", "engine", "random"]
+    """Backend the next request will use."""
+    maia_loaded: bool = False
+    maia_error: str | None = None
+    stockfish_available: bool = False

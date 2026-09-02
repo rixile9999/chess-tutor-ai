@@ -1,0 +1,28 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e5]: 체스 튜터
+    - generic [ref=e7]: 프로필
+    - link "기보 가져오기" [ref=e9] [cursor=pointer]:
+      - /url: /games?import=1
+  - generic [ref=e10]:
+    - navigation [ref=e11]:
+      - link "기보" [ref=e12] [cursor=pointer]:
+        - /url: /games
+      - link "리뷰" [ref=e16] [cursor=pointer]:
+        - /url: /review
+      - link "오프닝" [ref=e21] [cursor=pointer]:
+        - /url: /openings
+      - link "프로필" [ref=e28] [cursor=pointer]:
+        - /url: /profile
+      - link "훈련" [ref=e33] [cursor=pointer]:
+        - /url: /training
+    - main [ref=e39]:
+      - generic [ref=e40]:
+        - generic [ref=e41]:
+          - heading "약점 리포트" [level=2] [ref=e42]
+          - generic [ref=e43]: rixile · 최근 60일
+          - group "기간" [ref=e45]:
+            - button "30일" [disabled] [ref=e46]
+            - button "60일" [disabled] [pressed] [ref=e47]
+            - button "90일" [disabled] [ref=e48]
+        - status [ref=e60]: 리포트를 불러오는 중입니다

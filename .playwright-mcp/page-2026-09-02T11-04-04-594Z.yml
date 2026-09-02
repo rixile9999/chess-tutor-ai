@@ -1,0 +1,32 @@
+- generic [ref=f2e3]:
+  - banner [ref=f2e4]:
+    - generic [ref=f2e5]: 체스 튜터
+    - link "기보 가져오기" [ref=f2e7] [cursor=pointer]:
+      - /url: /games?import=1
+  - generic [ref=f2e8]:
+    - navigation [ref=f2e9]:
+      - link "기보" [ref=f2e10] [cursor=pointer]:
+        - /url: /games
+      - link "리뷰" [ref=f2e14] [cursor=pointer]:
+        - /url: /review
+      - link "오프닝" [ref=f2e19] [cursor=pointer]:
+        - /url: /openings
+      - link "프로필" [ref=f2e26] [cursor=pointer]:
+        - /url: /profile
+      - link "훈련" [ref=f2e31] [cursor=pointer]:
+        - /url: /training
+    - main [ref=f2e37]:
+      - generic [ref=f2e38]:
+        - generic [ref=f2e39]:
+          - heading "기보" [level=1] [ref=f2e40]
+          - generic [ref=f2e41]: 모든 기보 · 불러오는 중
+          - generic [ref=f2e42]:
+            - textbox "사용자 이름" [ref=f2e43]:
+              - /placeholder: chess.com 사용자 이름
+            - button "저장" [disabled] [ref=f2e44]
+          - button "기보 가져오기" [ref=f2e45] [cursor=pointer]
+        - region "기보 목록" [ref=f2e48]:
+          - generic [ref=f2e49]:
+            - generic [ref=f2e50]: 기보 목록
+            - generic [ref=f2e51]: 최근 순 · 분석이 끝난 기보는 리뷰에서 수마다 설명을 읽을 수 있습니다
+            - button "새로고침" [disabled] [ref=f2e52]

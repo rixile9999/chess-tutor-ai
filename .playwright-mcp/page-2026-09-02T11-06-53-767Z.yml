@@ -1,0 +1,32 @@
+- generic [ref=f2e3]:
+  - banner [ref=f2e4]:
+    - generic [ref=f2e5]: 체스 튜터
+    - generic [ref=f2e7]:
+      - generic [ref=f2e8]: 훈련
+      - generic [ref=f2e9]: 내 기보 퍼즐 · 간격 반복
+    - link "기보 가져오기" [ref=f2e10] [cursor=pointer]:
+      - /url: /games?import=1
+  - generic [ref=f2e11]:
+    - navigation [ref=f2e12]:
+      - link "기보" [ref=f2e13] [cursor=pointer]:
+        - /url: /games
+      - link "리뷰" [ref=f2e17] [cursor=pointer]:
+        - /url: /review
+      - link "오프닝" [ref=f2e22] [cursor=pointer]:
+        - /url: /openings
+      - link "프로필" [ref=f2e29] [cursor=pointer]:
+        - /url: /profile
+      - link "훈련" [ref=f2e34] [cursor=pointer]:
+        - /url: /training
+    - main [ref=f2e40]:
+      - generic [ref=f2e41]:
+        - generic [ref=f2e42]:
+          - generic [ref=f2e43]: 훈련
+          - generic [ref=f2e44]: 내 기보에서 만든 문제를 간격 반복으로 복습하고, 리뷰한 국면을 Maia와 이어 둡니다.
+          - generic [ref=f2e45]: rixile
+        - tablist [ref=f2e46]:
+          - tab "퍼즐" [selected] [ref=f2e47] [cursor=pointer]
+          - tab "이어 두기" [ref=f2e48] [cursor=pointer]
+        - generic [ref=f2e49]:
+          - generic [ref=f2e50]: 내 기보 퍼즐
+          - generic [ref=f2e54]: 복습할 문제를 불러오는 중입니다

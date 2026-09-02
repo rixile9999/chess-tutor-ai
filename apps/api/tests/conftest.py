@@ -1,11 +1,14 @@
 import os
+import tempfile
 from collections.abc import AsyncIterator, Iterator
 
 import pytest
 from fastapi.testclient import TestClient
 from httpx import ASGITransport, AsyncClient
 
-os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///./test_chess_tutor.db")
+# One database file per test process so parallel pytest runs never share state.
+_TEST_DB = os.path.join(tempfile.mkdtemp(prefix="chess-tutor-test-"), f"test_{os.getpid()}.db")
+os.environ["DATABASE_URL"] = f"sqlite+aiosqlite:///{_TEST_DB}"
 
 from chess_tutor import db  # noqa: E402
 from chess_tutor.api import app  # noqa: E402

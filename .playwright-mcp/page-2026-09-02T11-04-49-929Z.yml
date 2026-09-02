@@ -1,0 +1,191 @@
+- generic [ref=f6e3]:
+  - banner [ref=f6e4]:
+    - generic [ref=f6e5]: 체스 튜터
+    - generic [ref=f6e7]:
+      - generic [ref=f6e8]: 프로필
+      - generic [ref=f6e61]: chess.com 연동 · 60판 가져옴 · 분석 41판
+    - link "기보 가져오기" [ref=f6e9] [cursor=pointer]:
+      - /url: /games?import=1
+  - generic [ref=f6e10]:
+    - navigation [ref=f6e11]:
+      - link "기보" [ref=f6e12] [cursor=pointer]:
+        - /url: /games
+      - link "리뷰" [ref=f6e16] [cursor=pointer]:
+        - /url: /review
+      - link "오프닝" [ref=f6e21] [cursor=pointer]:
+        - /url: /openings
+      - link "프로필" [ref=f6e28] [cursor=pointer]:
+        - /url: /profile
+      - link "훈련" [ref=f6e33] [cursor=pointer]:
+        - /url: /training
+    - main [ref=f6e39]:
+      - generic [ref=f6e40]:
+        - generic [ref=f6e41]:
+          - heading "약점 리포트" [level=2] [ref=f6e42]
+          - generic [ref=f6e43]: rixile · 최근 60일 · 2026-07-01 ~ 08-30 · chess.com · 60판
+          - generic [ref=f6e44]:
+            - group "기간" [ref=f6e45]:
+              - button "30일" [ref=f6e46] [cursor=pointer]
+              - button "60일" [pressed] [ref=f6e47] [cursor=pointer]
+              - button "90일" [ref=f6e48] [cursor=pointer]
+            - generic [ref=f6e62]:
+              - text: 래피드
+              - generic [ref=f6e63]: "1560"
+            - generic [ref=f6e64]:
+              - text: 블리츠
+              - generic [ref=f6e65]: "1482"
+        - generic [ref=f6e66]:
+          - generic [ref=f6e67]:
+            - generic [ref=f6e68]:
+              - generic [ref=f6e69]:
+                - heading "튜터의 요약" [level=3] [ref=f6e70]
+                - generic [ref=f6e71]: 통계를 설명과 연결합니다
+              - generic [ref=f6e72]:
+                - paragraph [ref=f6e73]: 지난 60일 동안 가장 큰 손실은 헤지호그 구조에서 ...d5 브레이크의 타이밍이었습니다. 12판 중 8판에서 브레이크가 평균 5수 늦었고, 그 사이 백이 e5나 g4로 먼저 움직였습니다. 전술에서는 나이트가 체크와 함께 비켜서는 디스커버드 어택을 17번 놓쳤습니다.
+                - paragraph [ref=f6e74]: 이 둘은 같은 게임에서 자주 겹칩니다. 미들게임 정확도가 같은 구간보다 6점 낮은 이유의 대부분이 여기 있습니다.
+              - generic [ref=f6e75]:
+                - link "관련 게임 보기" [ref=f6e76] [cursor=pointer]:
+                  - /url: /review
+                - generic [ref=f6e79]: ·
+                - link "오프닝 계획 다시 읽기" [ref=f6e80] [cursor=pointer]:
+                  - /url: /openings
+                - generic [ref=f6e83]: 분석 41 / 60판
+            - generic [ref=f6e84]:
+              - generic [ref=f6e85]:
+                - heading "단계별 정확도" [level=3] [ref=f6e86]
+                - generic [ref=f6e87]: 100점 만점
+              - generic [ref=f6e88]:
+                - generic [ref=f6e89]:
+                  - generic [ref=f6e90]: 오프닝
+                  - generic [ref=f6e91]: "84"
+                  - generic [ref=f6e92]: +2 vs 같은 구간
+                - generic [ref=f6e93]:
+                  - generic [ref=f6e94]: 미들게임
+                  - generic [ref=f6e95]: "71"
+                  - generic [ref=f6e96]: −6 vs 같은 구간
+                - generic [ref=f6e97]:
+                  - generic [ref=f6e98]: 엔드게임
+                  - generic [ref=f6e99]: "63"
+                  - generic [ref=f6e100]: 비교 기준 없음
+          - generic [ref=f6e101]:
+            - generic [ref=f6e102]:
+              - generic [ref=f6e103]:
+                - heading "구조별 성적" [level=3] [ref=f6e104]
+                - generic [ref=f6e105]: 판수 · 승률 · 판당 평균 손실(센티폰)
+              - table "구조별 성적" [ref=f6e107]:
+                - rowgroup [ref=f6e108]:
+                  - row [ref=f6e109]:
+                    - cell "헤지호그" [ref=f6e110]
+                    - cell "12판" [ref=f6e111]
+                    - cell "33%" [ref=f6e112]
+                    - cell "−142" [ref=f6e113]
+                  - row [ref=f6e118]:
+                    - cell "오픈 센터" [ref=f6e119]
+                    - cell "15판" [ref=f6e120]
+                    - cell "47%" [ref=f6e121]
+                    - cell "−88" [ref=f6e122]
+                  - row [ref=f6e127]:
+                    - cell "IQP · 상대 보유" [ref=f6e128]
+                    - cell "11판" [ref=f6e129]
+                    - cell "45%" [ref=f6e130]
+                    - cell "−95" [ref=f6e131]
+                  - row [ref=f6e136]:
+                    - cell "프렌치 구조" [ref=f6e137]
+                    - cell "8판" [ref=f6e138]
+                    - cell "50%" [ref=f6e139]
+                    - cell "−70" [ref=f6e140]
+                  - row [ref=f6e145]:
+                    - cell "카로칸 어드밴스" [ref=f6e146]
+                    - cell "9판" [ref=f6e147]
+                    - cell "61%" [ref=f6e148]
+                    - cell "−40" [ref=f6e149]
+            - generic [ref=f6e154]:
+              - generic [ref=f6e155]:
+                - heading "놓친 전술 모티프" [level=3] [ref=f6e156]
+                - generic [ref=f6e157]: 리뷰에서 태그된 횟수
+              - generic [ref=f6e158]:
+                - generic [ref=f6e159]:
+                  - generic "디스커버드 어택" [ref=f6e160]
+                  - img "디스커버드 어택 17회" [ref=f6e161]
+                  - generic [ref=f6e163]: 17회
+                - generic [ref=f6e164]:
+                  - generic "포크" [ref=f6e165]
+                  - img "포크 14회" [ref=f6e166]
+                  - generic [ref=f6e168]: 14회
+                - generic [ref=f6e169]:
+                  - generic "핀" [ref=f6e170]
+                  - img "핀 9회" [ref=f6e171]
+                  - generic [ref=f6e173]: 9회
+                - generic [ref=f6e174]:
+                  - generic "백랭크" [ref=f6e175]
+                  - img "백랭크 6회" [ref=f6e176]
+                  - generic [ref=f6e178]: 6회
+                - generic [ref=f6e179]:
+                  - generic "수비수 제거" [ref=f6e180]
+                  - img "수비수 제거 4회" [ref=f6e181]
+                  - generic [ref=f6e183]: 4회
+                - generic [ref=f6e184]:
+                  - generic "zwischenzug" [ref=f6e185]
+                  - img "zwischenzug 2회" [ref=f6e186]
+                  - generic [ref=f6e188]: 2회
+            - generic [ref=f6e189]:
+              - generic [ref=f6e190]:
+                - heading "시간 관리" [level=3] [ref=f6e191]
+                - generic [ref=f6e192]: 남은 시간과 실수의 관계
+              - generic [ref=f6e193]: 30초 미만에 둔 수의 블런더율이 18%입니다. 같은 구간 기준 9%. 30초 미만으로 둔 수는 312개였습니다.
+              - generic [ref=f6e194]:
+                - generic [ref=f6e195]:
+                  - generic "30초 미만" [ref=f6e196]
+                  - img "30초 미만 18%" [ref=f6e197]
+                  - generic [ref=f6e200]: 18%
+                - generic [ref=f6e201]:
+                  - generic "30초 이상" [ref=f6e202]
+                  - img "30초 이상 6%" [ref=f6e203]
+                  - generic [ref=f6e206]: 6%
+                - generic [ref=f6e207]:
+                  - generic "구간 기준" [ref=f6e208]
+                  - img "구간 기준 9%" [ref=f6e209]
+                  - generic [ref=f6e211]: 9%
+          - generic [ref=f6e212]:
+            - generic [ref=f6e213]:
+              - generic [ref=f6e214]:
+                - heading "오늘의 훈련" [level=3] [ref=f6e215]
+                - generic [ref=f6e216]: 내 기보에서 만든 문제 · 간격 반복
+              - generic [ref=f6e217]:
+                - generic [ref=f6e218]:
+                  - generic [ref=f6e219]: 복습 예정
+                  - generic [ref=f6e220]: 내 기보 퍼즐 7개
+                  - generic [ref=f6e221]: 내 게임의 실수 장면에서 만든 문제
+                  - link "시작" [ref=f6e222] [cursor=pointer]:
+                    - /url: /training
+                - generic [ref=f6e225]:
+                  - generic [ref=f6e226]: 모티프 세트
+                  - generic [ref=f6e227]: 디스커버드 어택 12문제
+                  - generic [ref=f6e228]: 그 외 포크
+                  - link "시작" [ref=f6e229] [cursor=pointer]:
+                    - /url: /training?motif=discovered_attack
+                - generic [ref=f6e230]:
+                  - generic [ref=f6e231]: 구조 스터디
+                  - generic [ref=f6e232]: 헤지호그 ...d5 타이밍
+                  - generic [ref=f6e233]: 그 외 1개
+                  - link "열기" [ref=f6e234] [cursor=pointer]:
+                    - /url: /training
+            - generic [ref=f6e235]:
+              - generic [ref=f6e236]:
+                - heading "레퍼토리 구멍" [level=3] [ref=f6e237]
+                - generic [ref=f6e238]: 책에서 벗어난 지점과 그 뒤의 손실
+              - generic [ref=f6e239]:
+                - generic [ref=f6e240]:
+                  - generic [ref=f6e241]: 1.d4 상대
+                  - generic [ref=f6e242]: 18판 · 책 이탈 61%
+                  - generic [ref=f6e243]: 승률 39%
+                  - generic [ref=f6e244]: 평균 −0.8
+                  - link "오프닝 지도에서 보기" [ref=f6e245] [cursor=pointer]:
+                    - /url: /openings
+                - generic [ref=f6e248]:
+                  - generic [ref=f6e249]: 1.e4 c5 2.c3
+                  - generic [ref=f6e250]: 4판 · 책 이탈 25%
+                  - generic [ref=f6e251]: 승률 0%
+                  - generic [ref=f6e252]: 평균 −0.5
+                  - link "오프닝 지도에서 보기" [ref=f6e253] [cursor=pointer]:
+                    - /url: /openings
