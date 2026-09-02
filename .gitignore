@@ -26,3 +26,6 @@ data/
 
 # Design canvas build output (regenerate with node design/build.mjs + seed)
 design/chess-tutor-mockup.html
+
+# TypeScript incremental build info
+*.tsbuildinfo
