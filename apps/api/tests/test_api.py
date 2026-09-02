@@ -25,3 +25,11 @@ def test_motifs_rejects_illegal_san(client: TestClient) -> None:
 def test_router_stubs_mounted(client: TestClient) -> None:
     for name in ("games", "analysis", "review", "profile", "openings", "training", "maia"):
         assert client.get(f"/{name}/_status").status_code == 200
+
+
+def test_oversized_ids_are_rejected_not_500(client: TestClient) -> None:
+    huge = "9" * 25
+    assert client.get(f"/games/{huge}").status_code == 422
+    assert client.get(f"/analysis/{huge}").status_code == 422
+    assert client.get(f"/review/{huge}/1").status_code == 422
+    assert client.get(f"/training/puzzles/{huge}").status_code == 422
