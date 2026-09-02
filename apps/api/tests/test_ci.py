@@ -36,13 +36,17 @@ def test_ci_installs_stockfish_and_points_the_suite_at_it(workflow: dict[str, An
     api = workflow["jobs"]["api"]
     steps = _run_steps(api)
 
-    installs = [s for s in steps if "stockfish" in s and "apt-get install" in s]
-    assert installs, f"the api job never installs stockfish: {steps}"
+    # The official AVX2 release binary, not the apt package: the Debian build is a generic
+    # x86-64 binary whose NNUE evaluation is several times slower, and the suite's depth-14
+    # confirmation searches then exceed the job timeout.
+    installs = [s for s in steps if "stockfish" in s and "releases/download" in s]
+    assert installs, f"the api job never downloads stockfish: {steps}"
 
-    # The Debian package installs to /usr/games, which is not on the runner's PATH, so
-    # engine.find_stockfish only sees it through STOCKFISH_PATH.
+    # engine.find_stockfish only sees the binary through STOCKFISH_PATH, so the install step
+    # must put it exactly there.
     path = api.get("env", {}).get("STOCKFISH_PATH")
-    assert path == "/usr/games/stockfish", api.get("env")
+    assert isinstance(path, str) and path.startswith("/"), api.get("env")
+    assert "$STOCKFISH_PATH" in installs[0] or path in installs[0], installs[0]
 
     pytest_steps = [s for s in steps if "pytest" in s]
     assert pytest_steps, steps

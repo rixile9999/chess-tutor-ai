@@ -15,17 +15,27 @@ jobs:
     # Without the engine the whole layer-1..3 pipeline skips and a green run proves nothing:
     # test_e2e, test_engine and parts of analysis/maia/review/reasoning need Stockfish.
     env:
-      STOCKFISH_PATH: /usr/games/stockfish
+      STOCKFISH_PATH: /opt/stockfish/stockfish
+      STOCKFISH_RELEASE: sf_18
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
+      # The apt package is a generic x86-64 build whose NNUE evaluation is far slower than the
+      # official AVX2 binary; the depth-14 confirmation searches in the suite need the fast one.
       - name: install stockfish
-        run: sudo apt-get update && sudo apt-get install -y stockfish
+        run: |
+          curl -sSL -o /tmp/sf.tar "https://github.com/official-stockfish/Stockfish/releases/download/${STOCKFISH_RELEASE}/stockfish-ubuntu-x86-64-avx2.tar"
+          sudo mkdir -p /opt/stockfish
+          sudo tar -xf /tmp/sf.tar --strip-components=1 -C /opt/stockfish
+          sudo mv /opt/stockfish/stockfish-ubuntu-x86-64-avx2 "$STOCKFISH_PATH"
+          sudo chmod +x "$STOCKFISH_PATH"
+          printf 'uci\nquit\n' | "$STOCKFISH_PATH" | head -1
       - run: uv sync --all-groups
       - run: uv run ruff format --check src tests
       - run: uv run ruff check src tests
       - run: uv run mypy src
       - run: uv run pytest -q
+        timeout-minutes: 12
 
   web:
     runs-on: ubuntu-latest
