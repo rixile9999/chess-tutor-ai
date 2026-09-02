@@ -1,0 +1,28 @@
+.shell { display: flex; flex-direction: column; min-height: 100vh; background: var(--paper); }
+.topbar { height: 52px; display: flex; align-items: center; gap: 16px; padding: 0 20px; border-bottom: 1px solid var(--line); }
+.wordmark { font-family: var(--font-display); font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
+.divider { width: 1px; height: 22px; background: var(--line-strong); }
+.topbar-meta { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--ink-2); }
+.spacer { flex: 1; }
+.body { flex: 1; display: flex; min-height: 0; }
+.rail { width: 64px; flex-shrink: 0; border-right: 1px solid var(--line); display: flex; flex-direction: column; align-items: center; gap: 6px; padding-top: 12px; }
+.rail-item { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; width: 52px; height: 56px; border-radius: 10px; color: var(--ink-3); text-decoration: none; font-size: 11px; font-weight: 500; }
+.rail-item.active { color: var(--ink); background: rgba(43, 38, 34, 0.08); font-weight: 600; }
+.content { flex: 1; min-width: 0; padding: 20px 24px; }
+
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 36px; padding: 0 14px; border-radius: 8px; font-size: 13px; font-weight: 600; font-family: var(--font-ui); white-space: nowrap; border: none; cursor: pointer; text-decoration: none; }
+.btn-primary { background: var(--ink); color: var(--paper); }
+.btn-ghost { border: 1px solid var(--line-strong); color: var(--ink); background: transparent; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+.h3 { font-family: var(--font-display); font-size: 16px; font-weight: 700; margin: 0; letter-spacing: -0.01em; }
+.eyebrow { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); }
+.chip { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 10px; border-radius: 999px; border: 1px solid var(--line-strong); font-size: 12px; font-weight: 500; color: var(--ink-2); background: var(--surface); }
+.badge { display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 8px; border-radius: 6px; font-size: 12px; font-weight: 700; }
+.badge-bad { background: var(--bad-bg); color: var(--bad); }
+.badge-good { background: var(--good-bg); color: var(--good); }
+.badge-neutral { background: rgba(43, 38, 34, 0.07); color: var(--ink-2); }
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.mv { font-family: var(--font-mono); font-weight: 600; }
+.muted { color: var(--ink-2); }
+.faint { color: var(--ink-3); }
+.small { font-size: 12px; }
