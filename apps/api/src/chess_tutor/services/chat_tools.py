@@ -150,6 +150,16 @@ def _parse_move(board: chess.Board, text: str) -> chess.Move:
     return move
 
 
+def _as_list(value: str | list[str] | None) -> list[str]:
+    """Tool arguments that are lists in the schema but sometimes arrive as one string
+    ('a1a5, d8a5:good' or 'Qf6 Rxa5'): split on commas and whitespace."""
+    if value is None:
+        return []
+    if isinstance(value, str):
+        return [part for part in value.replace(",", " ").split() if part]
+    return [str(part) for part in value]
+
+
 def _depth(requested: int | None) -> int:
     settings = get_settings()
     depth = requested or settings.engine_depth
@@ -309,22 +319,22 @@ def _parse_arrow(text: str) -> schemas.Arrow:
 def show_board_impl(
     session: chat_svc.ChatSession | None,
     fen: str,
-    moves: list[str] | None = None,
+    moves: str | list[str] | None = None,
     caption: str = "",
-    arrows: list[str] | None = None,
-    highlights: list[str] | None = None,
+    arrows: str | list[str] | None = None,
+    highlights: str | list[str] | None = None,
 ) -> ShowResult:
     board = _board(fen)
     start_fen = board.fen()
     sans: list[str] = []
     last: list[str] | None = None
-    for text in moves or []:
+    for text in _as_list(moves):
         move = _parse_move(board, text)
         sans.append(board.san(move))
         last = [chess.square_name(move.from_square), chess.square_name(move.to_square)]
         board.push(move)
-    parsed_arrows = [_parse_arrow(a) for a in (arrows or [])[:MAX_ARROWS]]
-    squares = [s.strip().lower() for s in (highlights or [])]
+    parsed_arrows = [_parse_arrow(a) for a in _as_list(arrows)[:MAX_ARROWS]]
+    squares = [s.strip().lower() for s in _as_list(highlights)]
     bad = [s for s in squares if s not in chess.SQUARE_NAMES]
     if bad:
         raise ValueError(f"칸 이름이 아닙니다: {', '.join(bad)}")
@@ -363,12 +373,12 @@ def motifs_impl(fen: str, san: str) -> MotifsResult:
 
 
 def maia_probs_impl(
-    fen: str, rating: int | None = None, include: list[str] | None = None
+    fen: str, rating: int | None = None, include: str | list[str] | None = None
 ) -> ProbsResult:
     board = _board(fen)
     r = rating or get_settings().default_rating
     sans: list[str] = []
-    for text in include or []:
+    for text in _as_list(include):
         sans.append(board.san(_parse_move(board, text)))
     probs, source = maia_svc.move_probs(board.fen(), r, sans)
     ordered = dict(sorted(probs.items(), key=lambda kv: -kv[1]))
@@ -425,10 +435,10 @@ async def analyse(fen: str, depth: int | None = None, multipv: int | None = 3) -
 def show_board(
     fen: str,
     ctx: Context,
-    moves: list[str] | None = None,
+    moves: list[str] | str | None = None,
     caption: str = "",
-    arrows: list[str] | None = None,
-    highlights: list[str] | None = None,
+    arrows: list[str] | str | None = None,
+    highlights: list[str] | str | None = None,
 ) -> ShowResult:
     with _tool_errors():
         return show_board_impl(_session(ctx), fen, moves, caption, arrows, highlights)
@@ -465,7 +475,7 @@ def motifs(fen: str, san: str) -> MotifsResult:
     )
 )
 def maia_probs(
-    fen: str, rating: int | None = None, include: list[str] | None = None
+    fen: str, rating: int | None = None, include: list[str] | str | None = None
 ) -> ProbsResult:
     with _tool_errors():
         return maia_probs_impl(fen, rating, include)

@@ -28,25 +28,31 @@ export function Board({ fen, orientation = 'white', size = 520, shapes, lastMove
   const api = useRef<Api | null>(null);
   const onMoveRef = useRef(onMove);
   onMoveRef.current = onMove;
+  const latest = useRef({ fen, orientation, coordinates, shapes, lastMove, movable });
+  latest.current = { fen, orientation, coordinates, shapes, lastMove, movable };
+  const interactive = !!movable;
 
+  // Chessground binds its pointer handlers only when it is constructed without viewOnly, so a
+  // board that becomes movable later (the review board in the chat tab) is rebuilt, not `set`.
   useEffect(() => {
     if (!ref.current) return;
+    const p = latest.current;
     api.current = Chessground(ref.current, {
-      fen,
-      orientation,
-      coordinates,
-      viewOnly: !movable,
-      turnColor: movable?.color,
-      movable: movable ? { free: false, color: movable.color, dests: movable.dests, showDests: true } : { free: false, color: undefined },
-      draggable: { enabled: !!movable },
-      selectable: { enabled: !!movable },
-      drawable: { enabled: false, visible: true, shapes: shapes ?? [] },
-      lastMove: (lastMove ?? undefined) as Key[] | undefined,
+      fen: p.fen,
+      orientation: p.orientation,
+      coordinates: p.coordinates,
+      viewOnly: !p.movable,
+      turnColor: p.movable?.color,
+      movable: p.movable ? { free: false, color: p.movable.color, dests: p.movable.dests, showDests: true } : { free: false, color: undefined },
+      draggable: { enabled: !!p.movable },
+      selectable: { enabled: !!p.movable },
+      drawable: { enabled: false, visible: true, shapes: p.shapes ?? [] },
+      lastMove: (p.lastMove ?? undefined) as Key[] | undefined,
       events: { move: (orig, dest) => onMoveRef.current?.(orig, dest) },
       animation: { enabled: true, duration: 150 },
     });
     return () => { api.current?.destroy(); api.current = null; };
-  }, []);
+  }, [interactive]);
 
   useEffect(() => {
     api.current?.set({

@@ -579,3 +579,14 @@ def test_fen_pieces_ground_their_squares() -> None:
     session.note_squares(json.dumps({"fen": AFTER}))
     assert "d5" in session.known_squares
     assert session.unverified("a3 폰과 g8 나이트, d5 나이트") == ["a3"]
+
+
+def test_show_board_accepts_comma_separated_strings() -> None:
+    """Claude sometimes passes list arguments as one string; the tool must not reject that."""
+    session = _session()
+    out = chat_tools.show_board_impl(session, START, "e4, e5 Nf3", "x", "g1f3:good, e5e4", "e5 d4")
+    assert out.moves == ["e4", "e5", "Nf3"]
+    event = session.queue.get_nowait()
+    assert event is not None and [a["orig"] for a in event["arrows"]] == ["g1", "e5"]
+    assert event["highlights"] == ["e5", "d4"]
+    assert chat_tools.maia_probs_impl(START, 1200, "e4, d4").probs.keys() >= {"e4", "d4"}

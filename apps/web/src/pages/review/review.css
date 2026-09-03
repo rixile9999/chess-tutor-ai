@@ -117,6 +117,7 @@ button.rv-mv:hover { border-color: var(--line-strong); background: rgba(43, 38, 
 
 /* chat */
 .rv-chat { display: flex; flex-direction: column; gap: 10px; flex: 1; min-height: 0; }
+.rv-chat[hidden] { display: none; }
 .rv-chat-log { flex: 1; min-height: 240px; max-height: 62vh; overflow: auto; display: flex; flex-direction: column; gap: 14px; padding-right: 4px; }
 .rv-chat-intro { display: flex; flex-direction: column; gap: 10px; color: var(--ink-2); font-size: 13.5px; line-height: 1.55; }
 .rv-chat-chips { display: flex; flex-wrap: wrap; gap: 8px; }
