@@ -132,13 +132,14 @@ PGN/API 임포트
 
 ### M6 국면 채팅 (튜터에게 질문) — 완료 (2026-09-04)
 - 리뷰 화면 네 번째 탭. 학생이 이 수에 대해 질문하거나 추천 수에 반론하면 튜터가 보드를 움직이며 답한다. 보드에서 기물을 직접 움직이면 그 수가 질문이 된다(`ReviewPanel`·`ChatPanel.tsx`, `Board`는 채팅 탭에서만 movable)
-- 실행 경로: `POST /review/{game}/{ply}/chat` → `services/chat.run_turn`이 `claude -p --output-format stream-json --include-partial-messages --tools "" --strict-mcp-config --mcp-config … --allowedTools mcp__chess__* --system-prompt … --session-id|--resume <id>`를 띄운다. 질문은 stdin. 첫 질문은 `--session-id`, 이후는 `--resume`으로 같은 대화를 잇는다. `--bare`는 구독 로그인을 읽지 않으므로 쓰지 않는다. 환경에서 `ANTHROPIC_API_KEY`는 제거해 구독이 쓰이게 한다
+- 실행 경로: `POST /review/{game}/{ply}/chat` → `services/chat.run_turn`이 `claude -p --output-format stream-json --include-partial-messages --tools "" --strict-mcp-config --mcp-config … --allowedTools mcp__chess__* --system-prompt-file … --session-id|--resume <id>`를 자기 프로세스 그룹으로 띄운다. 질문은 stdin, 프롬프트는 파일(argv 크기 한도 회피). 첫 질문은 `--session-id`, 이후는 `--resume`. CLI의 init 줄이 오는 순간부터 그 id는 CLI 것이므로 타임아웃이나 탭 닫힘 뒤에도 다음 질문은 `--resume`한다("already in use"가 오면 한 번 `--resume`으로 재시도). `--bare`는 구독 로그인을 읽지 않으므로 쓰지 않는다. 환경에서 `ANTHROPIC_API_KEY`는 제거해 구독이 쓰이게 한다
+- 동시성: 같은 대화의 두 번째 질문은 0.5초만 기다린 뒤 `error` 이벤트로 거절되고(라우터의 409는 빠른 경로), 프로세스 슬롯(`CHAT_CONCURRENCY`)은 60초 대기. 이벤트마다 실행 번호가 붙어 죽인 프로세스가 남긴 이벤트는 다음 답에 섞이지 않는다. stderr는 따로 읽어 파이프가 막히지 않는다
 - 도구(`services/chat_tools.py`, MCP `/mcp/`에 stateless HTTP로 마운트): `analyse`, `compare`(두 수를 같은 깊이로, 승률 손실·등급·응수 줄·특징 차이표), `motifs`, `maia_probs`, `features`, `show_board`. `show_board`는 요청 헤더 `X-Chat-Session`으로 세션을 찾아 보드 상태를 SSE 스트림에 끼워 넣는다. 도구가 던진 `ValueError`(불법 수, 잘못된 FEN)는 `ToolError`로 모델에게 그대로 전달된다
 - 프롬프트(`services/chat_prompt.py`): 역할, 근거 규칙(수치는 facts·도구 결과만), 반론 절차 6단계(compare → 결론 → 응수 줄을 보드로 재생 → 모티프/특징 → 의도 인정과 대조 → 재반론), 형식(보드와 문단을 번갈아). `<facts>`에는 `MoveReviewOut`에서 claims를 뺀 JSON과 앞뒤 수순
 - 근거 표시: 답변 문장에 나온 칸 중 facts·도구 결과·FEN의 기물 칸 어디에도 없는 칸은 `text_end.unverified`로 내려가 "근거 미확인 칸" 배지가 붙는다. 삭제하지 않는다
 - 기록: `chat_turns` 테이블(세션, 역할, 블록 JSON). Claude Code 쪽 대화 원본은 `~/.cache/chess-tutor/chat`을 cwd로 한 세션 파일에 있다
 - 실측(2026-09-04, game 596 ply 16 "왜 Qf6가 블런더인가요?"): 첫 답 56초·도구 8회·보드 3장, 보드에서 Nc4를 두어 던진 재반론은 34초·도구 5회. 미확인 칸 0개
-- 테스트: `tests/test_chat.py` 32개. `tests/fixtures/fake_claude.py`가 stream-json을 재생하므로 CI에 구독이 필요 없다. MCP 마운트는 TestClient(lifespan 실행)로만 검증한다(ASGITransport는 lifespan을 돌리지 않는다)
+- 테스트: `tests/test_chat.py` 41개(타임아웃, 동시 질문 거절, max-turns 경고, id 충돌 재시도, 낡은 보드 이벤트 폐기, 워커 스레드 push 포함). `tests/fixtures/fake_claude.py`가 stream-json을 재생하므로 CI에 구독이 필요 없다. MCP 마운트는 TestClient(lifespan 실행)로만 검증한다(ASGITransport는 lifespan을 돌리지 않는다)
 - 남은 것: 대화 기록은 브라우저 상태에만 있어 새로고침하면 사라진다(`chat_turns`에서 복원 미구현). 오프닝 지도 국면에서는 아직 못 쓴다. 첫 답까지 30~60초라 상주 프로세스(`--input-format stream-json`)로 줄이는 안이 남아 있다
 
 ### 통합 상태 (2026-09-02)
@@ -224,7 +225,9 @@ MIT로 가고 싶다면: chessground 대신 MIT 보드 라이브러리를 쓰고
 - 웹 단위 테스트가 없다(vitest 미도입). Playwright로 실서버 연결 스모크만 했다.
 
 **국면 채팅**
-- 새로고침하면 대화가 사라진다. `chat_turns`에서 복원하는 `GET /chat/sessions/{id}`가 필요하다.
+- 새로고침하면 대화가 사라진다(ply 이동과 탭 전환은 유지된다). `chat_turns`에서 복원하는 `GET /chat/sessions/{id}`가 필요하다.
+- 근거 표시는 우회 가능하다: 도구 결과에 나온 칸은 모두 "확인됨"으로 치므로, 게임과 무관한 FEN을 분석하면 그 칸들도 확인된 것으로 남는다. `fen_before`에서 도달 가능한 국면만 접지하는 쪽이 정확하다.
+- 웹 ESLint에 `eslint-plugin-react-hooks`가 없어 effect 의존성 검사가 꺼져 있다.
 - 답이 도구 호출을 다 마친 뒤에야 첫 문장이 나올 때가 있다. 프롬프트는 "보드마다 문단"을 요구하지만 강제는 아니다. 상주 프로세스로 기동 지연을 줄이는 것과 함께 검토한다.
 - 구독 정책: Agent SDK 문서는 서드파티 제품에 claude.ai 로그인을 쓰는 것을 금지한다. 이 채팅은 본인 로컬 도구로만 쓴다. 서비스로 열려면 `ANTHROPIC_API_KEY` 경로(SDK 백엔드)를 추가해야 한다.
 
