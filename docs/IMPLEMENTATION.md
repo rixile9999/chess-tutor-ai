@@ -124,7 +124,7 @@ PGN/API 임포트
 - 남은 것: 레이팅대 기준선(`profile.BASELINES`)은 자리표시자 값이라 Lichess DB로 측정해야 한다. 구조 스터디는 제목만 나온다
 
 ### M5 시각화 — 완료
-- 오프닝 지도 `GET /openings/map`(`services/openings_map.py`): 국면 키 DAG(전위 병합), 이탈점·타비야 표시, `LICHESS_TOKEN`이 있으면 Lichess 익스플로러 마스터 오버레이. 화면은 d3 DAG + 미니보드 스냅샷
+- 오프닝 지도 `GET /openings/map`(`services/openings_map.py`): 국면 키 DAG(전위 병합), 이탈점·타비야 표시, `LICHESS_TOKEN`이 있으면 Lichess 익스플로러 마스터 오버레이. 화면은 아이시클 개요 스트립 + 브레드크럼 + 큰 국면 보드 + 열 탐색기(갈림길 단위, 외길은 접음)
 - 기물 목적지 히트맵 `GET /openings/heatmap`, 브레이크 타임라인 `GET /openings/breaks`(브레이크 11종)
 - 남은 것: 마스터 오버레이는 토큰 없이는 꺼져 있다(월간 DB 자체 집계 미착수)
 
