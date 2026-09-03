@@ -566,3 +566,16 @@ def test_mcp_mount_lists_the_tools(client: TestClient) -> None:
 def test_fake_claude_is_importable() -> None:
     """The fixture doubles as documentation of the stream-json shapes; keep it valid."""
     assert FAKE.exists() and os.access(FAKE, os.R_OK)
+
+
+def test_fen_pieces_ground_their_squares() -> None:
+    """A piece that stands on a square in any FEN the tutor saw may be named without a warning;
+    empty squares still need a tool result to mention them."""
+    placement = START.split(" ")[0]
+    occupied = chat_svc.occupied_squares(placement)
+    assert len(occupied) == 32 and "e1" in occupied and "e4" not in occupied
+    session = chat_svc.create_session(1, 1, 1500, f"positions: {START}", START, START)
+    assert "g8" in session.known_squares and "a3" not in session.known_squares
+    session.note_squares(json.dumps({"fen": AFTER}))
+    assert "d5" in session.known_squares
+    assert session.unverified("a3 폰과 g8 나이트, d5 나이트") == ["a3"]

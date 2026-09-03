@@ -4,7 +4,9 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../../api/client';
 import type { Color, GameAnalysis, GameDetail, Score } from '../../api/types';
 import { Board } from '../../components/Board';
+import { applyUci, legalDests, sideToMove } from '../../lib/chess';
 import { getUsername } from '../../lib/user';
+import type { BoardMove } from './ChatPanel';
 import { Controls } from './Controls';
 import { EvalBar } from './EvalBar';
 import { MoveList } from './MoveList';
@@ -60,6 +62,9 @@ export default function ReviewPage() {
   const [tab, setTab] = useState<Tab>('move');
   const [toast, setToast] = useState<string | null>(null);
   const [metaEl, setMetaEl] = useState<HTMLElement | null>(null);
+  const [chatDraft, setChatDraft] = useState<BoardMove | null>(null);
+  const [chatBusy, setChatBusy] = useState(false);
+  const clearChatDraft = useCallback(() => setChatDraft(null), []);
 
   useEffect(() => { setMetaEl(document.getElementById('topbar-meta')); }, []);
   useEffect(() => { if (game) setOrientation(game.user_color ?? 'white'); }, [game]);
@@ -105,6 +110,17 @@ export default function ReviewPage() {
     if (review && review.ply === ply) return arrowShapes(review.arrows, review.highlights);
     return EMPTY_SHAPES;
   }, [preview, review, ply]);
+  // In the chat tab the board takes moves: the student's move becomes the next question.
+  const movable = useMemo(() => {
+    if (tab !== 'chat' || chatBusy || !review || review.ply !== ply || !fen) return null;
+    try { return { color: sideToMove(fen), dests: legalDests(fen) }; } catch { return null; }
+  }, [tab, chatBusy, review, ply, fen]);
+  const onBoardMove = useCallback((orig: string, dest: string) => {
+    const played = applyUci(fen, orig + dest) ?? applyUci(fen, `${orig}${dest}q`);
+    if (!played) return;
+    setChatDraft({ fen, san: played.san, fenAfter: played.fen });
+    setPreview({ id: `chat:student:${played.san}`, fen: played.fen, label: `${played.san} · 학생이 둔 수`, lastMove: [orig, dest], shapes: [] });
+  }, [fen]);
   const score = useMemo<Score | null>(() => {
     if (analysis?.status === 'done' && analysis.moves?.length) {
       if (ply === 0) return analysis.moves[0].eval_before;
@@ -158,7 +174,7 @@ export default function ReviewPage() {
       <div className="rv-left">
         <div className="rv-board-row">
           <EvalBar score={score} orientation={orientation} />
-          <div className="rv-board"><Board fen={fen} orientation={orientation} size={520} shapes={shapes} lastMove={lastMove} /></div>
+          <div className="rv-board"><Board fen={fen} orientation={orientation} size={520} shapes={shapes} lastMove={lastMove} movable={movable} onMove={onBoardMove} /></div>
         </div>
         <Controls ply={ply} plyCount={plyCount} san={move?.san ?? null} fen={fen} preview={preview}
           onGo={goTo} onFlip={() => setOrientation((o) => (o === 'white' ? 'black' : 'white'))} onRestore={() => setPreview(null)} />
@@ -167,7 +183,8 @@ export default function ReviewPage() {
       </div>
       <ReviewPanel game={game} analysis={analysis} analysisWorking={working} analysisError={analysisError}
         ply={ply} review={review && review.ply === ply ? review : null} loading={loading} error={error} retry={retry}
-        tab={tab} onTab={setTab} preview={preview} onPreview={setPreview} rating={rating} boardFen={fen} onSavePuzzle={savePuzzle} />
+        tab={tab} onTab={setTab} preview={preview} onPreview={setPreview} rating={rating} boardFen={fen} onSavePuzzle={savePuzzle}
+        chatDraft={chatDraft} onChatDraftConsumed={clearChatDraft} onChatBusy={setChatBusy} />
       {toast && <div className="rv-toast" role="status">{toast}</div>}
     </div>
   );

@@ -37,6 +37,9 @@ SERVER_NAME = "chess"
 """MCP server name; Claude Code exposes its tools as `mcp__chess__<tool>`."""
 TOOL_NAMES = ("analyse", "show_board", "compare", "motifs", "maia_probs", "features")
 SQUARE = re.compile(r"[a-h][1-8]")
+FEN_BOARD = re.compile(r"(?<![\w/])([pnbrqkPNBRQK1-8]+(?:/[pnbrqkPNBRQK1-8]+){7})(?= [wb] )")
+"""The piece-placement field of a FEN followed by the side to move, as it appears in facts and
+tool results. The squares it occupies are grounded: a piece really stands there."""
 MAX_SESSIONS = 64
 """Conversations kept in memory; the oldest is dropped past this."""
 RESULT_PREVIEW = 240
@@ -77,7 +80,10 @@ class ChatSession:
     last_used: float = field(default_factory=time.monotonic)
 
     def note_squares(self, text: str) -> None:
+        """Ground every square named in `text` and every occupied square of any FEN in it."""
         self.known_squares.update(SQUARE.findall(text))
+        for placement in FEN_BOARD.findall(text):
+            self.known_squares.update(occupied_squares(placement))
 
     def unverified(self, text: str) -> list[str]:
         """Squares mentioned in `text` that nothing has grounded, in order of first mention."""
@@ -86,6 +92,22 @@ class ChatSession:
             if square not in self.known_squares:
                 seen.setdefault(square, None)
         return list(seen)
+
+
+def occupied_squares(placement: str) -> set[str]:
+    """Squares with a piece on them in a FEN piece-placement field."""
+    out: set[str] = set()
+    for rank_index, row in enumerate(placement.split("/")):
+        rank = 8 - rank_index
+        file = 0
+        for ch in row:
+            if ch.isdigit():
+                file += int(ch)
+            else:
+                if file < 8 and 1 <= rank <= 8:
+                    out.add(f"{'abcdefgh'[file]}{rank}")
+                file += 1
+    return out
 
 
 _sessions: dict[str, ChatSession] = {}
@@ -111,8 +133,9 @@ def create_session(
         system_prompt=system_prompt,
         fen_before=fen_before,
         fen_after=fen_after,
-        known_squares=set(SQUARE.findall(system_prompt)),
+        known_squares=set(),
     )
+    session.note_squares(system_prompt)
     _sessions[session.id] = session
     if len(_sessions) > MAX_SESSIONS:
         oldest = min(_sessions.values(), key=lambda s: s.last_used)

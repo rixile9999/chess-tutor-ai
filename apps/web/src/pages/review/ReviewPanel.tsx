@@ -1,12 +1,13 @@
 import type { Color, GameAnalysis, GameDetail, MoveReviewOut } from '../../api/types';
+import { ChatPanel, type BoardMove } from './ChatPanel';
 import { ExplanationPanel } from './ExplanationPanel';
 import { FeaturesPanel } from './FeaturesPanel';
 import { StrategyPanel } from './StrategyPanel';
 import { sideLabel, type Preview } from './shared';
 
-export type Tab = 'move' | 'plan' | 'features';
+export type Tab = 'move' | 'plan' | 'features' | 'chat';
 const TABS: { key: Tab; label: string }[] = [
-  { key: 'move', label: '이 수의 설명' }, { key: 'plan', label: '전략과 계획' }, { key: 'features', label: '국면 특징' },
+  { key: 'move', label: '이 수의 설명' }, { key: 'plan', label: '전략과 계획' }, { key: 'features', label: '국면 특징' }, { key: 'chat', label: '튜터에게 질문' },
 ];
 const STATUS_COPY: Record<GameAnalysis['status'], string> = {
   none: '분석을 시작하는 중', pending: '분석 대기 중', running: '엔진이 수를 살펴보는 중', done: '분석 완료', failed: '분석 실패',
@@ -17,6 +18,7 @@ type Props = {
   ply: number; review: MoveReviewOut | null; loading: boolean; error: string | null; retry: () => void;
   tab: Tab; onTab: (t: Tab) => void; preview: Preview | null; onPreview: (p: Preview | null) => void;
   rating: number | undefined; boardFen: string; onSavePuzzle: () => void;
+  chatDraft: BoardMove | null; onChatDraftConsumed: () => void; onChatBusy: (busy: boolean) => void;
 };
 
 function Skeleton() {
@@ -72,6 +74,8 @@ export function ReviewPanel(p: Props) {
     );
   } else if (!review) {
     body = <div className="rv-empty">설명이 아직 없습니다.</div>;
+  } else if (tab === 'chat') {
+    body = null; // the chat stays mounted below so a streaming answer survives a tab switch
   } else if (tab === 'move') {
     body = <ExplanationPanel review={review} ply={ply} rating={p.rating} boardFen={p.boardFen} preview={p.preview} onPreview={p.onPreview} onSavePuzzle={p.onSavePuzzle} />;
   } else if (tab === 'plan') {
@@ -91,6 +95,10 @@ export function ReviewPanel(p: Props) {
         ))}
       </div>
       {body}
+      {review && !analysisWorking && !loading && !error && (
+        <ChatPanel gameId={game.id} ply={ply} review={review} rating={p.rating} boardFen={p.boardFen} preview={p.preview} onPreview={p.onPreview}
+          draft={p.chatDraft} onDraftConsumed={p.onChatDraftConsumed} onBusy={p.onChatBusy} hidden={tab !== 'chat'} />
+      )}
     </div>
   );
 }
