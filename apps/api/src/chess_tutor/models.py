@@ -159,3 +159,18 @@ class PuzzleAttempt(Base):
     correct: Mapped[bool] = mapped_column(Boolean)
     seconds: Mapped[float] = mapped_column(Float, default=0.0)
     at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class ChatTurn(Base):
+    """One message of a position chat: the student's question or the tutor's answer with the
+    tool calls and board states it produced. Kept so a wrong explanation can be traced later."""
+
+    __tablename__ = "chat_turns"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    session_id: Mapped[str] = mapped_column(String(64), index=True)
+    game_id: Mapped[int] = mapped_column(ForeignKey("games.id"))
+    ply: Mapped[int] = mapped_column(Integer)
+    role: Mapped[str] = mapped_column(String(16))  # user | assistant
+    content: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
