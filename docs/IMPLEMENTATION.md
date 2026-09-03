@@ -16,6 +16,7 @@
 | 데이터베이스 | PostgreSQL 16 + SQLAlchemy 2 + Alembic | 기보, 분석 캐시(JSONB), 프로필, 퍼즐 스케줄 |
 | 작업 실행 | 처음엔 프로세스 내 워커, 필요해지면 arq + Redis | 엔진 분석은 CPU 바운드. 인프라를 미리 늘리지 않는다 |
 | LLM | Anthropic Python SDK, `claude-opus-5`, structured outputs | 언어화 전용. 입력은 계층 2·3의 사실 JSON뿐, 출력은 문장 + 근거 주장(Claim) 목록 |
+| 국면 채팅 | Claude Code 헤드리스(`claude -p`, 구독 로그인) + MCP(Python SDK 2.x, FastAPI에 마운트) | API 키 없이 Max 구독으로 튜터와 문답. 모델은 내장 도구 없이 이 서버의 체스 도구만 쓴다 |
 | 프론트엔드 | Vite + React 19 + TypeScript | 목업의 화면 구성이 컴포넌트 트리와 일치한다 |
 | 보드 | chessground 9 (GPL-3.0) | Lichess 보드. 화살표, 하이라이트, 좌표 내장 |
 | 시각화 | d3 7 | 오프닝 DAG, 히트맵, 브레이크 타임라인 |
@@ -41,6 +42,7 @@ chess-tutor-ai/
       engine.py           계층 1: Stockfish UCI 래퍼
       motifs.py           계층 2: 전술 모티프 탐지기
       verify.py           계층 4 가드: 주장 검증기, 수순 재생
+      services/chat*.py   국면 채팅: Claude Code 서브프로세스, MCP 체스 도구, 튜터 프롬프트
       values.py           기물 가치
       api.py              HTTP 엔드포인트
     tests/                국면 단위 테스트 (목업의 예시 국면 포함)
@@ -128,6 +130,17 @@ PGN/API 임포트
 - 기물 목적지 히트맵 `GET /openings/heatmap`, 브레이크 타임라인 `GET /openings/breaks`(브레이크 11종)
 - 남은 것: 마스터 오버레이는 토큰 없이는 꺼져 있다(월간 DB 자체 집계 미착수)
 
+### M6 국면 채팅 (튜터에게 질문) — 완료 (2026-09-04)
+- 리뷰 화면 네 번째 탭. 학생이 이 수에 대해 질문하거나 추천 수에 반론하면 튜터가 보드를 움직이며 답한다. 보드에서 기물을 직접 움직이면 그 수가 질문이 된다(`ReviewPanel`·`ChatPanel.tsx`, `Board`는 채팅 탭에서만 movable)
+- 실행 경로: `POST /review/{game}/{ply}/chat` → `services/chat.run_turn`이 `claude -p --output-format stream-json --include-partial-messages --tools "" --strict-mcp-config --mcp-config … --allowedTools mcp__chess__* --system-prompt … --session-id|--resume <id>`를 띄운다. 질문은 stdin. 첫 질문은 `--session-id`, 이후는 `--resume`으로 같은 대화를 잇는다. `--bare`는 구독 로그인을 읽지 않으므로 쓰지 않는다. 환경에서 `ANTHROPIC_API_KEY`는 제거해 구독이 쓰이게 한다
+- 도구(`services/chat_tools.py`, MCP `/mcp/`에 stateless HTTP로 마운트): `analyse`, `compare`(두 수를 같은 깊이로, 승률 손실·등급·응수 줄·특징 차이표), `motifs`, `maia_probs`, `features`, `show_board`. `show_board`는 요청 헤더 `X-Chat-Session`으로 세션을 찾아 보드 상태를 SSE 스트림에 끼워 넣는다. 도구가 던진 `ValueError`(불법 수, 잘못된 FEN)는 `ToolError`로 모델에게 그대로 전달된다
+- 프롬프트(`services/chat_prompt.py`): 역할, 근거 규칙(수치는 facts·도구 결과만), 반론 절차 6단계(compare → 결론 → 응수 줄을 보드로 재생 → 모티프/특징 → 의도 인정과 대조 → 재반론), 형식(보드와 문단을 번갈아). `<facts>`에는 `MoveReviewOut`에서 claims를 뺀 JSON과 앞뒤 수순
+- 근거 표시: 답변 문장에 나온 칸 중 facts·도구 결과·FEN의 기물 칸 어디에도 없는 칸은 `text_end.unverified`로 내려가 "근거 미확인 칸" 배지가 붙는다. 삭제하지 않는다
+- 기록: `chat_turns` 테이블(세션, 역할, 블록 JSON). Claude Code 쪽 대화 원본은 `~/.cache/chess-tutor/chat`을 cwd로 한 세션 파일에 있다
+- 실측(2026-09-04, game 596 ply 16 "왜 Qf6가 블런더인가요?"): 첫 답 56초·도구 8회·보드 3장, 보드에서 Nc4를 두어 던진 재반론은 34초·도구 5회. 미확인 칸 0개
+- 테스트: `tests/test_chat.py` 32개. `tests/fixtures/fake_claude.py`가 stream-json을 재생하므로 CI에 구독이 필요 없다. MCP 마운트는 TestClient(lifespan 실행)로만 검증한다(ASGITransport는 lifespan을 돌리지 않는다)
+- 남은 것: 대화 기록은 브라우저 상태에만 있어 새로고침하면 사라진다(`chat_turns`에서 복원 미구현). 오프닝 지도 국면에서는 아직 못 쓴다. 첫 답까지 30~60초라 상주 프로세스(`--input-format stream-json`)로 줄이는 안이 남아 있다
+
 ### 통합 상태 (2026-09-02)
 - 백엔드: `ruff format`·`ruff check`·`mypy --strict` 통과, pytest 271개 약 22초(엔진 테스트는 깊이 ≤ 8). `tests/test_e2e.py`가 TestClient로 임포트 → 분석 → 리뷰 → 프로필 → 오프닝 지도 → 퍼즐 → 스파링을 한 번에 돈다
 - 웹: `pnpm lint`, `tsc --noEmit`, `pnpm build` 통과. 라우트 `/games`, `/review/:gameId/:ply`, `/profile/:username`, `/openings`, `/training`
@@ -178,6 +191,8 @@ pnpm dev                          # http://localhost:5173, /api → 8000 프록�
 docker compose up -d db           # 그리고 .env의 DATABASE_URL
 ```
 
+국면 채팅을 쓰려면 Claude Code가 설치되고 로그인돼 있어야 한다(`claude` 실행 후 `/login`, Max 구독). `GET /chat/status`가 실행 파일을 찾았는지 알려준다. 채팅 서브프로세스가 이 서버의 `/mcp/`에 접속하므로 API 포트를 바꾸면 `CHAT_MCP_URL`도 바꾼다.
+
 환경 변수는 `.env.example` 참고. `STOCKFISH_PATH`가 없으면 PATH의 `stockfish`를 찾고, 그것도 없으면 엔진 테스트는 건너뛴다. `ANTHROPIC_API_KEY`가 없으면 설명은 템플릿으로만 나온다. Maia-2 가중치는 첫 사용 때 `~/.cache/chess-tutor/maia2`에 내려받는다(`MAIA_MODEL_DIR`로 변경).
 
 ---
@@ -207,6 +222,11 @@ MIT로 가고 싶다면: chessground 대신 MIT 보드 라이브러리를 쓰고
 - LLM 언어화(`services/verbalize.llm_explanation`)는 `ANTHROPIC_API_KEY`가 없어 템플릿 경로만 검증했다. 키를 넣고 LLM → 검증기 → 템플릿 폴백을 실제로 돌려봐야 한다.
 - Postgres 경로(`asyncpg` extra, docker compose)는 미검증이다. 모든 테스트는 SQLite로 돈다. Alembic 마이그레이션도 아직 없다(`create_all`).
 - 웹 단위 테스트가 없다(vitest 미도입). Playwright로 실서버 연결 스모크만 했다.
+
+**국면 채팅**
+- 새로고침하면 대화가 사라진다. `chat_turns`에서 복원하는 `GET /chat/sessions/{id}`가 필요하다.
+- 답이 도구 호출을 다 마친 뒤에야 첫 문장이 나올 때가 있다. 프롬프트는 "보드마다 문단"을 요구하지만 강제는 아니다. 상주 프로세스로 기동 지연을 줄이는 것과 함께 검토한다.
+- 구독 정책: Agent SDK 문서는 서드파티 제품에 claude.ai 로그인을 쓰는 것을 금지한다. 이 채팅은 본인 로컬 도구로만 쓴다. 서비스로 열려면 `ANTHROPIC_API_KEY` 경로(SDK 백엔드)를 추가해야 한다.
 
 **제품 상 알려진 간극**
 - 승급 시 기물 선택 UI가 없다(자동 퀸). 퍼즐 정답이 언더프로모션이면 정답 기물을 적용한다.
