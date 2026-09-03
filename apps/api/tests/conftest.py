@@ -16,6 +16,9 @@ os.environ["DATABASE_URL"] = f"sqlite+aiosqlite:///{_TEST_DB}"
 # this test session starts is pinned; the fixture below covers a settings object built earlier.
 os.environ["ENGINE_THREADS"] = "1"
 
+# The MCP mount only accepts loopback Host headers; the test client identifies as "testserver".
+os.environ["CHAT_MCP_ALLOWED_HOSTS"] = '["127.0.0.1:*", "localhost:*", "[::1]:*", "testserver"]'
+
 from chess_tutor import db  # noqa: E402
 from chess_tutor import engine as engine_mod  # noqa: E402
 from chess_tutor.api import app  # noqa: E402

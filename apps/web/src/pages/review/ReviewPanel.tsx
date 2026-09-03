@@ -91,14 +91,16 @@ export function ReviewPanel(p: Props) {
     <div className="card rv-panel">
       <div className="rv-tabs" role="tablist">
         {TABS.map((t) => (
-          <button key={t.key} type="button" role="tab" aria-selected={tab === t.key} className={`rv-tab${tab === t.key ? ' active' : ''}`} onClick={() => onTab(t.key)}>{t.label}</button>
+          <button key={t.key} type="button" role="tab" id={`rv-tab-${t.key}`} aria-selected={tab === t.key} aria-controls="rv-tabpanel"
+            className={`rv-tab${tab === t.key ? ' active' : ''}`} onClick={() => onTab(t.key)}>{t.label}</button>
         ))}
       </div>
-      {body}
-      {review && !analysisWorking && !loading && !error && (
+      <div id="rv-tabpanel" role="tabpanel" aria-labelledby={`rv-tab-${tab}`} className="rv-tabpanel">
+        {body}
+        {/* Mounted for the whole page: conversations and a streaming answer live in its state. */}
         <ChatPanel gameId={game.id} ply={ply} review={review} rating={p.rating} boardFen={p.boardFen} preview={p.preview} onPreview={p.onPreview}
-          draft={p.chatDraft} onDraftConsumed={p.onChatDraftConsumed} onBusy={p.onChatBusy} hidden={tab !== 'chat'} />
-      )}
+          draft={p.chatDraft} onDraftConsumed={p.onChatDraftConsumed} onBusy={p.onChatBusy} hidden={tab !== 'chat' || !review} />
+      </div>
     </div>
   );
 }

@@ -47,6 +47,7 @@
 
 /* right panel */
 .rv-panel { flex: 1; min-width: 0; padding: 16px 22px; overflow: auto; display: flex; flex-direction: column; gap: 13px; }
+.rv-tabpanel { display: flex; flex-direction: column; gap: 13px; flex: 1; min-height: 0; }
 .rv-tabs { display: flex; border-bottom: 1px solid var(--line); margin: -4px 0 3px; flex-shrink: 0; }
 .rv-tab { height: 36px; display: inline-flex; align-items: center; padding: 0 4px; margin-right: 22px; font-size: 14px; font-weight: 500; color: var(--ink-3); border: none; border-bottom: 2px solid transparent; background: transparent; cursor: pointer; font-family: var(--font-ui); }
 .rv-tab.active { font-weight: 700; color: var(--ink); border-bottom-color: var(--ink); }
@@ -118,7 +119,7 @@ button.rv-mv:hover { border-color: var(--line-strong); background: rgba(43, 38, 
 /* chat */
 .rv-chat { display: flex; flex-direction: column; gap: 10px; flex: 1; min-height: 0; }
 .rv-chat[hidden] { display: none; }
-.rv-chat-log { flex: 1; min-height: 240px; max-height: 62vh; overflow: auto; display: flex; flex-direction: column; gap: 14px; padding-right: 4px; }
+.rv-chat-log { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 14px; padding-right: 4px; }
 .rv-chat-intro { display: flex; flex-direction: column; gap: 10px; color: var(--ink-2); font-size: 13.5px; line-height: 1.55; }
 .rv-chat-chips { display: flex; flex-wrap: wrap; gap: 8px; }
 .rv-chat-turn { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }

@@ -57,16 +57,16 @@ export async function streamChat(p: StreamParams, onEvent: (e: ChatEvent) => voi
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
+  // One frame per blank line; its data: lines joined with newlines, per the SSE spec.
   const flush = (chunk: string) => {
-    for (const line of chunk.split('\n')) {
-      if (!line.startsWith('data: ')) continue;
-      try { onEvent(JSON.parse(line.slice(6)) as ChatEvent); } catch { /* skip a malformed event */ }
-    }
+    const payload = chunk.split('\n').filter((l) => l.startsWith('data:')).map((l) => l.slice(5).replace(/^ /, '')).join('\n');
+    if (!payload) return;
+    try { onEvent(JSON.parse(payload) as ChatEvent); } catch { /* skip a malformed event */ }
   };
   for (;;) {
     const { value, done } = await reader.read();
     if (done) break;
-    buffer += decoder.decode(value, { stream: true });
+    buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, '\n');
     let idx = buffer.indexOf('\n\n');
     while (idx >= 0) {
       flush(buffer.slice(0, idx));

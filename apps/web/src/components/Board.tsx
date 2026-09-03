@@ -30,10 +30,12 @@ export function Board({ fen, orientation = 'white', size = 520, shapes, lastMove
   onMoveRef.current = onMove;
   const latest = useRef({ fen, orientation, coordinates, shapes, lastMove, movable });
   latest.current = { fen, orientation, coordinates, shapes, lastMove, movable };
-  const interactive = !!movable;
-
   // Chessground binds its pointer handlers only when it is constructed without viewOnly, so a
-  // board that becomes movable later (the review board in the chat tab) is rebuilt, not `set`.
+  // board that becomes movable later (the review board in the chat tab) is rebuilt once, the
+  // first time; going back to view-only is handled by `set` (the handlers check viewOnly).
+  const everInteractive = useRef(false);
+  if (movable) everInteractive.current = true;
+  const generation = everInteractive.current ? 1 : 0;
   useEffect(() => {
     if (!ref.current) return;
     const p = latest.current;
@@ -52,7 +54,7 @@ export function Board({ fen, orientation = 'white', size = 520, shapes, lastMove
       animation: { enabled: true, duration: 150 },
     });
     return () => { api.current?.destroy(); api.current = null; };
-  }, [interactive]);
+  }, [generation]);
 
   useEffect(() => {
     api.current?.set({

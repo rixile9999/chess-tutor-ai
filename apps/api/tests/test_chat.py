@@ -4,6 +4,7 @@ chat exposes over MCP, the system prompt, and the SSE endpoint."""
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import sys
@@ -63,7 +64,7 @@ async def _collect(session: chat_svc.ChatSession, text: str, **kw: Any) -> list[
 
 
 def _session(prompt: str = "facts: Nd5 is strong") -> chat_svc.ChatSession:
-    return chat_svc.create_session(1, 40, 1500, prompt, FEN, AFTER)
+    return chat_svc.create_session(1, 40, prompt)
 
 
 # ---------- command and environment ----------
@@ -85,6 +86,9 @@ def test_build_command_uses_only_the_chess_tools() -> None:
     assert server["type"] == "http" and server["headers"]["X-Chat-Session"] == session.id
     assert command[command.index("--session-id") + 1] == session.id
     assert "--resume" not in command
+    assert "--system-prompt" not in command
+    prompt_file = Path(command[command.index("--system-prompt-file") + 1])
+    assert prompt_file == session.prompt_path and prompt_file.read_text() == session.system_prompt
     session.resumable = True
     resumed = chat_svc.build_command(session)
     assert resumed[resumed.index("--resume") + 1] == session.id
@@ -103,6 +107,19 @@ def test_availability_reports_missing_binary(monkeypatch: pytest.MonkeyPatch) ->
     monkeypatch.setattr(get_settings(), "chat_claude_command", "no-such-claude-binary")
     info = chat_svc.availability()
     assert info["available"] is False and info["reason"]
+    monkeypatch.setattr(get_settings(), "chat_claude_command", "claude 'unbalanced")
+    info = chat_svc.availability()
+    assert info["available"] is False and "CHAT_CLAUDE_COMMAND" in info["reason"]
+
+
+def test_mcp_url_follows_api_port(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(get_settings(), "chat_mcp_url", None)
+    monkeypatch.delenv("API_PORT", raising=False)
+    assert chat_svc.mcp_url() == "http://127.0.0.1:8000/mcp/"
+    monkeypatch.setenv("API_PORT", "8123")
+    assert chat_svc.mcp_url() == "http://127.0.0.1:8123/mcp/"
+    monkeypatch.setattr(get_settings(), "chat_mcp_url", "http://127.0.0.1:9/x/")
+    assert chat_svc.mcp_url() == "http://127.0.0.1:9/x/"
 
 
 def test_format_message_attaches_the_board_move() -> None:
@@ -124,9 +141,12 @@ def test_parser_turns_stream_json_into_events() -> None:
     session = _session("Nd5")
     parser = chat_svc.StreamParser(session)
     assert parser.feed("not json") == []
-    assert parser.feed(_line({"type": "system", "subtype": "init", "mcp_servers": []})) == [
+    assert not session.resumable
+    init = {"type": "system", "subtype": "init", "session_id": session.id, "mcp_servers": []}
+    assert parser.feed(_line(init)) == [
         {"type": "warning", "message": "체스 도구 서버가 로드되지 않았습니다."}
     ]
+    assert session.resumable  # the CLI owns the id from its init line on
     start = {"type": "content_block_start", "index": 0, "content_block": {"type": "text"}}
     assert parser.feed(_line({"type": "stream_event", "event": start})) == []
     delta = {"type": "content_block_delta", "delta": {"type": "text_delta", "text": "f6 폰"}}
@@ -184,6 +204,30 @@ def test_parser_reports_failed_tool_and_error_result() -> None:
     )
     assert events[0]["type"] == "done" and not events[0]["ok"]
     assert events[1] == {"type": "error", "message": "Claude Code 오류: x"}
+
+
+def test_parser_reads_the_real_result_shapes() -> None:
+    """The CLI says subtype "success" on an API failure and error_max_turns (with is_error)
+    when the tool loop hit --max-turns; only the first is an error for the user."""
+    parser = chat_svc.StreamParser(_session())
+    failed = {
+        "type": "result",
+        "subtype": "success",
+        "is_error": True,
+        "api_error_status": 404,
+        "result": "There's an issue with the selected model",
+    }
+    events = parser.feed(_line(failed))
+    assert events[0]["type"] == "done" and not events[0]["ok"] and events[0]["subtype"] == "error"
+    assert events[1]["type"] == "error" and "(API 404)" in events[1]["message"]
+    capped = {"type": "result", "subtype": "error_max_turns", "is_error": True, "num_turns": 16}
+    events = parser.feed(_line(capped))
+    assert (
+        events[0]["type"] == "done"
+        and events[0]["ok"]
+        and events[0]["subtype"] == "error_max_turns"
+    )
+    assert events[1]["type"] == "warning" and "한도" in events[1]["message"]
 
 
 def test_parser_emits_whole_text_block_without_partial_messages() -> None:
@@ -251,7 +295,8 @@ async def test_crash_is_reported_as_error(monkeypatch: pytest.MonkeyPatch) -> No
     session = _session()
     events = await _collect(session, "q")
     assert events[-1]["type"] == "error" and "boom" in events[-1]["message"]
-    assert not session.resumable
+    assert session.resumable  # init was printed, so the id is taken: resume next time
+    assert not session.lock.locked() and session.turns == 0
 
 
 async def test_missing_binary_is_reported(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -283,6 +328,98 @@ async def test_turns_are_stored() -> None:
     blocks = rows[1].content["blocks"]
     assert [b["type"] for b in blocks] == ["text", "tool", "text"]
     assert blocks[1]["name"] == "show_board" and rows[1].content["done"]["ok"]
+
+
+async def test_timeout_kills_the_process_and_frees_the_session(
+    monkeypatch: pytest.MonkeyPatch, _fake_claude: Path
+) -> None:
+    monkeypatch.setenv("FAKE_CLAUDE_MODE", "hang")
+    monkeypatch.setattr(get_settings(), "chat_timeout_seconds", 0.8)
+    session = _session()
+    events = await _collect(session, "q")
+    kinds = [e["type"] for e in events]
+    assert kinds[-2:] == ["error", "done"] and events[-1]["subtype"] == "timeout"
+    assert "초 안에" in events[-2]["message"]
+    assert not session.lock.locked() and session.resumable
+    monkeypatch.setenv("FAKE_CLAUDE_MODE", "ok")
+    events = await _collect(session, "again")
+    assert events[-1]["type"] == "done" and events[-1]["ok"]
+    assert "--resume" in _invocations(_fake_claude)[1]["args"]
+
+
+async def test_second_question_during_an_answer_is_refused(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("FAKE_CLAUDE_PAUSE", "1.0")
+    session = _session()
+    first = asyncio.create_task(_collect(session, "first"))
+    await asyncio.sleep(0.3)
+    second = await _collect(session, "second")
+    assert [e["type"] for e in second] == ["error", "done"]
+    assert "이전 답" in second[0]["message"] and second[1]["subtype"] == "busy"
+    events = await first
+    assert events[-1]["type"] == "done" and events[-1]["ok"]
+
+
+async def test_max_turns_is_a_warning_not_an_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("FAKE_CLAUDE_MODE", "max-turns")
+    session = _session()
+    events = await _collect(session, "q")
+    assert events[-1]["type"] == "warning" and "한도" in events[-1]["message"]
+    assert not any(e["type"] == "error" for e in events)
+    assert session.turns == 1
+
+
+async def test_taken_session_id_is_retried_with_resume(
+    monkeypatch: pytest.MonkeyPatch, _fake_claude: Path
+) -> None:
+    """A turn cut off before its init line leaves the CLI owning the id while we do not know
+    it; the CLI's "already in use" answer triggers one retry with --resume."""
+    monkeypatch.setenv("FAKE_CLAUDE_MODE", "in-use")
+    session = _session()
+    events = await _collect(session, "q")
+    assert events[-1]["type"] == "done" and events[-1]["ok"]
+    assert not any(e["type"] == "error" for e in events)
+    runs = _invocations(_fake_claude)
+    assert len(runs) == 2
+    assert "--session-id" in runs[0]["args"] and "--resume" in runs[1]["args"]
+
+
+async def test_stale_board_events_are_dropped() -> None:
+    """A show_board that lands before the turn starts (or from a killed process) never shows
+    up in the next answer."""
+    session = _session()
+    chat_tools.show_board_impl(session, START, ["e4"], "stale")
+    events = await _collect(session, "q")
+    assert not any(e["type"] == "board" for e in events)
+    assert all("attempt" not in e for e in events)
+
+
+def test_show_board_tool_runs_on_the_event_loop() -> None:
+    import inspect
+
+    assert inspect.iscoroutinefunction(chat_tools.show_board)
+
+
+def test_push_board_from_a_worker_thread() -> None:
+    """The queue belongs to the loop the session was created on; a push from another thread
+    must still arrive (call_soon_threadsafe), not touch the loop directly."""
+    import threading
+
+    async def scenario() -> list[str]:
+        session = _session()
+        done = threading.Event()
+
+        def worker() -> None:
+            chat_tools.show_board_impl(session, START, ["d4"], "from thread")
+            done.set()
+
+        threading.Thread(target=worker).start()
+        event = await asyncio.wait_for(session.queue.get(), 2)
+        done.wait(2)
+        return list(event["moves"])
+
+    assert asyncio.run(scenario()) == ["d4"]
 
 
 # ---------- the tools ----------
@@ -334,7 +471,7 @@ def test_features_tool_reports_structure_and_rows() -> None:
     assert out.structure is None or out.structure.key
 
 
-def test_maia_probs_tool_orders_moves(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_maia_probs_tool_orders_moves() -> None:
     out = chat_tools.maia_probs_impl(START, 1200, ["e4"])
     assert out.rating == 1200 and "e4" in out.probs
     values = list(out.probs.values())
@@ -574,7 +711,7 @@ def test_fen_pieces_ground_their_squares() -> None:
     placement = START.split(" ")[0]
     occupied = chat_svc.occupied_squares(placement)
     assert len(occupied) == 32 and "e1" in occupied and "e4" not in occupied
-    session = chat_svc.create_session(1, 1, 1500, f"positions: {START}", START, START)
+    session = chat_svc.create_session(1, 1, f"positions: {START}")
     assert "g8" in session.known_squares and "a3" not in session.known_squares
     session.note_squares(json.dumps({"fen": AFTER}))
     assert "d5" in session.known_squares

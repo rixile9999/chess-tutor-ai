@@ -38,8 +38,12 @@ class Settings(BaseSettings):
     chat_timeout_seconds: float = 300.0
     chat_concurrency: int = 2
     """Claude Code processes that may run at once."""
-    chat_mcp_url: str = "http://127.0.0.1:8000/mcp/"
-    """Where the Claude Code subprocess reaches this server's chess tools (the MCP mount)."""
+    chat_mcp_url: str | None = None
+    """Where the Claude Code subprocess reaches this server's chess tools (the MCP mount).
+    Default: http://127.0.0.1:{API_PORT or 8000}/mcp/ (services.chat.mcp_url)."""
+    chat_mcp_allowed_hosts: list[str] = ["127.0.0.1:*", "localhost:*", "[::1]:*"]
+    """Host headers the MCP mount accepts (DNS-rebinding protection). Loopback only; tests
+    add their client's host through the environment."""
     chat_workdir: str | None = None
     """Working directory for the Claude Code subprocess; default ~/.cache/chess-tutor/chat.
     Its sessions (the conversation memory) are stored under this path by Claude Code."""

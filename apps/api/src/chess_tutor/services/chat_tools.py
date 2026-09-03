@@ -432,7 +432,7 @@ async def analyse(fen: str, depth: int | None = None, multipv: int | None = 3) -
         "'e2e4' or 'e2e4:bad'; `highlights` are squares."
     )
 )
-def show_board(
+async def show_board(
     fen: str,
     ctx: Context,
     moves: list[str] | str | None = None,
@@ -440,6 +440,8 @@ def show_board(
     arrows: list[str] | str | None = None,
     highlights: list[str] | str | None = None,
 ) -> ShowResult:
+    # async so it runs on the event loop: the SDK sends plain functions to a worker thread,
+    # and the session queue this pushes into belongs to the loop.
     with _tool_errors():
         return show_board_impl(_session(ctx), fen, moves, caption, arrows, highlights)
 

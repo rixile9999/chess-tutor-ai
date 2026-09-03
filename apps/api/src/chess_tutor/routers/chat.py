@@ -80,10 +80,9 @@ async def chat(
     if chat_session is None or chat_session.game_id != game_id or chat_session.ply != ply:
         review = await review_svc.build_move_review(session, game, analysis, ply, r)
         prompt = chat_prompt.build_system_prompt(game, analysis, review, r)
-        chat_session = chat_svc.create_session(
-            game_id, ply, r, prompt, review.fen_before, review.fen_after
-        )
+        chat_session = chat_svc.create_session(game_id, ply, prompt)
     if chat_session.lock.locked():
+        # Fast path; run_turn re-checks under the lock and reports the same thing as an event.
         raise HTTPException(status_code=409, detail="이 대화는 아직 이전 답을 쓰는 중입니다.")
     move_fen = req.move.fen if req.move else None
     move_san = req.move.san if req.move else None

@@ -12,6 +12,7 @@ from sqlalchemy.exc import IntegrityError
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from chess_tutor import __version__
+from chess_tutor.config import get_settings
 from chess_tutor.db import init_db
 from chess_tutor.engine import pool
 from chess_tutor.jobs import runner
@@ -62,7 +63,7 @@ def build_mcp_app() -> ASGIApp:
         json_response=True,
         transport_security=TransportSecuritySettings(
             enable_dns_rebinding_protection=True,
-            allowed_hosts=["127.0.0.1:*", "localhost:*", "[::1]:*", "testserver"],
+            allowed_hosts=list(get_settings().chat_mcp_allowed_hosts),
             allowed_origins=["http://127.0.0.1:*", "http://localhost:*"],
         ),
     )

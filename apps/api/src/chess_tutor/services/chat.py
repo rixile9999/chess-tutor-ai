@@ -14,15 +14,17 @@ id, so the second and later questions resume the stored conversation (`--resume`
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import logging
 import os
 import re
 import shlex
 import shutil
+import signal
 import time
 import uuid
-from collections.abc import AsyncIterator, Iterable
+from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -41,8 +43,15 @@ FEN_BOARD = re.compile(r"(?<![\w/])([pnbrqkPNBRQK1-8]+(?:/[pnbrqkPNBRQK1-8]+){7}
 """The piece-placement field of a FEN followed by the side to move, as it appears in facts and
 tool results. The squares it occupies are grounded: a piece really stands there."""
 MAX_SESSIONS = 64
-"""Conversations kept in memory; the oldest is dropped past this."""
+"""Conversations kept in memory; the oldest idle one is dropped past this."""
 RESULT_PREVIEW = 240
+LOCK_WAIT_SECONDS = 0.5
+"""How long a new question waits for the previous answer of the same conversation."""
+QUEUE_WAIT_SECONDS = 60.0
+"""How long a question waits for a free Claude Code slot (chat_concurrency)."""
+REAP_SECONDS = 3.0
+IN_USE = "already in use"
+"""Claude Code's complaint when `--session-id` names a session it has already stored."""
 
 Event = dict[str, Any]
 
@@ -54,44 +63,6 @@ def full_tool_names() -> list[str]:
 def short_tool_name(name: str) -> str:
     prefix = f"mcp__{SERVER_NAME}__"
     return name[len(prefix) :] if name.startswith(prefix) else name
-
-
-# ---------- sessions ----------
-
-
-@dataclass
-class ChatSession:
-    id: str
-    game_id: int
-    ply: int
-    rating: int
-    system_prompt: str
-    fen_before: str
-    fen_after: str
-    known_squares: set[str]
-    """Squares that some fact, tool result or board state has grounded so far. A square the
-    tutor mentions outside this set is flagged as unverified in the UI."""
-    queue: asyncio.Queue[Event | None] = field(default_factory=asyncio.Queue)
-    lock: asyncio.Lock = field(default_factory=asyncio.Lock)
-    resumable: bool = False
-    """True once Claude Code has stored a conversation under `id` (after the first turn)."""
-    turns: int = 0
-    boards: int = 0
-    last_used: float = field(default_factory=time.monotonic)
-
-    def note_squares(self, text: str) -> None:
-        """Ground every square named in `text` and every occupied square of any FEN in it."""
-        self.known_squares.update(SQUARE.findall(text))
-        for placement in FEN_BOARD.findall(text):
-            self.known_squares.update(occupied_squares(placement))
-
-    def unverified(self, text: str) -> list[str]:
-        """Squares mentioned in `text` that nothing has grounded, in order of first mention."""
-        seen: dict[str, None] = {}
-        for square in SQUARE.findall(text):
-            if square not in self.known_squares:
-                seen.setdefault(square, None)
-        return list(seen)
 
 
 def occupied_squares(placement: str) -> set[str]:
@@ -110,6 +81,49 @@ def occupied_squares(placement: str) -> set[str]:
     return out
 
 
+# ---------- sessions ----------
+
+
+@dataclass
+class ChatSession:
+    id: str
+    game_id: int
+    ply: int
+    system_prompt: str
+    prompt_path: Path
+    """The system prompt on disk, passed as `--system-prompt-file` (argv has size limits)."""
+    known_squares: set[str] = field(default_factory=set)
+    """Squares that some fact, tool result or board state has grounded so far. A square the
+    tutor mentions outside this set is flagged as unverified in the UI."""
+    queue: asyncio.Queue[Event] = field(default_factory=asyncio.Queue)
+    lock: asyncio.Lock = field(default_factory=asyncio.Lock)
+    loop: asyncio.AbstractEventLoop | None = None
+    """The loop the queue belongs to, so a tool running on a worker thread can still push."""
+    resumable: bool = False
+    """True once Claude Code has stored a conversation under `id`: from the moment its init
+    line arrives, whatever happens to the rest of that turn."""
+    turns: int = 0
+    boards: int = 0
+    attempt: int = 0
+    """Counts process launches; every event carries the launch it came from, so anything a
+    killed process still emits is dropped instead of leaking into the next answer."""
+    last_used: float = field(default_factory=time.monotonic)
+
+    def note_squares(self, text: str) -> None:
+        """Ground every square named in `text` and every occupied square of any FEN in it."""
+        self.known_squares.update(SQUARE.findall(text))
+        for placement in FEN_BOARD.findall(text):
+            self.known_squares.update(occupied_squares(placement))
+
+    def unverified(self, text: str) -> list[str]:
+        """Squares mentioned in `text` that nothing has grounded, in order of first mention."""
+        seen: dict[str, None] = {}
+        for square in SQUARE.findall(text):
+            if square not in self.known_squares:
+                seen.setdefault(square, None)
+        return list(seen)
+
+
 _sessions: dict[str, ChatSession] = {}
 
 
@@ -122,38 +136,55 @@ def get_session(session_id: str | None) -> ChatSession | None:
     return session
 
 
-def create_session(
-    game_id: int, ply: int, rating: int, system_prompt: str, fen_before: str, fen_after: str
-) -> ChatSession:
+def create_session(game_id: int, ply: int, system_prompt: str) -> ChatSession:
+    session_id = str(uuid.uuid4())
+    prompts = workdir() / "prompts"
+    prompts.mkdir(parents=True, exist_ok=True)
+    path = prompts / f"{session_id}.md"
+    path.write_text(system_prompt, encoding="utf-8")
+    try:
+        loop: asyncio.AbstractEventLoop | None = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = None
     session = ChatSession(
-        id=str(uuid.uuid4()),
+        id=session_id,
         game_id=game_id,
         ply=ply,
-        rating=rating,
         system_prompt=system_prompt,
-        fen_before=fen_before,
-        fen_after=fen_after,
-        known_squares=set(),
+        prompt_path=path,
+        loop=loop,
     )
     session.note_squares(system_prompt)
     _sessions[session.id] = session
     if len(_sessions) > MAX_SESSIONS:
-        oldest = min(_sessions.values(), key=lambda s: s.last_used)
-        if oldest.id != session.id:
+        idle = [s for s in _sessions.values() if s.id != session.id and not s.lock.locked()]
+        if idle:
+            oldest = min(idle, key=lambda s: s.last_used)
             del _sessions[oldest.id]
+            with contextlib.suppress(OSError):
+                oldest.prompt_path.unlink()
     return session
 
 
 def push_board(session: ChatSession, event: Event) -> None:
-    """Called by the show_board tool: put a board state into the session's stream."""
+    """Called by the show_board tool: put a board state into the session's stream. Safe from a
+    worker thread too (the queue is bound to the loop the session was created on)."""
     session.boards += 1
     event.setdefault("type", "board")
     event["n"] = session.boards
+    event["attempt"] = session.attempt
     session.note_squares(json.dumps(event, ensure_ascii=False))
-    session.queue.put_nowait(event)
+    try:
+        running: asyncio.AbstractEventLoop | None = asyncio.get_running_loop()
+    except RuntimeError:
+        running = None
+    if running is None and session.loop is not None and session.loop.is_running():
+        session.loop.call_soon_threadsafe(session.queue.put_nowait, event)
+    else:
+        session.queue.put_nowait(event)
 
 
-def _drain(queue: asyncio.Queue[Event | None]) -> None:
+def _drain(queue: asyncio.Queue[Event]) -> None:
     while not queue.empty():
         queue.get_nowait()
 
@@ -172,12 +203,21 @@ def workdir() -> Path:
     return path
 
 
+def mcp_url() -> str:
+    """Where the subprocess reaches this server's tools: the setting, else this server's own
+    port (scripts/server.sh exports API_PORT)."""
+    configured = get_settings().chat_mcp_url
+    if configured:
+        return configured
+    return f"http://127.0.0.1:{os.environ.get('API_PORT', '8000')}/mcp/"
+
+
 def mcp_config(session: ChatSession) -> dict[str, Any]:
     return {
         "mcpServers": {
             SERVER_NAME: {
                 "type": "http",
-                "url": get_settings().chat_mcp_url,
+                "url": mcp_url(),
                 "headers": {"X-Chat-Session": session.id},
             }
         }
@@ -209,8 +249,8 @@ def build_command(session: ChatSession) -> list[str]:
         str(settings.chat_max_turns),
         "--model",
         settings.chat_model,
-        "--system-prompt",
-        session.system_prompt,
+        "--system-prompt-file",
+        str(session.prompt_path),
     ]
     command += ["--resume", session.id] if session.resumable else ["--session-id", session.id]
     return command
@@ -227,7 +267,15 @@ def subprocess_env() -> dict[str, str]:
 
 def availability() -> dict[str, Any]:
     settings = get_settings()
-    words = shlex.split(settings.chat_claude_command)
+    try:
+        words = shlex.split(settings.chat_claude_command)
+    except ValueError as exc:
+        return {
+            "available": False,
+            "command": settings.chat_claude_command,
+            "model": settings.chat_model,
+            "reason": f"CHAT_CLAUDE_COMMAND을 읽지 못했습니다: {exc}",
+        }
     executable = words[0] if words else ""
     found = shutil.which(executable) if executable else None
     if found is None and executable and Path(executable).exists():
@@ -398,29 +446,43 @@ class StreamParser:
         ]
 
     def _result(self, item: dict[str, Any]) -> list[Event]:
+        """The CLI's final line. `is_error` is the truth; `subtype` is "success" even on some
+        failures (an API error, for instance) and "error_max_turns" when the tool loop hit
+        --max-turns, which still produced an answer and is reported as a warning."""
         events = self._end_text()
         is_error = bool(item.get("is_error"))
-        subtype = str(item.get("subtype", ""))
+        subtype = str(item.get("subtype", "")) or "success"
+        max_turns = subtype == "error_max_turns"
+        ok = max_turns or not is_error
+        if is_error and subtype == "success":
+            subtype = "error"
         events.append(
             {
                 "type": "done",
-                "ok": not is_error,
+                "ok": ok,
                 "subtype": subtype,
                 "duration_ms": item.get("duration_ms"),
                 "turns": item.get("num_turns"),
                 "cost_usd": item.get("total_cost_usd"),
             }
         )
-        if is_error:
-            detail = item.get("result") or item.get("error") or subtype or "unknown error"
-            events.append({"type": "error", "message": f"Claude Code 오류: {detail}"})
-        elif subtype == "error_max_turns":
+        if max_turns:
             events.append({"type": "warning", "message": "도구 호출 한도에 걸려 답을 끊었습니다."})
+        elif not ok:
+            detail = item.get("result") or item.get("error") or subtype
+            status = item.get("api_error_status")
+            if status:
+                detail = f"{detail} (API {status})"
+            events.append({"type": "error", "message": f"Claude Code 오류: {detail}"})
         return events
 
     def _system(self, item: dict[str, Any]) -> list[Event]:
         if item.get("subtype") != "init":
             return []
+        if item.get("session_id"):
+            # From here on the CLI owns this id: the next turn must --resume, even if this one
+            # is cut off by a timeout or a closed tab.
+            self.session.resumable = True
         for server in item.get("mcp_servers") or []:
             if isinstance(server, dict) and server.get("name") == SERVER_NAME:
                 if server.get("status") != "connected":
@@ -462,7 +524,7 @@ class TurnRecord:
                 {"type": "tool", "name": event.get("name"), "input": event.get("input")}
             )
         elif kind == "board":
-            self.blocks.append({k: v for k, v in event.items() if k != "type"} | {"type": "board"})
+            self.blocks.append(dict(event))
         elif kind == "done":
             self.done = {k: v for k, v in event.items() if k != "type"}
         elif kind in ("error", "warning"):
@@ -480,6 +542,8 @@ _semaphore_loop: asyncio.AbstractEventLoop | None = None
 
 
 def _slots() -> asyncio.Semaphore:
+    """Claude Code processes allowed at once. Rebuilt when the event loop changes, which only
+    happens in tests (one loop per test); the server has a single loop for its lifetime."""
     global _semaphore, _semaphore_loop
     loop = asyncio.get_running_loop()
     if _semaphore is None or _semaphore_loop is not loop:
@@ -505,19 +569,39 @@ async def store_turn(session: ChatSession, role: str, content: dict[str, Any]) -
         log.warning("chat: could not store %s turn: %s", role, exc)
 
 
+def _terminate(proc: asyncio.subprocess.Process) -> None:
+    """Kill the CLI and everything it spawned (it runs in its own process group)."""
+    if proc.returncode is not None:
+        return
+    try:
+        os.killpg(proc.pid, signal.SIGKILL)
+    except (ProcessLookupError, PermissionError, OSError):
+        with contextlib.suppress(ProcessLookupError):
+            proc.kill()
+
+
 async def _pump(
-    proc: asyncio.subprocess.Process, session: ChatSession, message: str
-) -> tuple[bool, str]:
-    """Feed the question, parse stdout into the session queue, end with the sentinel. Returns
-    whether a result event was seen and the stderr text."""
+    proc: asyncio.subprocess.Process, session: ChatSession, message: str, attempt: int
+) -> bool:
+    """Feed the question, parse stdout into the session queue, end with an `_eof` marker.
+    Returns whether a result line was seen. stderr is drained concurrently so a chatty CLI
+    can never block on a full pipe."""
     parser = StreamParser(session)
     saw_result = False
-    stderr_text = ""
+    assert proc.stdin is not None and proc.stdout is not None and proc.stderr is not None
+    stderr_task = asyncio.create_task(proc.stderr.read())
+
+    def put(event: Event) -> None:
+        event["attempt"] = attempt
+        session.queue.put_nowait(event)
+
     try:
-        assert proc.stdin is not None and proc.stdout is not None
-        proc.stdin.write(message.encode())
-        await proc.stdin.drain()
-        proc.stdin.close()
+        try:
+            proc.stdin.write(message.encode())
+            await proc.stdin.drain()
+            proc.stdin.close()
+        except (BrokenPipeError, ConnectionResetError):
+            pass  # the process died before reading; its stderr says why below
         while True:
             raw = await proc.stdout.readline()
             if not raw:
@@ -525,84 +609,131 @@ async def _pump(
             for event in parser.feed(raw.decode(errors="replace")):
                 if event.get("type") == "done":
                     saw_result = True
-                session.queue.put_nowait(event)
-        if proc.stderr is not None:
-            stderr_text = (await proc.stderr.read()).decode(errors="replace")
+                put(event)
+        stderr_text = (await stderr_task).decode(errors="replace")
         code = await proc.wait()
         if not saw_result:
-            detail = stderr_text.strip().splitlines()[-1:] or [f"exit code {code}"]
-            session.queue.put_nowait(
-                {"type": "error", "message": f"Claude Code가 답을 내지 못했습니다: {detail[0]}"}
-            )
+            lines = [ln for ln in stderr_text.strip().splitlines() if ln.strip()]
+            detail = lines[-1] if lines else f"exit code {code}"
+            if IN_USE in stderr_text:
+                # The id was claimed by an earlier, cut-off turn; the caller retries with
+                # --resume once.
+                session.resumable = True
+                put({"type": "error", "message": detail, "retry": True})
+            else:
+                put({"type": "error", "message": f"Claude Code가 답을 내지 못했습니다: {detail}"})
+    except asyncio.CancelledError:
+        raise
     except Exception as exc:  # noqa: BLE001 - reported to the client, never raised
         log.exception("chat: stream failed")
-        session.queue.put_nowait({"type": "error", "message": f"스트림 오류: {exc}"})
+        put({"type": "error", "message": f"스트림 오류: {exc}"})
     finally:
-        session.queue.put_nowait(None)
-    return saw_result, stderr_text
+        if not stderr_task.done():
+            stderr_task.cancel()
+        put({"type": "_eof"})
+    return saw_result
+
+
+async def _launch(session: ChatSession, message: str) -> AsyncIterator[Event]:
+    """One process: its events in order, board events from the tools interleaved, a timeout
+    turned into an error, and the process killed whatever way the consumer stops."""
+    settings = get_settings()
+    session.attempt += 1
+    attempt = session.attempt
+    _drain(session.queue)
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            *build_command(session),
+            stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            cwd=str(workdir()),
+            env=subprocess_env(),
+            start_new_session=True,
+        )
+    except OSError as exc:
+        yield {"type": "error", "message": f"Claude Code를 시작하지 못했습니다: {exc}"}
+        yield {"type": "done", "ok": False, "subtype": "launch_failed"}
+        return
+    pump = asyncio.create_task(_pump(proc, session, message, attempt))
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + settings.chat_timeout_seconds
+    try:
+        while True:
+            remaining = deadline - loop.time()
+            if remaining <= 0:
+                raise TimeoutError
+            event = await asyncio.wait_for(session.queue.get(), remaining)
+            if event.get("attempt") != attempt:
+                continue  # left over from a process that was killed
+            if event.get("type") == "_eof":
+                break
+            yield event
+    except TimeoutError:
+        limit = int(settings.chat_timeout_seconds)
+        yield {"type": "error", "message": f"{limit}초 안에 답이 끝나지 않아 중단했습니다."}
+        yield {"type": "done", "ok": False, "subtype": "timeout"}
+    finally:
+        _terminate(proc)
+        if not pump.done():
+            pump.cancel()
+        # asyncio.wait never raises the pump's own CancelledError; a cancellation of *this*
+        # task still propagates from the await, as it should.
+        await asyncio.wait({pump}, timeout=REAP_SECONDS)
+        with contextlib.suppress(TimeoutError, ProcessLookupError):
+            await asyncio.wait_for(proc.wait(), REAP_SECONDS)
 
 
 async def run_turn(
     session: ChatSession, text: str, move_fen: str | None = None, move_san: str | None = None
 ) -> AsyncIterator[Event]:
     """One question, streamed: the events Claude Code produces plus the board states the tools
-    push, in order. Stores both turns in chat_turns."""
-    settings = get_settings()
+    push, in order. Stores both turns in chat_turns. A question that arrives while the previous
+    answer is still being written, or while every Claude Code slot is busy, gets an error
+    event instead of a silent wait."""
     message = format_message(text, move_fen, move_san)
-    async with session.lock, _slots():
-        session.last_used = time.monotonic()
-        session.note_squares(message)
-        _drain(session.queue)
-        await store_turn(
-            session, "user", {"text": text, "move_fen": move_fen, "move_san": move_san}
-        )
-        yield {"type": "session", "session_id": session.id, "resumed": session.resumable}
+    try:
+        await asyncio.wait_for(session.lock.acquire(), LOCK_WAIT_SECONDS)
+    except TimeoutError:
+        yield {"type": "error", "message": "이 대화는 아직 이전 답을 쓰는 중입니다."}
+        yield {"type": "done", "ok": False, "subtype": "busy"}
+        return
+    try:
+        slots = _slots()
         try:
-            proc = await asyncio.create_subprocess_exec(
-                *build_command(session),
-                stdin=asyncio.subprocess.PIPE,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                cwd=str(workdir()),
-                env=subprocess_env(),
-            )
-        except OSError as exc:
-            yield {"type": "error", "message": f"Claude Code를 시작하지 못했습니다: {exc}"}
-            yield {"type": "done", "ok": False, "subtype": "launch_failed"}
-            return
-        pump = asyncio.create_task(_pump(proc, session, message))
-        record = TurnRecord()
-        loop = asyncio.get_running_loop()
-        deadline = loop.time() + settings.chat_timeout_seconds
-        try:
-            while True:
-                remaining = deadline - loop.time()
-                if remaining <= 0:
-                    raise TimeoutError
-                event = await asyncio.wait_for(session.queue.get(), remaining)
-                if event is None:
-                    break
-                record.add(event)
-                yield event
+            await asyncio.wait_for(slots.acquire(), QUEUE_WAIT_SECONDS)
         except TimeoutError:
-            limit = int(settings.chat_timeout_seconds)
-            event = {"type": "error", "message": f"{limit}초 안에 답이 끝나지 않아 중단했습니다."}
-            record.add(event)
-            yield event
-        finally:
-            if proc.returncode is None:
-                proc.kill()
-            pump.cancel()
-            try:
-                saw_result, _ = await pump
-            except (asyncio.CancelledError, Exception):  # noqa: BLE001
-                saw_result = record.done is not None
-            if saw_result:
-                session.resumable = True
+            yield {
+                "type": "error",
+                "message": "튜터가 다른 답을 쓰는 중입니다. 잠시 뒤 다시 보내 주세요.",
+            }
+            yield {"type": "done", "ok": False, "subtype": "busy"}
+            return
+        try:
+            session.last_used = time.monotonic()
+            session.note_squares(message)
+            await store_turn(
+                session, "user", {"text": text, "move_fen": move_fen, "move_san": move_san}
+            )
+            yield {"type": "session", "session_id": session.id, "resumed": session.resumable}
+            record = TurnRecord()
+            for attempt in (1, 2):
+                retry = False
+                async for event in _launch(session, message):
+                    if event.get("retry") and attempt == 1:
+                        retry = True
+                        continue
+                    event.pop("retry", None)
+                    event.pop("attempt", None)
+                    record.add(event)
+                    yield event
+                if not retry:
+                    break
+                log.info("chat: session %s was already stored; retrying with --resume", session.id)
+            if record.done is not None and record.done.get("ok"):
                 session.turns += 1
             await store_turn(session, "assistant", record.content())
-
-
-def sse(events: Iterable[Event]) -> Iterable[str]:
-    for event in events:
-        yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+        finally:
+            slots.release()
+    finally:
+        session.lock.release()

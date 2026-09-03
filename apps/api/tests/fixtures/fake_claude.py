@@ -4,7 +4,17 @@
 Reads the question from stdin like `claude -p` does, echoes its arguments and the question to
 the file named by FAKE_CLAUDE_LOG (one JSON line per run), and prints the event sequence a
 real answer produces: partial text, a show_board tool call and its result, more text, a rate
-limit event and the final result. FAKE_CLAUDE_MODE=crash exits early with an error;
+limit event and the final result.
+
+FAKE_CLAUDE_MODE selects a variant:
+  ok         the full answer (default)
+  crash      init, then exit 1 with a message on stderr
+  no-mcp     init reports the chess server as failed
+  max-turns  the answer, then a result with is_error and subtype error_max_turns (what the
+             real CLI prints when --max-turns stops the tool loop)
+  hang       init, then sleep for FAKE_CLAUDE_HANG seconds (default 10) without a result
+  in-use     with --session-id: fail like the CLI does for an id it already stored
+             ("Error: Session ID ... is already in use."); with --resume: the full answer
 FAKE_CLAUDE_PAUSE (seconds) waits between the two halves so a test can push a board event in
 the middle of the stream."""
 
@@ -26,10 +36,13 @@ def main() -> int:
     prompt = sys.stdin.read()
     if "--session-id" in args:
         sid = args[args.index("--session-id") + 1]
+        fresh = True
     elif "--resume" in args:
         sid = args[args.index("--resume") + 1]
+        fresh = False
     else:
         sid = "no-session"
+        fresh = True
     log = os.environ.get("FAKE_CLAUDE_LOG")
     if log:
         with open(log, "a", encoding="utf-8") as fh:
@@ -37,6 +50,10 @@ def main() -> int:
     mode = os.environ.get("FAKE_CLAUDE_MODE", "ok")
     pause = float(os.environ.get("FAKE_CLAUDE_PAUSE", "0.05"))
     mcp_status = "connected" if mode != "no-mcp" else "failed"
+
+    if mode == "in-use" and fresh:
+        sys.stderr.write(f"Error: Session ID {sid} is already in use.\n")
+        return 1
 
     emit(
         {
@@ -51,6 +68,9 @@ def main() -> int:
     if mode == "crash":
         sys.stderr.write("fake claude: boom\n")
         return 1
+    if mode == "hang":
+        time.sleep(float(os.environ.get("FAKE_CLAUDE_HANG", "10")))
+        return 0
 
     def stream(event: dict) -> None:
         emit({"type": "stream_event", "event": event, "session_id": sid})
@@ -119,6 +139,15 @@ def main() -> int:
     )
     stream({"type": "content_block_stop", "index": 1})
     time.sleep(pause)
+    result_text = json.dumps(
+        {
+            "shown": True,
+            "fen": "x",
+            "moves": ["Nxf6+"],
+            "last_move": ["d5", "f6"],
+            "note": "표시했습니다.",
+        }
+    )
     emit(
         {
             "type": "user",
@@ -128,20 +157,7 @@ def main() -> int:
                     {
                         "type": "tool_result",
                         "tool_use_id": tool_id,
-                        "content": [
-                            {
-                                "type": "text",
-                                "text": json.dumps(
-                                    {
-                                        "shown": True,
-                                        "fen": "x",
-                                        "moves": ["Nxf6+"],
-                                        "last_move": ["d5", "f6"],
-                                        "note": "표시했습니다.",
-                                    }
-                                ),
-                            }
-                        ],
+                        "content": [{"type": "text", "text": result_text}],
                         "is_error": False,
                     }
                 ],
@@ -186,11 +202,12 @@ def main() -> int:
             "session_id": sid,
         }
     )
+    max_turns = mode == "max-turns"
     emit(
         {
             "type": "result",
-            "subtype": "success" if mode != "max-turns" else "error_max_turns",
-            "is_error": False,
+            "subtype": "error_max_turns" if max_turns else "success",
+            "is_error": max_turns,
             "duration_ms": 12,
             "num_turns": 2,
             "total_cost_usd": 0.0,

@@ -118,7 +118,7 @@ export default function ReviewPage() {
   const onBoardMove = useCallback((orig: string, dest: string) => {
     const played = applyUci(fen, orig + dest) ?? applyUci(fen, `${orig}${dest}q`);
     if (!played) return;
-    setChatDraft({ fen, san: played.san, fenAfter: played.fen });
+    setChatDraft({ fen, san: played.san });
     setPreview({ id: `chat:student:${played.san}`, fen: played.fen, label: `${played.san} · 학생이 둔 수`, lastMove: [orig, dest], shapes: [] });
   }, [fen]);
   const score = useMemo<Score | null>(() => {
