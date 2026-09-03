@@ -19,6 +19,14 @@ apps/web   Vite · React 19 · TypeScript · chessground
 ```bash
 brew install stockfish
 
+scripts/server.sh setup      # uv sync + pnpm install + 도구 점검 (Maia-2까지: --maia)
+scripts/server.sh dev        # API(8000) + 웹(5173)을 띄우고 로그를 따라간다. Ctrl-C 로 모두 종료
+scripts/server.sh status     # 서비스·포트·헬스 확인. 그 밖의 명령은 scripts/server.sh help
+```
+
+손으로 띄우려면:
+
+```bash
 cd apps/api && uv sync --all-groups && uv run pytest -q     # Maia-2까지: --extra maia
 uv run uvicorn chess_tutor.api:app --reload                 # http://localhost:8000/docs
 

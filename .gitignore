@@ -38,3 +38,6 @@ apps/api/*.db
 /*.jpeg
 /*.png
 .coverage
+
+# scripts/server.sh pid files and logs
+.run/

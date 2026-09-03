@@ -143,6 +143,20 @@ PGN/API 임포트
 
 ## 6. 개발 환경
 
+`scripts/server.sh` 가 아래 명령을 감싼다. 서비스는 각자 프로세스 그룹으로 떠서 `stop` 하면
+uvicorn 의 reload 자식·Stockfish·vite 의 node 까지 함께 내려간다. pid 와 로그는 `.run/` 에 둔다.
+
+```bash
+scripts/server.sh setup [--maia]     # uv sync + pnpm install + 도구 점검
+scripts/server.sh dev                # api + web 을 띄우고 로그 follow. Ctrl-C 로 모두 종료
+scripts/server.sh start|stop|restart [api|web|design]   # 백그라운드 관리. stop -f 는 외부 프로세스도 종료
+scripts/server.sh status | health | logs [-f] | open
+scripts/server.sh test [api|web] | lint | fmt | ci       # ci 는 .github/workflows/ci.yml 과 같은 검사
+scripts/server.sh db url | up | down | shell | reset     # Postgres(docker) / SQLite
+scripts/server.sh doctor             # 도구·의존성·환경 변수·포트 진단
+# 포트·호스트는 API_PORT, WEB_PORT, API_HOST, WEB_HOST, API_RELOAD=0 등으로 바꾼다. 루트 .env 도 읽는다.
+```
+
 ```bash
 # 엔진
 brew install stockfish            # macOS
@@ -199,4 +213,4 @@ MIT로 가고 싶다면: chessground 대신 MIT 보드 라이브러리를 쓰고
 - 마지막 수에서 저지른 실수(기권 직전)는 다음 국면 분석이 없어 퍼즐이 되지 않는다.
 - 리뷰 캐시(`move_reviews`)는 레이팅과 깊이로만 구분한다. 엔진 버전이 바뀌어도 자동 무효화되지 않는다.
 - 분석은 프로세스 내 워커 한 개로 돈다. 동시 사용자가 늘면 arq + Redis로 분리한다.
-- 개발 서버는 `--reload` 없이 띄우면 코드 변경이 반영되지 않는다. `.claude/launch.json`의 api 설정 또는 `uvicorn ... --reload`를 쓴다.
+- 개발 서버는 `--reload` 없이 띄우면 코드 변경이 반영되지 않는다. `scripts/server.sh dev`(기본 `--reload`), `.claude/launch.json`의 api 설정 또는 `uvicorn ... --reload`를 쓴다.
