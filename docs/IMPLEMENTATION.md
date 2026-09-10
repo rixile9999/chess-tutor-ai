@@ -142,6 +142,10 @@ PGN/API 임포트
 - 테스트: `tests/test_chat.py` 41개(타임아웃, 동시 질문 거절, max-turns 경고, id 충돌 재시도, 낡은 보드 이벤트 폐기, 워커 스레드 push 포함). `tests/fixtures/fake_claude.py`가 stream-json을 재생하므로 CI에 구독이 필요 없다. MCP 마운트는 TestClient(lifespan 실행)로만 검증한다(ASGITransport는 lifespan을 돌리지 않는다)
 - 남은 것: 대화 기록은 브라우저 상태에만 있어 새로고침하면 사라진다(`chat_turns`에서 복원 미구현). 오프닝 지도 국면에서는 아직 못 쓴다. 첫 답까지 30~60초라 상주 프로세스(`--input-format stream-json`)로 줄이는 안이 남아 있다
 
+### M7 모의 게임 (수동 / AI 대국 / 오프닝 연습) — 기획 (2026-09-10)
+- 기획서 [PLAY.md](PLAY.md). 스파링 탭을 `/play` 화면으로 승격하고 저장 → 분석 → 리뷰 파이프라인에 잇는다. 오프닝 카탈로그(TSV 기반 타비야)에서 시작하는 타비야 대국·수순 드릴과 구조별 계획 실행 리포트가 핵심. 단계 M7a~M7d
+- 미착수
+
 ### 통합 상태 (2026-09-02)
 - 백엔드: `ruff format`·`ruff check`·`mypy --strict` 통과, pytest 271개 약 22초(엔진 테스트는 깊이 ≤ 8). `tests/test_e2e.py`가 TestClient로 임포트 → 분석 → 리뷰 → 프로필 → 오프닝 지도 → 퍼즐 → 스파링을 한 번에 돈다
 - 웹: `pnpm lint`, `tsc --noEmit`, `pnpm build` 통과. 라우트 `/games`, `/review/:gameId/:ply`, `/profile/:username`, `/openings`, `/training`

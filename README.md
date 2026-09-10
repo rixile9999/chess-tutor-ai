@@ -4,6 +4,7 @@
 
 - 목표와 아키텍처: [PLAN.md](PLAN.md)
 - 구현 계획과 기술 스택: [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md)
+- 모의 게임 모드(수동·AI 대국·오프닝 연습) 기획: [docs/PLAY.md](docs/PLAY.md)
 - 취지와 조사 노트: [draft.md](draft.md), [research-notes.md](research-notes.md)
 - UI 목업 소스: [design/](design/) (`node design/build.mjs`로 화면 생성)
 
