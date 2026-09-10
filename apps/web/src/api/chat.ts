@@ -39,14 +39,44 @@ type StreamParams = {
   gameId: number; ply: number; message: string; sessionId: string | null; move: ChatMove | null; rating?: number;
 };
 
+/** A question about a practice-game position that is not stored yet (POST /play/chat). */
+export type LiveStreamParams = {
+  fen: string; startFen: string; movesSan: string[]; userColor: 'white' | 'black' | null; opponent: string | null;
+  openingName?: string | null; message: string; sessionId: string | null; move: ChatMove | null; rating?: number;
+};
+
 /** POST a question and hand every server-sent event to `onEvent` as it arrives. Resolves when
  * the stream closes; rejects on a non-2xx response or when `signal` aborts. */
 export async function streamChat(p: StreamParams, onEvent: (e: ChatEvent) => void, signal?: AbortSignal): Promise<void> {
   const q = p.rating ? `?rating=${p.rating}` : '';
-  const res = await fetch(`${BASE}/review/${p.gameId}/${p.ply}/chat${q}`, {
+  return streamFrom(
+    `${BASE}/review/${p.gameId}/${p.ply}/chat${q}`,
+    { message: p.message, session_id: p.sessionId, move: p.move },
+    onEvent,
+    signal,
+  );
+}
+
+/** Same stream for a live practice position: the server keys the session by FEN, so a
+ * question from a new position starts a new conversation even with the old session id. */
+export async function streamLiveChat(p: LiveStreamParams, onEvent: (e: ChatEvent) => void, signal?: AbortSignal): Promise<void> {
+  const q = p.rating ? `?rating=${p.rating}` : '';
+  return streamFrom(
+    `${BASE}/play/chat${q}`,
+    {
+      message: p.message, session_id: p.sessionId, move: p.move, fen: p.fen, start_fen: p.startFen, moves_san: p.movesSan,
+      user_color: p.userColor, opponent: p.opponent, opening_name: p.openingName ?? null,
+    },
+    onEvent,
+    signal,
+  );
+}
+
+async function streamFrom(url: string, body: unknown, onEvent: (e: ChatEvent) => void, signal?: AbortSignal): Promise<void> {
+  const res = await fetch(url, {
     method: 'POST',
     headers: { 'content-type': 'application/json', accept: 'text/event-stream' },
-    body: JSON.stringify({ message: p.message, session_id: p.sessionId, move: p.move }),
+    body: JSON.stringify(body),
     signal,
   });
   if (!res.ok || !res.body) {

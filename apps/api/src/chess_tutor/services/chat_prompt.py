@@ -16,10 +16,21 @@ CONTEXT_PLIES_BEFORE = 24
 CONTEXT_PLIES_AFTER = 6
 TOP_PROBS = 5
 
-ROLE = """\
+ROLE_INTRO = """\
 당신은 체스 튜터입니다. 학생은 자기 게임의 한 수를 놓고 튜터와 토론합니다. 학생의 언어는 \
 한국어이고, 당신도 항상 한국어로 답합니다. 수는 SAN(예: Nf3, Bxd7+, O-O)으로 적고, 칸은 \
 소문자 a1~h8로 적습니다. 학생의 반론이 옳으면 옳다고 인정합니다. 억지로 깎아내리지 않습니다.
+"""
+
+LIVE_INTRO = """\
+당신은 체스 튜터입니다. 학생은 지금 연습 게임을 두는 중이고, 현재 국면에 대해 질문합니다. \
+학생의 언어는 한국어이고, 당신도 항상 한국어로 답합니다. 수는 SAN(예: Nf3, Bxd7+, O-O)으로 \
+적고, 칸은 소문자 a1~h8로 적습니다. 게임이 진행 중이므로 정답 수를 바로 말하기보다 구조와 \
+계획, 후보 수의 장단점을 먼저 말하고, 학생이 최선수를 물으면 그때 도구로 확인해 답합니다. \
+학생의 반론이 옳으면 옳다고 인정합니다.
+"""
+
+ROLE_BODY = """\
 
 ## 무엇을 근거로 말하는가
 - 아래 <facts>에는 이 수에 대해 엔진과 탐지기가 이미 계산한 사실이 있습니다. 평가 수치(cp, \
@@ -73,6 +84,9 @@ show_board를 한 번 부를 때마다 바로 그 장면을 설명하는 문단�
 말합니다.
 - 얕은 깊이의 엔진 판단은 틀릴 수 있으니 depth를 밝히며 조심스럽게 말합니다.
 """
+
+ROLE = ROLE_INTRO + ROLE_BODY
+LIVE_ROLE = LIVE_INTRO + ROLE_BODY
 
 
 def _strip_claims(value: Any) -> Any:
@@ -196,3 +210,93 @@ def build_system_prompt(
 ) -> str:
     body = json.dumps(facts(game, analysis, review, rating), ensure_ascii=False)
     return f"{ROLE}\n<facts>\n{body}\n</facts>\n"
+
+
+# ---------- live practice position (M7) ----------
+
+LIVE_MOVES_CONTEXT = 24
+
+
+def live_facts(
+    fen: str,
+    start_fen: str,
+    moves_san: list[str],
+    user_color: schemas.Color | None,
+    rating: int,
+    opponent: str | None,
+    opening_name: str | None,
+) -> dict[str, Any]:
+    """What the tutor knows about a position that is still being played: the moves so far,
+    the pawn structure and the typical plans of both sides. No engine numbers: the tutor asks
+    its tools for those, and the student sees no evaluation during the game."""
+    import chess
+
+    from chess_tutor import structure
+    from chess_tutor.services import plans as plans_svc
+
+    board = chess.Board(fen)
+    start = chess.Board(start_fen)
+    played: list[chess.Move] = []
+    walk = start.copy()
+    for san in moves_san:
+        try:
+            move = walk.parse_san(san)
+        except ValueError:
+            break
+        played.append(move)
+        walk.push(move)
+    info = structure.classify(board)
+    mirror = plans_svc.mirrored(info.key, board)
+    plan_facts: dict[str, list[dict[str, Any]]] = {}
+    for side in ("white", "black"):
+        matched = plans_svc.match_plans(
+            info.key, side, [], board, played, mirror=mirror, start_board=start
+        )
+        plan_facts[side] = [
+            {"title": p.title, "condition": p.condition, "status": p.status} for p in matched
+        ]
+    first = max(0, len(moves_san) - LIVE_MOVES_CONTEXT)
+    labelled = []
+    walk = start.copy()
+    for i, san in enumerate(moves_san):
+        if i >= first:
+            labelled.append(_label(walk.ply() + 1, san))
+        try:
+            walk.push_san(san)
+        except ValueError:
+            break
+    return {
+        "game": {
+            "student_color": user_color,
+            "opponent": opponent,
+            "opening": opening_name,
+            "in_progress": True,
+        },
+        "student": {"rating_for_maia": rating},
+        "position": {
+            "fen": fen,
+            "side_to_move": "white" if board.turn else "black",
+            "move_number": board.fullmove_number,
+            "in_check": board.is_check(),
+        },
+        "moves_so_far": " ".join(labelled) or "(아직 둔 수 없음)",
+        "structure": info.model_dump(mode="json"),
+        "plans": plan_facts,
+        "positions_note": "position.fen = 지금 보드에 있는 국면. 학생이 다음 수를 고르는 중",
+    }
+
+
+def build_live_prompt(
+    fen: str,
+    start_fen: str,
+    moves_san: list[str],
+    user_color: schemas.Color | None,
+    rating: int,
+    opponent: str | None = None,
+    opening_name: str | None = None,
+) -> str:
+    body = json.dumps(
+        live_facts(fen, start_fen, moves_san, user_color, rating, opponent, opening_name),
+        ensure_ascii=False,
+    )
+    return f"{LIVE_ROLE}\n<facts>\n{body}\n</facts>\n"

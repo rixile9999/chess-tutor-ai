@@ -87,7 +87,8 @@ def occupied_squares(placement: str) -> set[str]:
 @dataclass
 class ChatSession:
     id: str
-    game_id: int
+    game_id: int | None
+    """None for a live practice position: the game is not stored while it is being played."""
     ply: int
     system_prompt: str
     prompt_path: Path
@@ -108,6 +109,8 @@ class ChatSession:
     """Counts process launches; every event carries the launch it came from, so anything a
     killed process still emits is dropped instead of leaking into the next answer."""
     last_used: float = field(default_factory=time.monotonic)
+    fen: str | None = None
+    """Position of a live session; a question about another position starts a new session."""
 
     def note_squares(self, text: str) -> None:
         """Ground every square named in `text` and every occupied square of any FEN in it."""
@@ -136,7 +139,9 @@ def get_session(session_id: str | None) -> ChatSession | None:
     return session
 
 
-def create_session(game_id: int, ply: int, system_prompt: str) -> ChatSession:
+def create_session(
+    game_id: int | None, ply: int, system_prompt: str, fen: str | None = None
+) -> ChatSession:
     session_id = str(uuid.uuid4())
     prompts = workdir() / "prompts"
     prompts.mkdir(parents=True, exist_ok=True)
@@ -153,6 +158,7 @@ def create_session(game_id: int, ply: int, system_prompt: str) -> ChatSession:
         system_prompt=system_prompt,
         prompt_path=path,
         loop=loop,
+        fen=fen,
     )
     session.note_squares(system_prompt)
     _sessions[session.id] = session

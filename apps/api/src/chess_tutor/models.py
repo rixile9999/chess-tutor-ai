@@ -169,7 +169,8 @@ class ChatTurn(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     session_id: Mapped[str] = mapped_column(String(64), index=True)
-    game_id: Mapped[int] = mapped_column(ForeignKey("games.id"))
+    game_id: Mapped[int | None] = mapped_column(ForeignKey("games.id"), nullable=True)
+    """None for a live practice position (M7): the game is not stored yet when the chat runs."""
     ply: Mapped[int] = mapped_column(Integer)
     role: Mapped[str] = mapped_column(String(16))  # user | assistant
     content: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)

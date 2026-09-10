@@ -9,6 +9,7 @@ import json
 from collections.abc import AsyncIterator
 from typing import Annotated, Any
 
+import chess
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
@@ -18,6 +19,7 @@ from chess_tutor import models
 from chess_tutor.config import get_settings
 from chess_tutor.db import get_session
 from chess_tutor.routers.review import NOT_FOUND, PLY_NOT_FOUND, _analysis
+from chess_tutor.schemas import Color
 from chess_tutor.services import chat as chat_svc
 from chess_tutor.services import chat_prompt
 from chess_tutor.services import review as review_svc
@@ -38,6 +40,17 @@ class ChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=4000)
     session_id: str | None = None
     move: MoveAttachment | None = None
+
+
+class LiveChatRequest(ChatRequest):
+    """A question about a practice-game position that is not stored yet (M7)."""
+
+    fen: str = Field(description="지금 보드에 있는 국면")
+    start_fen: str = Field(default=chess.STARTING_FEN, description="게임의 시작 국면")
+    moves_san: list[str] = Field(default_factory=list, description="시작 국면부터 지금까지의 수")
+    user_color: Color | None = Field(default=None, description="학생의 색. 수동 게임이면 비움")
+    opponent: str | None = Field(default=None, description='상대 표시 이름, 예: "Maia 1500"')
+    opening_name: str | None = None
 
 
 class ChatStatus(BaseModel):
@@ -83,6 +96,35 @@ async def chat(
         chat_session = chat_svc.create_session(game_id, ply, prompt)
     if chat_session.lock.locked():
         # Fast path; run_turn re-checks under the lock and reports the same thing as an event.
+        raise HTTPException(status_code=409, detail="이 대화는 아직 이전 답을 쓰는 중입니다.")
+    move_fen = req.move.fen if req.move else None
+    move_san = req.move.san if req.move else None
+    return StreamingResponse(
+        _sse(chat_svc.run_turn(chat_session, req.message, move_fen, move_san)),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@router.post("/play/chat")
+async def live_chat(req: LiveChatRequest, rating: Rating = None) -> StreamingResponse:
+    """Ask the tutor about the position of a practice game in progress. The session follows
+    the position: a question from a different FEN starts a new conversation."""
+    try:
+        board = chess.Board(req.fen)
+        chess.Board(req.start_fen)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=f"읽을 수 없는 FEN: {exc}") from exc
+    if not board.is_valid():
+        raise HTTPException(status_code=422, detail="규칙에 맞지 않는 국면입니다.")
+    r = rating or get_settings().default_rating
+    chat_session = chat_svc.get_session(req.session_id)
+    if chat_session is None or chat_session.game_id is not None or chat_session.fen != req.fen:
+        prompt = chat_prompt.build_live_prompt(
+            req.fen, req.start_fen, req.moves_san, req.user_color, r, req.opponent, req.opening_name
+        )
+        chat_session = chat_svc.create_session(None, len(req.moves_san), prompt, fen=req.fen)
+    if chat_session.lock.locked():
         raise HTTPException(status_code=409, detail="이 대화는 아직 이전 답을 쓰는 중입니다.")
     move_fen = req.move.fen if req.move else None
     move_san = req.move.san if req.move else None
