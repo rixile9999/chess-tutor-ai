@@ -4,7 +4,7 @@
 
 - 목표와 아키텍처: [PLAN.md](PLAN.md)
 - 구현 계획과 기술 스택: [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md)
-- 모의 게임 모드(수동·AI 대국·오프닝 연습) 기획: [docs/PLAY.md](docs/PLAY.md)
+- 모의 게임 모드(수동·AI 대국·오프닝 연습) 기획과 구현 상태: [docs/PLAY.md](docs/PLAY.md)
 - 취지와 조사 노트: [draft.md](draft.md), [research-notes.md](research-notes.md)
 - UI 목업 소스: [design/](design/) (`node design/build.mjs`로 화면 생성)
 
@@ -34,7 +34,7 @@ uv run uvicorn chess_tutor.api:app --reload                 # http://localhost:8
 cd ../web && pnpm install && pnpm dev                       # http://localhost:5173
 ```
 
-첫 화면에서 PGN을 붙여 넣거나 chess.com/lichess 아이디로 기보를 가져온 뒤 분석 → 리뷰 → 프로필 → 오프닝 지도 → 트레이닝 순으로 쓴다. 엔진 분석은 Stockfish만 있으면 되고, `ANTHROPIC_API_KEY`(LLM 언어화)와 Maia-2 가중치는 없어도 템플릿·Stockfish 폴백으로 동작한다. 자세한 명령은 [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md) 6절.
+첫 화면에서 PGN을 붙여 넣거나 chess.com/lichess 아이디로 기보를 가져온 뒤 분석 → 리뷰 → 프로필 → 오프닝 지도 → 트레이닝 → 대국(`/play`: 수동·AI 대국과 오프닝 연습, 저장하면 다시 리뷰로) 순으로 쓴다. 엔진 분석은 Stockfish만 있으면 되고, `ANTHROPIC_API_KEY`(LLM 언어화)와 Maia-2 가중치는 없어도 템플릿·Stockfish 폴백으로 동작한다. 자세한 명령은 [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md) 6절.
 
 ## 원칙
 

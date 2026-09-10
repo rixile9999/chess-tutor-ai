@@ -72,6 +72,15 @@ svc_port() {
   esac
 }
 
+# Built-in port of each service: the value used when the environment says nothing.
+svc_default_port() {
+  case "$1" in
+    api) echo 8000 ;;
+    web) echo 5173 ;;
+    design) echo 8765 ;;
+  esac
+}
+
 svc_url() {
   case "$1" in
     api) echo "http://$API_HOST:$API_PORT" ;;
@@ -99,8 +108,18 @@ svc_match() {
   esac
 }
 
-pidfile() { echo "$RUN_DIR/$1.pid"; }
-logfile() { echo "$LOG_DIR/$1.log"; }
+# pid and log files carry the port, so two servers of the same service on different ports do
+# not claim each other's state: `API_PORT=8012 … start api` must not see the one on 8000 as
+# "already running", and `stop api` must never kill it. The default port keeps the short name
+# (.run/api.pid, .run/logs/api.log); any other port gets a suffix (.run/api-8012.pid).
+port_suffix() {
+  local port
+  port=$(svc_port "$1")
+  if [[ "$port" == "$(svc_default_port "$1")" ]]; then echo ""; else echo "-$port"; fi
+}
+
+pidfile() { echo "$RUN_DIR/$1$(port_suffix "$1").pid"; }
+logfile() { echo "$LOG_DIR/$1$(port_suffix "$1").log"; }
 
 # Space-separated pids listening on a TCP port (empty when none or lsof is missing).
 port_pids() {
@@ -669,6 +688,8 @@ chess-tutor-ai 개발 서버 관리
   open                 브라우저로 웹 열기
 
 svc = api (uvicorn :$API_PORT) | web (vite :$WEB_PORT) | design (design/ 미리보기 :$DESIGN_PORT)
+pid·로그는 서비스와 포트로 구분한다: .run/api.pid, .run/logs/api.log (기본 포트) / .run/api-8012.pid
+(다른 포트). 그래서 포트를 바꿔 띄운 서버와 기본 포트의 서버가 서로를 건드리지 않는다.
 
 개발
   setup [--maia]       uv sync + pnpm install + 도구 점검

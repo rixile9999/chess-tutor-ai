@@ -10,6 +10,18 @@ type State = { status: 'loading' | 'ready' | 'error'; report: PlanReport | null;
 
 const MODE_LABEL: Record<NonNullable<PlanReport['practice_mode']>, string> = { free: '자유 대국', drill: '수순 드릴', tabiya: '타비야 대국' };
 
+/** Placeholder shown in place of the report while the game is still being analysed.
+ * GET /play/report/{id} needs the finished analysis and blocks until it has it (minutes on a
+ * long game), so the card itself is only mounted once /analysis reports `done`. */
+export function PlanReportPending() {
+  return (
+    <div className="rv-section rv-report">
+      <span className="eyebrow">연습 게임 계획 리포트</span>
+      <div className="small muted">분석이 끝나면 계획 리포트가 나옵니다.</div>
+    </div>
+  );
+}
+
 /** Game-level plan report for a practice game (GET /play/report/{id}): which typical plans of
  * the structure the student executed, which the engine still saw, which never came. Shown
  * above the per-move strategy panel so the 전략과 계획 tab reads game first, move second. */

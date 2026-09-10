@@ -142,9 +142,40 @@ PGN/API 임포트
 - 테스트: `tests/test_chat.py` 41개(타임아웃, 동시 질문 거절, max-turns 경고, id 충돌 재시도, 낡은 보드 이벤트 폐기, 워커 스레드 push 포함). `tests/fixtures/fake_claude.py`가 stream-json을 재생하므로 CI에 구독이 필요 없다. MCP 마운트는 TestClient(lifespan 실행)로만 검증한다(ASGITransport는 lifespan을 돌리지 않는다)
 - 남은 것: 대화 기록은 브라우저 상태에만 있어 새로고침하면 사라진다(`chat_turns`에서 복원 미구현). 오프닝 지도 국면에서는 아직 못 쓴다. 첫 답까지 30~60초라 상주 프로세스(`--input-format stream-json`)로 줄이는 안이 남아 있다
 
-### M7 모의 게임 (수동 / AI 대국 / 오프닝 연습) — 기획 (2026-09-10)
-- 기획서 [PLAY.md](PLAY.md). 스파링 탭을 `/play` 화면으로 승격하고 저장 → 분석 → 리뷰 파이프라인에 잇는다. 오프닝 카탈로그(TSV 기반 타비야)에서 시작하는 타비야 대국·수순 드릴과 구조별 계획 실행 리포트가 핵심. 단계 M7a~M7d
-- 미착수
+### M7 모의 게임 (수동 / AI 대국 / 오프닝 연습) — 완료 (2026-09-11)
+- 기획서 [PLAY.md](PLAY.md). 화면 하나(`/play`)에서 양쪽을 손으로 두거나 한쪽을 AI에게 맡기고, 오프닝 카탈로그의 타비야에서 시작하거나 수순을 드릴한다. 게임이 끝나면 저장 → 분석 → 리뷰 → 채팅 → 퍼즐의 기존 파이프라인으로 그대로 넘어간다. 트레이닝의 스파링 탭은 `/play` 로 보내는 링크가 됐다. 단계 M7a~M7d 를 모두 붙였다
+- 실행 경로: 왼쪽 레일의 **대국** → `/play`(`pages/play/index.tsx`). 상태는 리듀서 하나(`pages/play/state.ts`)다. 수동 / AI가 백 / AI가 흑을 게임 도중에 바꿀 수 있고, 커서를 뒤로 옮긴 채 두면 뒤의 수를 잘라내며(한 번 확인), 물리기는 사용자 차례까지 되돌린다. 승급 피커(`components/PromotionPicker`)를 만들어 퍼즐의 자동 퀸도 이걸로 바꿨다. 진행 중 게임은 `localStorage`(`chess-tutor:play:current`)에 있어 새로고침을 견딘다. 오른쪽 패널은 수 목록 · 코치 · 튜터에게 질문 · 오프닝 · 설정 탭
+- 엔드포인트(`routers/play.py`. 라우터는 얇고 서비스 네 개에 위임한다):
+
+| 경로 | 하는 일 |
+|---|---|
+| `POST /play/move` | 상대의 수(`play_opponent`). `maia` 는 1100~2000 버킷으로 클램프하고 `opp_rating` 으로 사용자 레이팅까지 조건부로 준다. `stockfish` 는 `PlayEngine`(`UCI_LimitStrength`+`UCI_Elo` 1320~3190, movetime). **평가치는 돌려주지 않는다**. Stockfish 바이너리가 없으면 Maia 체인으로 폴백하고 실제로 답한 백엔드를 `source` 에 적는다 |
+| `POST /play/hint` | 3단계 힌트(`play_coach`). 1단계는 구조와 계획만 말하고 수를 말하지 않는다, 2단계는 Maia 상위 후보와 이유, 3단계는 엔진 최선수·주변화·모티프. 문장은 `verify.verify_all` 을 통과한 것만 남는다 |
+| `POST /play/check` | 방금 둔 수를 깊이 12로 재서 분류(실수 알림). 최선수가 컴퓨터 수면 그 레이팅대의 자연스러운 대안을 함께 낸다 |
+| `POST /play/games` | PGN 조립 → `source="practice"` Game 행 → 분석 잡(`practice.save`) |
+| `GET /play/report/{id}` | 타비야 대국 사후 계획 리포트(`practice.plan_report`). 분석 결과를 쓰므로 끝날 때까지 기다린다 |
+| `GET /play/openings`, `/play/openings/{id}` | 카탈로그 카드와 상세(수순·타비야 FEN·구조·양쪽 계획·내 기록) |
+| `GET /play/book` | 이 국면에서 책이 아는 다음 수들(전위 포함) |
+| `POST /play/chat` | 저장 전 라이브 국면 채팅. M6 의 실행 경로를 그대로 쓰되 프롬프트만 다르다 |
+
+- 오프닝 카탈로그(`services/openings_catalog.py`): 손으로 적는 데이터는 **34줄의 이름뿐**이다. 각 항목은 `(eco, tsv_name, ply)` 로 `assets/openings_*.tsv` 의 행 하나를 지목하고(`tests/test_openings_catalog.py` 가 34개 전부 해석되는지 확인한다), 수순·타비야 FEN·폰 구조·양쪽 계획은 전부 거기서 파생된다. 오타는 배포가 아니라 테스트에서 걸린다. **책 따라가기**는 모든 TSV 행의 모든 접두사로 만든 트리(`openings._tree()`)라 전위도 잡는다. 내 기록은 임포트 게임이면 타비야의 위치 키로, 연습 게임이면 `OpeningId` 헤더로 센다
+- 라이브 채팅(M7d): 저장된 게임이 없으므로 세션 키는 FEN 이다(국면이 바뀌면 새 대화). 프롬프트(`chat_prompt.build_live_prompt`)에는 지금까지의 수순·폰 구조·양쪽 계획이 들어가고 엔진 수치는 들어가지 않는다. 코치 프리셋 "진지하게"에서는 탭 자체가 숨고, 질문 한 번은 힌트 한 번으로 센다
+- 데이터 모델 결정
+  - **새 테이블이 없다.** 연습 게임은 `source="practice"` 인 보통 `Game` 행이고 나머지는 PGN 헤더가 담는다: `Mode`(`manual`/`ai-white`/`ai-black`), `Opponent`(`maia:1500` 꼴), `CoachPreset`, `Hints`, `Takebacks`, `Alerts`, `PracticeMode`(`free`/`drill`/`tabiya`), `OpeningId`, `Termination`, 시계가 있으면 수마다 `%clk`
+  - `games.parse_pgn` 이 PGN 해시로 `source_id` 를 만들기 때문에 같은 수순을 두 번 저장하면 뒤엣것이 "건너뜀"이 된다. 그래서 저장마다 초 단위 UTC 시각과 `PracticeNonce`(uuid4) 헤더를 붙여 매번 새 행이 되게 한다
+  - 수동 게임(`user_color` 가 없는, 양쪽을 손으로 둔 게임)은 사용자를 백, "수동"을 흑으로 적는다. 둘 중 하나가 사용자 이름이어야 `upsert_games` 가 계정에 붙일 수 있고, 백은 그 선택의 임의적인 절반이다. 대국이 아니었다는 사실은 `Mode` 헤더가 말한다
+  - `PlayEngine` 은 풀 밖의 전용 프로세스다. `UCI_Elo` 는 탐색 결과를 바꾸는데 풀 엔진의 캐시 이름(`analysis.cache_name`)에는 그 옵션이 들어가지 않으므로, 약화된 엔진을 풀에 넣으면 분석 캐시가 오염된다. 한 프로세스가 모든 레이팅을 처리하고 Elo 가 바뀔 때만 재설정한다
+  - `chat_turns.game_id` 는 라이브 채팅 때문에 nullable 이 됐다. `create_all` 은 이미 있는 테이블을 고치지 않으므로 시작할 때 `db._allow_live_chat_turns` 가 컬럼을 직접 바꾼다(SQLite 는 테이블 재작성, 그 밖은 `ALTER … DROP NOT NULL`)
+  - 프로필과 오프닝 지도는 `practice` 게임을 기본 제외한다(`?include_practice=1` 로 포함). 퍼즐 생성은 허용한다. `GET /games?source=` 로 걸러 볼 수 있다
+  - 구조 커버리지: 카탈로그 34개 중 24개(**70.6%**)만 `unclassified` 가 아닌 구조로 분류된다. M7b 의 완료 기준 80% 에 못 미친다(→ §8)
+- 테스트: API **384개**(M7 전용 71개 — `test_play_opponent` 14, `test_play_coach` 16, `test_practice` 19, `test_openings_catalog` 14, `test_play_chat` 6, `test_db_migrations` 2. 여기에 `test_e2e`·`test_openings`·`test_games`·`test_review` 의 추가분이 더 있다). 웹은 vitest **62개**(4파일). 그중 `play-state.test.ts` 39개가 리듀서를 덮는다: 커서 뒤에서 두면 잘라내기, 물리기, 책 이탈 감지, 승급, 종료 판정, 시계 틱
+- 실측(2026-09-11, 로컬 종단 스모크)
+  - Maia 상대 수: 첫 요청 1.1초(가중치 로드), 이후 p50 **14ms**. Stockfish 상대는 movetime 0.5초에 왕복 0.5~0.7초
+  - 힌트 L1 **2ms** · L2 **20ms** · L3 **0.2~0.4초**(깊이 12). 실수 판정 `POST /play/check` **0.19초** — 기획의 "2초 이내"를 넉넉히 만족한다
+  - `GET /play/book` 첫 호출 **2.5초**(TSV 3,810줄의 접두사 인덱스), 이후 **2ms**. 지금은 시작할 때 스레드로 미리 만들어(`openings.warm`) 첫 요청도 2ms 다
+  - 저장 `POST /play/games` **31ms**. 18플라이 게임의 분석은 기본 깊이로 약 **85초**
+  - 라이브 채팅 한 답 **25.7초**(도구 3회). M6 리뷰 채팅의 첫 답 56초보다 짧은데 재료가 적어서다
+- 남은 것: 드릴 성공률은 헤더에 남을 뿐 아직 집계되지 않는다. 구조 커버리지 70.6%, 계획 실행 판정과 리포트의 구조 선택에 알려진 오차가 있다(§8). 무승부 수락 기준(±30cp·30수)은 여전히 자리표시자고, 개인 모델 상대와 간격 반복 오프닝 덱은 미결이다
 
 ### 통합 상태 (2026-09-02)
 - 백엔드: `ruff format`·`ruff check`·`mypy --strict` 통과, pytest 271개 약 22초(엔진 테스트는 깊이 ≤ 8). `tests/test_e2e.py`가 TestClient로 임포트 → 분석 → 리뷰 → 프로필 → 오프닝 지도 → 퍼즐 → 스파링을 한 번에 돈다
@@ -162,7 +193,11 @@ PGN/API 임포트
 ## 6. 개발 환경
 
 `scripts/server.sh` 가 아래 명령을 감싼다. 서비스는 각자 프로세스 그룹으로 떠서 `stop` 하면
-uvicorn 의 reload 자식·Stockfish·vite 의 node 까지 함께 내려간다. pid 와 로그는 `.run/` 에 둔다.
+uvicorn 의 reload 자식·Stockfish·vite 의 node 까지 함께 내려간다. pid 와 로그는 `.run/` 에 두고
+**서비스와 포트로 이름을 짓는다**: 기본 포트는 짧은 이름(`.run/api.pid`, `.run/logs/api.log`),
+다른 포트는 포트가 붙는다(`.run/api-8012.pid`, `.run/logs/api-8012.log`). 그래서
+`API_PORT=8012 scripts/server.sh start api` 가 8000 의 서버를 "이미 실행 중"으로 오해하지 않고,
+`stop api` 가 엉뚱한 쪽을 죽이지 않는다. `status`·`logs`·`stop` 모두 같은 규칙을 쓴다.
 
 ```bash
 scripts/server.sh setup [--maia]     # uv sync + pnpm install + 도구 점검
@@ -226,7 +261,7 @@ MIT로 가고 싶다면: chessground 대신 MIT 보드 라이브러리를 쓰고
 **아직 실측하지 않은 경로**
 - LLM 언어화(`services/verbalize.llm_explanation`)는 `ANTHROPIC_API_KEY`가 없어 템플릿 경로만 검증했다. 키를 넣고 LLM → 검증기 → 템플릿 폴백을 실제로 돌려봐야 한다.
 - Postgres 경로(`asyncpg` extra, docker compose)는 미검증이다. 모든 테스트는 SQLite로 돈다. Alembic 마이그레이션도 아직 없다(`create_all`).
-- 웹 단위 테스트가 없다(vitest 미도입). Playwright로 실서버 연결 스모크만 했다.
+- 웹 단위 테스트는 M7에서 vitest로 들어왔지만(4파일 62개) 순수 로직(리듀서·포매터)만 덮는다. 컴포넌트 렌더링 테스트와 Playwright 종단 테스트는 여전히 없고, 화면은 손으로 스모크한다.
 
 **국면 채팅**
 - 새로고침하면 대화가 사라진다(ply 이동과 탭 전환은 유지된다). `chat_turns`에서 복원하는 `GET /chat/sessions/{id}`가 필요하다.
@@ -235,8 +270,17 @@ MIT로 가고 싶다면: chessground 대신 MIT 보드 라이브러리를 쓰고
 - 답이 도구 호출을 다 마친 뒤에야 첫 문장이 나올 때가 있다. 프롬프트는 "보드마다 문단"을 요구하지만 강제는 아니다. 상주 프로세스로 기동 지연을 줄이는 것과 함께 검토한다.
 - 구독 정책: Agent SDK 문서는 서드파티 제품에 claude.ai 로그인을 쓰는 것을 금지한다. 이 채팅은 본인 로컬 도구로만 쓴다. 서비스로 열려면 `ANTHROPIC_API_KEY` 경로(SDK 백엔드)를 추가해야 한다.
 
+**모의 게임 (M7, 2026-09-11 스모크에서 나온 것)**
+- 계획 실행 판정(`plans.match_plans`)이 **준비 수를 실행으로 센다**. 소수 공격의 `b4` 만 두고 `b5` 를 두지 않아도 리포트에는 실행으로 올라간다. 계획마다 "완료 조건"을 따로 두거나 실행을 단계로 나눠야 한다.
+- 리포트의 구조를 `OpeningId` 가 있으면 **무조건 카탈로그 타비야에서** 읽는다(`practice.structure_board`). 드릴에서 타비야에 닿기 전에 이탈해 다른 구조가 됐어도 타비야의 구조와 계획으로 채점한다. 실제로 지나간 국면인지 먼저 확인해야 한다.
+- 카탈로그의 **내 기록이 실제 컬렉션에서 비어 있다**. 임포트 게임은 타비야의 위치 키가 정확히 일치해야 세는데, 609 게임을 훑어 카탈로그 수순과 가장 깊이 겹친 지점이 7플라이였다. 타비야(10~20플라이)까지 닿는 게임이 거의 없다. 접두사 매칭이나 오프닝 이름 매칭으로 바꾸거나, 타비야를 더 얕게 잡아야 한다.
+- 카탈로그 34개 중 **10개가 `unclassified`**(커버리지 70.6%, M7b 기준 80% 미달): 스카치 클래시컬, 시실리안 드래곤, 카로칸 클래시컬, 스칸디나비안, 피르츠, 세미슬라브 메란, 님조 클래시컬, 그륀펠트 익스체인지, 카탈란 오픈, 레티 더블 피안케토. 같은 오프닝의 1~3플라이 깊은 TSV 행으로 바꿔도 하나도 분류되지 않는다(카로칸만 10플라이 더 들어간 ply 24 의 로브론 시스템에서 `slav_caro` 가 된다). 분류기 쪽 문제다: 이 타비야들은 구조를 정하는 폰 교환이 아직 일어나지 않았거나(님조·레티·카탈란), 그 구조가 15종 안에 없다(드래곤·피르츠·그륀펠트 익스체인지). 분류기에 구조를 더하는 편이 카탈로그를 손보는 것보다 낫다.
+- `PlanReport` 에 **분석 상태 필드가 없다**. `GET /play/report/{id}` 는 분석이 끝날 때까지 기다리므로 긴 게임에서 수 분간 막힌다. 프론트는 그래서 `/analysis/{id}` 의 `status === 'done'` 을 보고서야 카드를 띄운다(`ReviewPanel` → `PlanReportCard`). 리포트 자체가 상태를 돌려주는 쪽이 옳다.
+- 라이브 채팅의 `analyse` 도구가 한 번 **엔진 경합으로 타임아웃**했다. 채팅 도구는 깊이 18로 재는데 풀에는 엔진이 2개뿐이라, 같은 시간에 게임 분석이 돌면 도구가 기다리다 끊긴다. 도구 깊이를 낮추거나 풀을 늘려야 한다.
+- **드릴 성공률이 집계되지 않는다.** `PracticeMode`·`OpeningId` 헤더에 재료는 다 있지만 항목별 이탈 지점·성공률을 세는 곳이 없다.
+- **Alembic 은 여전히 없다.** M7 에서 `chat_turns.game_id` 를 nullable 로 바꿔야 했고, `create_all` 이 기존 테이블을 고치지 않으므로 시작할 때 `db._allow_live_chat_turns` 가 손으로 패치한다(SQLite 는 테이블 재작성). 이런 변경이 한 번 더 필요해지면 마이그레이션을 도입한다.
+
 **제품 상 알려진 간극**
-- 승급 시 기물 선택 UI가 없다(자동 퀸). 퍼즐 정답이 언더프로모션이면 정답 기물을 적용한다.
 - 마지막 수에서 저지른 실수(기권 직전)는 다음 국면 분석이 없어 퍼즐이 되지 않는다.
 - 리뷰 캐시(`move_reviews`)는 레이팅과 깊이로만 구분한다. 엔진 버전이 바뀌어도 자동 무효화되지 않는다.
 - 분석은 프로세스 내 워커 한 개로 돈다. 동시 사용자가 늘면 arq + Redis로 분리한다.
