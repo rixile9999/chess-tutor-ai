@@ -56,6 +56,12 @@ class Settings(BaseSettings):
     maia_enabled: bool = True
     default_rating: int = 1500
 
+    play_movetime_seconds: float = 0.5
+    """Thinking time of the Stockfish practice opponent (`engine.PlayEngine`) per move."""
+    play_depth: int = 12
+    """Search depth of the coach's hint and blunder check. Shallow on purpose: both run while
+    the user waits mid-game, and the alert budget in docs/PLAY.md is two seconds."""
+
 
 @lru_cache
 def get_settings() -> Settings:

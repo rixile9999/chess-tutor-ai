@@ -85,12 +85,21 @@ class Backend(Protocol):
 
     def is_available(self) -> bool: ...
 
-    def move_probs(self, fen: str, rating: int, include: Iterable[str] = ()) -> dict[str, float]:
+    def move_probs(
+        self,
+        fen: str,
+        rating: int,
+        include: Iterable[str] = (),
+        opp_rating: int | None = None,
+    ) -> dict[str, float]:
         """SAN -> probability over legal moves, highest first, summing to 1.
 
         ``include`` lists SAN moves whose probability must come from a real evaluation
-        even when they fall outside the backend's usual candidate set. Raises ValueError
-        for a bad FEN or SAN and BackendUnavailable when the backend itself fails.
+        even when they fall outside the backend's usual candidate set. ``opp_rating`` is the
+        rating of the side *not* to move, for a backend that conditions on both players
+        (Maia-2); it defaults to ``rating``, which is what a review of a single player's game
+        wants. Raises ValueError for a bad FEN or SAN and BackendUnavailable when the backend
+        itself fails.
         """
         ...
 
@@ -146,7 +155,13 @@ class RandomBackend:
     def is_available(self) -> bool:
         return True
 
-    def move_probs(self, fen: str, rating: int, include: Iterable[str] = ()) -> dict[str, float]:
+    def move_probs(
+        self,
+        fen: str,
+        rating: int,
+        include: Iterable[str] = (),
+        opp_rating: int | None = None,
+    ) -> dict[str, float]:
         board = chess.Board(fen)
         for san in include:
             board.parse_san(san)
@@ -237,7 +252,14 @@ class EngineBackend:
             raise BackendUnavailable("stockfish returned no lines")
         return scores
 
-    def move_probs(self, fen: str, rating: int, include: Iterable[str] = ()) -> dict[str, float]:
+    def move_probs(
+        self,
+        fen: str,
+        rating: int,
+        include: Iterable[str] = (),
+        opp_rating: int | None = None,
+    ) -> dict[str, float]:
+        """``opp_rating`` is ignored: the softmax only conditions on the mover's rating."""
         board = chess.Board(fen)
         scores = self.scores(board, include)
         if not scores:
@@ -308,7 +330,13 @@ class MaiaBackend:
                 return False
             return True
 
-    def move_probs(self, fen: str, rating: int, include: Iterable[str] = ()) -> dict[str, float]:
+    def move_probs(
+        self,
+        fen: str,
+        rating: int,
+        include: Iterable[str] = (),
+        opp_rating: int | None = None,
+    ) -> dict[str, float]:
         board = chess.Board(fen)
         for san in include:
             board.parse_san(san)
@@ -319,7 +347,11 @@ class MaiaBackend:
         try:
             with self._lock:
                 uci_probs, _win = self._inference.inference_each(
-                    self._model, self._prepared, board.fen(), rating, rating
+                    self._model,
+                    self._prepared,
+                    board.fen(),
+                    rating,
+                    rating if opp_rating is None else opp_rating,
                 )
         except Exception as exc:  # noqa: BLE001 - inference failure -> fallback
             self._error = f"{type(exc).__name__}: {exc}"
@@ -378,14 +410,23 @@ def status() -> dict[str, Any]:
 
 
 def move_probs(
-    fen: str, rating: int, include: Iterable[str] = (), backend: Backend | None = None
+    fen: str,
+    rating: int,
+    include: Iterable[str] = (),
+    backend: Backend | None = None,
+    opp_rating: int | None = None,
 ) -> tuple[dict[str, float], Source]:
-    """Probabilities from the first backend that answers, with its name."""
+    """Probabilities from the first backend that answers, with its name.
+
+    ``opp_rating`` is only passed on when it is given, so a backend written against the older
+    three-argument signature keeps working."""
     chain = [backend] if backend is not None else [b for b in backends() if b.is_available()]
     errors: list[str] = []
     for b in chain:
         try:
-            return b.move_probs(fen, rating, list(include)), b.name
+            if opp_rating is None:
+                return b.move_probs(fen, rating, list(include)), b.name
+            return b.move_probs(fen, rating, list(include), opp_rating), b.name
         except BackendUnavailable as exc:
             errors.append(f"{b.name}: {exc}")
     if backend is None:
@@ -394,14 +435,21 @@ def move_probs(
 
 
 def choose_move(
-    fen: str, rating: int, seed: int | None = None, backend: Backend | None = None
+    fen: str,
+    rating: int,
+    seed: int | None = None,
+    backend: Backend | None = None,
+    opp_rating: int | None = None,
 ) -> tuple[str, str, dict[str, float], Source]:
     """Sample a move for the side to move: (san, uci, probs, source).
+
+    ``opp_rating`` is the rating of the side not to move: playing *against* a user, the model
+    should condition on the user's strength, not on the opponent's own.
 
     Raises ValueError when the FEN is invalid or the game is over.
     """
     board = chess.Board(fen)
-    probs, source = move_probs(fen, rating, backend=backend)
+    probs, source = move_probs(fen, rating, backend=backend, opp_rating=opp_rating)
     if not probs:
         raise ValueError("no legal moves in this position")
     rng = random.Random(seed)

@@ -14,6 +14,7 @@ import weakref
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
+from typing import Protocol
 
 import chess
 import chess.engine
@@ -21,6 +22,10 @@ import chess.engine
 from chess_tutor.config import get_settings
 
 BUSY = "엔진이 모두 사용 중입니다. 잠시 후 다시 시도해 주세요."
+
+ELO_MIN = 1320
+ELO_MAX = 3190
+"""UCI_Elo range of Stockfish 16+; used when the build does not report its own bounds."""
 
 
 class EngineBusy(RuntimeError):
@@ -56,7 +61,13 @@ def _name_from_uci_id(raw: str) -> str:
     return "stockfish"
 
 
-_LIVE_ENGINES: weakref.WeakSet[Engine] = weakref.WeakSet()
+class Closable(Protocol):
+    """Anything holding an engine process that shutdown must quit."""
+
+    def close(self) -> None: ...
+
+
+_LIVE_ENGINES: weakref.WeakSet[Closable] = weakref.WeakSet()
 """Every engine process that has not been quit yet, pooled or not, so shutdown can find them."""
 
 
@@ -126,6 +137,83 @@ class Engine:
             )
         lines.sort(key=lambda line: line.rank)
         return lines
+
+
+class PlayEngine:
+    """A private Stockfish process that *plays* instead of analysing.
+
+    It is deliberately kept out of `pool`: `UCI_LimitStrength`/`UCI_Elo` change what a search
+    returns, and the pooled engines' output is cached under a name that does not mention them
+    (services.analysis.cache_name), so a weakened engine in the pool would poison the cache.
+
+    One process serves every rating: `play` reconfigures it only when the Elo changes. The lock
+    serialises calls the way `maia.EngineBackend` does, because a UCI process handles one search
+    at a time and FastAPI runs the play endpoint in a thread pool.
+    """
+
+    def __init__(self, path: str | None = None) -> None:
+        resolved = path or find_stockfish()
+        if resolved is None:
+            raise RuntimeError("Stockfish not found: set STOCKFISH_PATH or install it on PATH")
+        self._engine = chess.engine.SimpleEngine.popen_uci(resolved)
+        self._closed = False
+        self._elo: int | None = None
+        self._lock = threading.Lock()
+        _LIVE_ENGINES.add(self)
+        self.name = _name_from_uci_id(self._engine.id.get("name", ""))
+
+    def close(self) -> None:
+        if self._closed:
+            return
+        self._closed = True
+        _LIVE_ENGINES.discard(self)
+        try:
+            self._engine.quit()
+        except chess.engine.EngineError:
+            pass
+
+    def __enter__(self) -> PlayEngine:
+        return self
+
+    def __exit__(self, *exc: object) -> None:
+        self.close()
+
+    def elo_range(self) -> tuple[int, int]:
+        """What this build accepts for UCI_Elo (1320-3190 on Stockfish 16+)."""
+        option = self._engine.options.get("UCI_Elo")
+        low = option.min if option is not None and option.min is not None else ELO_MIN
+        high = option.max if option is not None and option.max is not None else ELO_MAX
+        return int(low), int(high)
+
+    def _configure(self, elo: int) -> int:
+        """Set the strength limit when it differs from the one in force; returns the Elo used."""
+        low, high = self.elo_range()
+        elo = max(low, min(high, elo))
+        if elo == self._elo:
+            return elo
+        options: dict[str, str | int | bool | None] = {
+            "UCI_LimitStrength": True,
+            "UCI_Elo": elo,
+        }
+        supported = {k: v for k, v in options.items() if k in self._engine.options}
+        if supported:
+            self._engine.configure(supported)
+        self._elo = elo
+        return elo
+
+    def play(self, board: chess.Board, movetime: float = 0.5, elo: int = 1500) -> chess.Move:
+        """The engine's move for `board`, thinking `movetime` seconds at roughly `elo`.
+
+        Raises ValueError when the position has no move to make, so a finished game answers 422
+        instead of 500."""
+        if not any(board.legal_moves):
+            raise ValueError("no legal moves in this position")
+        with self._lock:
+            self._configure(elo)
+            result = self._engine.play(board, chess.engine.Limit(time=movetime), game=object())
+        if result.move is None:
+            raise RuntimeError("engine returned no move")
+        return result.move
 
 
 class EnginePool:
