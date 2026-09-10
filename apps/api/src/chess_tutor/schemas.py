@@ -460,6 +460,60 @@ class BreakTiming(BaseModel):
     master_median: float | None = None
 
 
+# ---------- opening map: position guide (M8a) ----------
+
+
+class NamedCandidate(BaseModel):
+    """One move the opening book (or the master explorer) knows from a position."""
+
+    san: str
+    uci: str
+    label: str
+    """Move number and SAN, '3.Bb5' or '3…a6' (services.openings_map.move_label)."""
+    fen_after: str
+    name: str = ""
+    eco: str = ""
+    named_here: bool = False
+    """True when the position the move reaches is itself named in the book; otherwise the name
+    is the one of the line the move belongs to."""
+    to_name: list[str] = []
+    """SAN moves still to play before a named position, when the line is forced up to it."""
+    master_games: int | None = None
+    master_score: float | None = None
+    """Master result from the requested colour's point of view, (wins + 0.5 draws) / games."""
+    master_only: bool = False
+    """The book does not know this move; the master explorer does."""
+
+
+class SetupStatus(BaseModel):
+    """How far one system opening (services.setups) has come in a position."""
+
+    id: str
+    name: str
+    side: Color
+    status: Literal["completed", "in_progress", "possible", "blocked"]
+    done: list[str] = []
+    """Target squares already filled, as 'd4' / 'Bf4' / 'O-O'."""
+    remaining: list[str] = []
+    blocked_by: str | None = None
+    """Why the setup is out of reach, in the knowledge base's words."""
+    plans: list[str] = []
+    typical_against: str | None = None
+
+
+class PositionGuide(BaseModel):
+    """Everything the opening map shows about one position, without touching the engine."""
+
+    fen: str
+    side: Color
+    name: str | None = None
+    eco: str | None = None
+    in_book: bool = False
+    structure: StructureInfo
+    candidates: list[NamedCandidate] = []
+    setups: list[SetupStatus] = []
+
+
 # ---------- training ----------
 
 
