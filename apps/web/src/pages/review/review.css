@@ -139,3 +139,5 @@ button.rv-mv:hover { border-color: var(--line-strong); background: rgba(43, 38, 
 }
 
 .rv-report { padding-bottom: 12px; margin-bottom: 12px; border-bottom: 2px solid var(--line); }
+.rv-moves-head .rv-map-link { margin-left: auto; color: var(--good); text-decoration: none; white-space: nowrap; }
+.rv-moves-head .rv-map-link:hover { text-decoration: underline; }

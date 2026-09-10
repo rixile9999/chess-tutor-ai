@@ -142,3 +142,74 @@ export interface PlanReport {
   game_id: number; side: Color; structure: StructureInfo | null; executed: Plan[]; pv_match: Plan[]; later: Plan[]; unavailable: Plan[];
   breaks: string[]; opening_id: string | null; opening_name: string | null; practice_mode: PracticeMode | null; summary: string;
 }
+
+// ---------- openings v2 (M8 오프닝 지도: 국면 정보 · 수 해설 · 깊은 노트) ----------
+export interface NamedCandidate {
+  san: string; uci: string;
+  /** "3.Bb5" / "3…a6" — the move number is part of the string. */
+  label: string;
+  fen_after: string;
+  /** Empty only when nothing names this move; a master-only move that lands in the book keeps its name. */
+  name: string; eco: string;
+  /** The arriving position itself is in the book (otherwise `name` is the line this move belongs to). */
+  named_here: boolean;
+  /** SAN left to the next named position while the line is forced; empty when `named_here`. */
+  to_name: string[];
+  master_games: number | null; master_score: number | null;
+  /** The move comes from the master DB only — I have never played it and the book has no line for it. */
+  master_only: boolean;
+}
+export type SetupState = 'completed' | 'in_progress' | 'possible' | 'blocked';
+export interface SetupStatus {
+  id: string; name: string; side: Color; status: SetupState;
+  /** Placements already on the board / still to come, as "Bf4" · "e3" · "O-O". */
+  done: string[]; remaining: string[];
+  blocked_by: string | null; plans: string[]; typical_against: string | null;
+}
+export interface PositionGuide {
+  fen: string; side: Color;
+  name: string | null; eco: string | null; in_book: boolean;
+  structure: StructureInfo; candidates: NamedCandidate[]; setups: SetupStatus[];
+}
+export interface MoveFact { kind: string; text: string; claims: Claim[]; verified: boolean }
+export interface MoveAnnotation {
+  ply: number; label: string; san: string; uci: string;
+  fen_before: string; fen_after: string;
+  in_book: boolean; name_before: string | null; name_after: string | null; transposition: boolean;
+  /** Only when the move left the book, at most 3. */
+  book_alternatives: NamedCandidate[];
+  facts: MoveFact[];
+  /** One-line summary for the journal (§9.3); the deep prose lives in OpeningNote. */
+  text: string;
+  engine: PlayCheckResponse | null;
+  /** Maia probability of this move at the asked rating, when requested. */
+  naturalness: number | null;
+  verified: boolean; verified_claims: number; total_claims: number;
+}
+export type AnnotateEngine = 'off' | 'off_book' | 'always';
+export interface AnnotateRequest {
+  start_fen?: string; moves_san: string[]; color?: Color; rating?: number;
+  engine?: AnnotateEngine; naturalness?: boolean; depth?: number;
+}
+export interface AnnotateResponse { annotations: MoveAnnotation[] }
+export interface TrapLine {
+  title: string;
+  /** SAN from the position after the annotated move; the server keeps only legal lines. */
+  line_san: string[];
+  text: string;
+}
+export interface OpeningNote {
+  position_key: string; san: string; in_book: boolean;
+  /** 2~3 sentences; [[...]] marks a sentence the verifier confirmed on the board. */
+  summary: string;
+  why: string[];
+  replies: [string, string][]; alternatives: [string, string][];
+  traps: TrapLine[];
+  mine: string | null; engine: string | null;
+  sources: string[];
+  verified_claims: number; total_claims: number;
+  model: string; created_at: string;
+}
+export interface NoteMissing { status: 'missing' }
+export type NoteLookup = OpeningNote | NoteMissing;
+export interface NoteRequest { fen: string; san: string; username?: string | null; regenerate?: boolean }
