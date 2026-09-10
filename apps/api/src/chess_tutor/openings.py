@@ -111,6 +111,16 @@ def _tree() -> dict[str, dict[str, Opening]]:
     return tree
 
 
+def warm() -> None:
+    """Build the TSV tables now rather than on the first request.
+
+    Parsing the 3,810 lines and every prefix of them takes about 2.5 s, which is what the first
+    ``GET /play/book`` used to pay. The API startup runs this on a thread; the caches are
+    ``lru_cache``, so a request arriving meanwhile just builds it itself and both get the same
+    table."""
+    _tree()
+
+
 def next_moves(board: chess.Board) -> list[tuple[chess.Move, Opening]]:
     """Book continuations from this position, sorted by the name they lead to."""
     entries = _tree().get(position_key(board), {})

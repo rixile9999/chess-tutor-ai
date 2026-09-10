@@ -566,7 +566,8 @@ class HintBest(BaseModel):
 class PlayHintRequest(BaseModel):
     fen: str
     level: HintLevel = 1
-    rating: int = 1500
+    rating: int = Field(default=1500, ge=400, le=3200)
+    """Rating the candidates are conditioned on. Bounded so a stray value cannot reach Maia."""
     depth: int | None = None
     start_fen: str | None = None
     moves_san: list[str] = []
@@ -591,7 +592,7 @@ class PlayHintResponse(BaseModel):
 class PlayCheckRequest(BaseModel):
     fen_before: str
     san: str
-    rating: int = 1500
+    rating: int = Field(default=1500, ge=400, le=3200)
     depth: int | None = None
 
 

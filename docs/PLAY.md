@@ -4,6 +4,21 @@
 
 ---
 
+## 0. 구현 상태 (2026-09-11)
+
+아래 기획은 **전부 구현됐다**. 이 문서는 그대로 두고(결정의 근거가 남아야 한다), 실제로 무엇이 들어갔는지와 실측·남은 과제는 [IMPLEMENTATION.md](IMPLEMENTATION.md) §5 의 "M7 모의 게임 — 완료 (2026-09-11)" 와 §8 의 "모의 게임 (M7)" 에 있다.
+
+| 단계 | 상태 | 들어간 것 |
+|---|---|---|
+| **M7a 코어** | 완료 | `/play` 화면과 리듀서(`pages/play/state.ts`), 수동 ↔ AI가 백 ↔ AI가 흑 토글, 물리기·커서 탐색(뒤에서 두면 잘라내기)·종료 판정, 승급 피커(`components/PromotionPicker`, 퍼즐의 자동 퀸도 교체), `POST /play/games` 저장 → `/review/{id}`, `localStorage` 복원, 스파링 탭 → `/play` 링크 |
+| **M7b 오프닝 연습** | 완료 | 카탈로그 34개(`services/openings_catalog.py`, TSV 에서 파생), `GET /play/openings*`·`GET /play/book`, 카탈로그 탭, 타비야 대국, 수순 드릴(이탈 시 책 수와 이유 → 다시 두기 / 그대로 진행), 책 따라가기 화살표, 리뷰의 계획 실행 리포트(`GET /play/report/{id}` → `PlanReportCard`) |
+| **M7c 코치** | 완료 | `POST /play/hint` 3단계, `POST /play/check` 실수 알림(깊이 12, 왕복 0.19초), 코치 프리셋 3종, PGN 헤더 기록(`Hints`/`Takebacks`/`Alerts`/`CoachPreset`), 프로필·오프닝 지도의 `include_practice` |
+| **M7d 확장** | 완료 | `PlayEngine`(Stockfish `UCI_Elo`), Maia `opp_rating` 분리, 시계(`%clk` 저장·증초·시간패), 기권·무승부, 프로필 레퍼토리 구멍 → "연습하기", 라이브 국면 채팅 `POST /play/chat` |
+
+미달한 완료 기준 하나: M7b 의 "항목의 80% 이상이 `unclassified` 가 아닌 구조" 는 **70.6%**(34개 중 24개)에 그쳤다(§4.4).
+
+---
+
 ## 1. 한 줄 요약
 
 보드에서 직접 게임을 두는 화면을 만든다. 양쪽을 손으로 두는 **수동 모드**와, 한쪽을 AI가 맡는 **AI 대국 모드**를 게임 도중 언제든 바꿀 수 있다. 시작 국면은 초기 국면, **오프닝 카탈로그의 타비야**, FEN, 리뷰·오프닝 지도의 국면 중에서 고른다. 게임이 끝나면 저장 → 분석 → 리뷰 → 채팅 → 퍼즐의 기존 파이프라인으로 그대로 흘러간다.
@@ -96,6 +111,8 @@
 | 1.d4 인디언 | 님조 인디언 E32, 퀸즈 인디언 E12, 킹스 인디언 클래시컬 E97, 그륀펠트 익스체인지 D85, 모던 베노니 A60, 카탈란 E04 | KID, 베노니, 행잉 폰, 오픈 센터 |
 | 플랭크 | 잉글리시 대칭(헤지호그) A30, 레티 A05 | 헤지호그, 대칭 d폰 |
 
+실제로 만든 카탈로그는 34개이고, 그중 24개(**70.6%**)만 `structure.classify` 가 `unclassified` 가 아닌 구조로 분류한다. M7b 의 완료 기준 80% 에 못 미친다. 같은 오프닝의 1~3플라이 깊은 TSV 행으로 바꿔 보면 열 개 중 하나도 분류되지 않으므로(카로칸 클래시컬만 10플라이 더 들어간 로브론 시스템에서 `slav_caro` 가 된다) 카탈로그가 아니라 분류기 쪽 문제다. 분류되지 않는 열 개: 스카치 클래시컬, 시실리안 드래곤, 카로칸 클래시컬, 스칸디나비안, 피르츠, 세미슬라브 메란, 님조 클래시컬, 그륀펠트 익스체인지, 카탈란 오픈, 레티 더블 피안케토. 앞의 몇은 구조를 정하는 폰 교환이 타비야에서 아직 일어나지 않았고, 뒤의 몇은 그 구조가 15종 안에 없다.
+
 카탈로그 화면은 가족별 그리드. 각 카드에 `MiniBoard`(타비야), 구조 라벨, 내 기록(오프닝 지도 노드의 games/score, 연습 게임 성적), "백으로/흑으로" 버튼.
 
 **서브모드 두 개.**
@@ -147,8 +164,9 @@
 | `POST /play/check` | `{fen_before, san, rating, depth=12}` | `{classification, win_loss, best_san, pv, reason, claims, verified, computer_move}` | 실수 알림. `EngineCache`로 캐시 |
 | `POST /play/games` | `PracticeGameIn` | `{game_id, analysis_status}` | PGN 조립·저장·분석 큐 |
 | `GET /play/openings` | `?username=` | `OpeningCard[]` | 카탈로그 + 내 기록 |
-| `GET /play/openings/{id}` | | `OpeningDetail{line_san[], tabiya_fen, structure, plans{white,black}, breaks}` | 드릴·타비야 대국 시작 데이터 |
-| `GET /review/{game_id}/plan-report` | | `PlanReport` | 타비야 대국 사후 리포트. 분석 완료 후 |
+| `GET /play/openings/{id}` | | `OpeningDetail{line_san[], tabiya_fen, structure, plans_white[], plans_black[], fens[]}` | 드릴·타비야 대국 시작 데이터. 계획은 `plans_white`/`plans_black` 두 필드로 나갔다(중첩 객체 아님). `fens` 는 수마다의 FEN 이라 드릴이 어느 국면에서 벗어났는지 바로 안다 |
+| `GET /play/report/{game_id}` | | `PlanReport` | 타비야 대국 사후 리포트. 분석 완료 후(구현된 경로는 `/review/…` 가 아니라 `/play/report/…`) |
+| `POST /play/chat` | `LiveChatRequest` | SSE | 저장 전 라이브 국면 채팅(M7d). 이벤트 이름은 M6 리뷰 채팅과 같다: `session`, `text`, `text_end`, `tool`, `tool_args`, `tool_result`, `board`, `limits`, `warning`, `error`, `done`. 세션 키는 FEN 이라 국면이 바뀌면 새 대화가 된다 |
 
 스키마 초안:
 

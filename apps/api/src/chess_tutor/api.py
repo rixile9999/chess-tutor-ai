@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import threading
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -12,6 +13,7 @@ from sqlalchemy.exc import IntegrityError
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from chess_tutor import __version__
+from chess_tutor import openings as openings_book
 from chess_tutor.config import get_settings
 from chess_tutor.db import init_db
 from chess_tutor.engine import pool
@@ -74,6 +76,10 @@ def build_mcp_app() -> ASGIApp:
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     await init_db()
     runner.start()
+    # The opening book (3,810 TSV lines, every prefix indexed) takes ~2.5 s to build and is
+    # only used by /play and /openings. A thread keeps startup instant and makes the first
+    # request cheap; it holds nothing but its own caches, so nothing waits on it.
+    threading.Thread(target=openings_book.warm, name="openings-warm", daemon=True).start()
     mcp_mount.app = build_mcp_app()
     try:
         async with chat_tools.mcp.session_manager.run():
