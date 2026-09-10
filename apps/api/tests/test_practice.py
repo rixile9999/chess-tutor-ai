@@ -157,6 +157,23 @@ def test_start_fen_other_than_the_start_keeps_the_position(client: TestClient) -
     assert [m["san"] for m in stored["moves"]] == ["O-O", "Nbd7", "b4"]
 
 
+def test_a_game_from_a_tabiya_is_still_named(client: TestClient) -> None:
+    """The start position of a tabiya game is itself a named book position, so the ECO and
+    Opening headers (and with them the game row's opening) must come from it - a game that
+    never leaves the tabiya has no move that would name it."""
+    board = chess.Board()
+    for san in CARLSBAD_GAME[:14]:
+        board.push_san(san)
+    body = client.post(
+        "/play/games", json=payload(start_fen=board.fen(), moves_san=["Ne5", "Nbd7", "f4"])
+    ).json()
+    headers = headers_of(body["pgn"])
+    assert headers["ECO"] == "D35"
+    assert "Exchange" in headers["Opening"]
+    stored = client.get(f"/games/{body['game_id']}").json()
+    assert stored["eco"] == "D35" and "Exchange" in stored["opening_name"]
+
+
 def test_bad_start_fen_is_rejected(client: TestClient) -> None:
     res = client.post("/play/games", json=payload(start_fen="not a fen", moves_san=["e4"]))
     assert res.status_code == 422 and "FEN" in res.json()["detail"]

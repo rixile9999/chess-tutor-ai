@@ -13,10 +13,12 @@ from __future__ import annotations
 
 from typing import Annotated
 
+import chess.engine
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from chess_tutor.db import get_session
+from chess_tutor.engine import EngineBusy
 from chess_tutor.schemas import (
     BookMoves,
     OpeningCard,
@@ -36,6 +38,20 @@ from chess_tutor.services import openings_catalog, play_coach, play_opponent, pr
 router = APIRouter(prefix="/play", tags=["play"])
 
 Session = Annotated[AsyncSession, Depends(get_session)]
+
+NO_ENGINE = "엔진을 찾을 수 없습니다. STOCKFISH_PATH를 확인해 주세요."
+ENGINE_DIED = "엔진이 분석 도중 종료됐습니다. 국면을 확인한 뒤 다시 시도해 주세요."
+
+
+def _engine_trouble(exc: RuntimeError) -> HTTPException:
+    """503 for anything the engine itself could not do, the way routers/analysis.py answers:
+    a killed process, a pool with nothing free, or no binary at all. Every one of them is a
+    RuntimeError, so the order of the checks is what tells them apart."""
+    if isinstance(exc, chess.engine.EngineTerminatedError):
+        return HTTPException(status_code=503, detail=ENGINE_DIED)
+    if isinstance(exc, EngineBusy):
+        return HTTPException(status_code=503, detail=str(exc))
+    return HTTPException(status_code=503, detail=NO_ENGINE)
 
 
 @router.get("/_status")
@@ -59,6 +75,8 @@ def hint(req: PlayHintRequest) -> PlayHintResponse:
         return play_coach.hint(req)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise _engine_trouble(exc) from exc
 
 
 @router.post("/check", response_model=PlayCheckResponse)
@@ -68,6 +86,8 @@ def check(req: PlayCheckRequest) -> PlayCheckResponse:
         return play_coach.check(req)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise _engine_trouble(exc) from exc
 
 
 @router.post("/games", response_model=PracticeGameOut, status_code=201)

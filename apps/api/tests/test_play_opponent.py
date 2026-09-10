@@ -17,6 +17,8 @@ from chess_tutor.services import play_opponent
 MOCKUP_FEN = "5rk1/p3bppp/1pq1pn2/3N4/4P3/4B3/PP2QPPP/3R2K1 b - - 4 20"
 MATE_FEN = "R5k1/5ppp/8/8/8/8/8/6K1 b - - 1 1"
 """Black to move after Ra8#: a finished game, so no opponent move exists."""
+ILLEGAL_FEN = "4k3/4R3/8/8/8/8/8/4K3 w - - 0 1"
+"""White to move with Black already in check: unreachable, and Stockfish exits on it."""
 
 needs_engine = pytest.mark.skipif(find_stockfish() is None, reason="stockfish binary not available")
 
@@ -222,3 +224,36 @@ def test_stockfish_falls_back_to_the_human_backend_when_the_binary_is_missing(
     body = res.json()
     assert body["source"] == "random"
     assert body["san"] in _legal_sans(MOCKUP_FEN)
+
+
+def test_position_the_rules_forbid_is_422(client: TestClient, uniform: None) -> None:
+    """Neither opponent may be asked about a position no game can reach."""
+    for kind in ("maia", "stockfish"):
+        res = client.post(
+            "/play/move", json={"fen": ILLEGAL_FEN, "opponent": {"kind": kind, "rating": 1500}}
+        )
+        assert res.status_code == 422, res.text
+        assert "규칙" in res.json()["detail"]
+
+
+def test_a_dead_engine_does_not_close_its_replacement() -> None:
+    """Two games at once: one engine dies, another request has already started a new one.
+    Closing must then take down only the dead process, not the fresh one."""
+
+    class _Fake:
+        def __init__(self) -> None:
+            self.closed = False
+
+        def close(self) -> None:
+            self.closed = True
+
+    dead, fresh = _Fake(), _Fake()
+    play_opponent._engine = fresh  # type: ignore[assignment]
+    try:
+        play_opponent.close_engine(dead)  # type: ignore[arg-type]
+        assert dead.closed and not fresh.closed
+        assert play_opponent._engine is fresh  # type: ignore[comparison-overlap]
+        play_opponent.close_engine(fresh)  # type: ignore[arg-type]
+        assert fresh.closed and play_opponent._engine is None
+    finally:
+        play_opponent._engine = None

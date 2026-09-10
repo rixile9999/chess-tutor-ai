@@ -23,6 +23,9 @@ MOCKUP_FEN = "5rk1/p3bppp/1pq1pn2/3N4/4P3/4B3/PP2QPPP/3R2K1 b - - 4 20"
 SICILIAN_FEN = "rnbqkbnr/pp1ppppp/8/2p5/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2"
 """Quiet opening position where the top three moves are all playable."""
 MATE_FEN = "R5k1/5ppp/8/8/8/8/8/6K1 b - - 1 1"
+ILLEGAL_FEN = "4k3/4R3/8/8/8/8/8/4K3 w - - 0 1"
+"""White to move with Black already in check: a position no game can reach. Stockfish exits
+when it is asked about one, taking a pooled engine with it, so the coach must refuse it."""
 
 needs_engine = pytest.mark.skipif(find_stockfish() is None, reason="stockfish binary not available")
 
@@ -248,3 +251,37 @@ def test_check_rejects_a_bad_fen_and_an_illegal_move(client: TestClient, no_maia
     assert client.post("/play/check", json={"fen_before": "nope", "san": "e4"}).status_code == 422
     res = client.post("/play/check", json={"fen_before": MOCKUP_FEN, "san": "Qxh8", "depth": DEPTH})
     assert res.status_code == 422
+
+
+def test_hint_rejects_a_position_the_rules_forbid(client: TestClient, no_maia: None) -> None:
+    """A rule-breaking FEN must never reach the engine: Stockfish dies on it (the process
+    exits and the pooled engine is thrown away), which used to answer 500."""
+    res = client.post("/play/hint", json={"fen": ILLEGAL_FEN, "level": 3, "depth": DEPTH})
+    assert res.status_code == 422
+    assert "규칙" in res.json()["detail"]
+
+
+def test_check_rejects_a_position_the_rules_forbid(client: TestClient, no_maia: None) -> None:
+    res = client.post(
+        "/play/check", json={"fen_before": ILLEGAL_FEN, "san": "Rxe8", "depth": DEPTH}
+    )
+    assert res.status_code == 422
+    assert "규칙" in res.json()["detail"]
+
+
+def test_a_busy_pool_is_503_not_500(client: TestClient, no_maia: None) -> None:
+    """Every engine checked out is a wait, not a fault; /analysis/position already says so."""
+    import chess_tutor.services.play_coach as coach
+    from chess_tutor.engine import EngineBusy
+
+    class _Busy:
+        def borrow(self) -> object:
+            raise EngineBusy
+
+    original = coach.pool
+    coach.pool = _Busy()  # type: ignore[assignment]
+    try:
+        res = client.post("/play/check", json={"fen_before": SICILIAN_FEN, "san": "Nc6"})
+    finally:
+        coach.pool = original
+    assert res.status_code == 503

@@ -129,17 +129,24 @@ def classify_game(
     """Return the deepest named opening reached and the ply where the game left the book.
 
     The second value is the 0-based index of the first unknown position, or len(moves) when
-    every position is in the book."""
+    every position is in the book.
+
+    A game that starts from a position the book already names (a practice game from a tabiya,
+    an imported "from position" game) takes its name from that position, so it is classified
+    even when none of its own moves reaches a named line. Book depth is compared in absolute
+    plies (`start.ply()` plus the index), because a row's `ply` counts from the standard start
+    while `i` counts from `start`."""
     board = (start or chess.Board()).copy()
-    best: Opening | None = None
     book = _book()
+    base = board.ply()
+    best: Opening | None = book.get(position_key(board))
     left_at = len(moves)
     for i, move in enumerate(moves):
         board.push(move)
         op = book.get(position_key(board))
         if op is not None:
             best = op
-        elif best is not None and i - best.ply >= 3:
+        elif best is not None and base + i - best.ply >= 3:
             left_at = i
             break
     if best is None:

@@ -56,6 +56,10 @@ move this module offers as a natural alternative is never one /play/check would 
 COLOR_KO: dict[Color, str] = {"white": "백", "black": "흑"}
 
 NO_MOVES = "이미 끝난 국면입니다."
+ILLEGAL_POSITION = "체스 규칙에 맞지 않는 국면입니다."
+"""Stockfish dies on a position the rules forbid (a side to move with the opponent already in
+check, two kings of one colour), which would take a pooled engine down with it, so such a FEN
+is refused before the engine sees it - the same guard routers/analysis.py puts on /position."""
 
 
 class _Sentence:
@@ -68,6 +72,14 @@ class _Sentence:
 
 def _side(board: chess.Board) -> Color:
     return "white" if board.turn == chess.WHITE else "black"
+
+
+def _board(fen: str) -> chess.Board:
+    """The position, refused when it breaks the rules. Raises ValueError either way."""
+    board = chess.Board(fen)
+    if not board.is_valid():
+        raise ValueError(ILLEGAL_POSITION)
+    return board
 
 
 def _percent(prob: float) -> str:
@@ -194,7 +206,7 @@ def _best(board: chess.Board, lines: list[EngineLine], probs: dict[str, float]) 
 
 def hint(req: PlayHintRequest) -> PlayHintResponse:
     """What to say at this hint level, with every sentence verified."""
-    board = chess.Board(req.fen)
+    board = _board(req.fen)
     if not any(board.legal_moves):
         raise ValueError(NO_MOVES)
     side = _side(board)
@@ -297,7 +309,7 @@ def _natural_alternative(
 
 def check(req: PlayCheckRequest) -> PlayCheckResponse:
     """Classify the move that was just played, shallow enough to answer mid-game."""
-    board = chess.Board(req.fen_before)
+    board = _board(req.fen_before)
     move = board.parse_san(req.san)
     san = board.san(move)
     pov = _side(board)

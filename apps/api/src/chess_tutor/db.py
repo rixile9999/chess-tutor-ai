@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 
+from sqlalchemy import inspect
+from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -41,6 +43,41 @@ def session_factory() -> async_sessionmaker[AsyncSession]:
     return _session_factory
 
 
+def _allow_live_chat_turns(connection: Connection) -> None:
+    """Let ``chat_turns.game_id`` be NULL on a database made before M7.
+
+    A live practice position has no stored game, so the column became nullable when
+    ``POST /play/chat`` arrived. ``create_all`` never alters a table that already exists, and
+    services.chat.store_turn logs the failure instead of raising, so on an older database every
+    live chat turn was dropped without a word. SQLite cannot drop a NOT NULL in place, hence the
+    rebuild; anything else does it in one statement."""
+    from chess_tutor.models import ChatTurn
+
+    inspector = inspect(connection)
+    if ChatTurn.__tablename__ not in inspector.get_table_names():
+        return
+    columns = {c["name"]: c for c in inspector.get_columns(ChatTurn.__tablename__)}
+    column = columns.get("game_id")
+    if column is None or column["nullable"]:
+        return
+    if connection.dialect.name != "sqlite":
+        connection.exec_driver_sql(
+            f"ALTER TABLE {ChatTurn.__tablename__} ALTER COLUMN game_id DROP NOT NULL"
+        )
+        return
+    table = Base.metadata.tables[ChatTurn.__tablename__]
+    names = ", ".join(c.name for c in table.columns)
+    old = f"{ChatTurn.__tablename__}_pre_m7"
+    for index in inspector.get_indexes(ChatTurn.__tablename__):
+        connection.exec_driver_sql(f'DROP INDEX IF EXISTS "{index["name"]}"')
+    connection.exec_driver_sql(f"ALTER TABLE {ChatTurn.__tablename__} RENAME TO {old}")
+    table.create(connection)
+    connection.exec_driver_sql(
+        f"INSERT INTO {ChatTurn.__tablename__} ({names}) SELECT {names} FROM {old}"
+    )
+    connection.exec_driver_sql(f"DROP TABLE {old}")
+
+
 async def init_db() -> None:
     """Create tables. Alembic migrations come later; create_all is enough while the schema moves."""
     from chess_tutor import models  # noqa: F401  (register tables)
@@ -48,6 +85,7 @@ async def init_db() -> None:
     engine = get_engine()
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        await conn.run_sync(_allow_live_chat_turns)
 
 
 async def reset_engine() -> None:
