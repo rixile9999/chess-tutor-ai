@@ -158,3 +158,5 @@ button.rv-mv:hover { border-color: var(--line-strong); background: rgba(43, 38, 
   .rv-left { width: 100%; max-width: 544px; }
   .rv-moves { max-height: 260px; }
 }
+
+.rv-report { padding-bottom: 12px; margin-bottom: 12px; border-bottom: 2px solid var(--line); }

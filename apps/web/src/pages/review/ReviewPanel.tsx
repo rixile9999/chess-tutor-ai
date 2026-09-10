@@ -2,6 +2,7 @@ import type { Color, GameAnalysis, GameDetail, MoveReviewOut } from '../../api/t
 import { ChatPanel, type BoardMove } from './ChatPanel';
 import { ExplanationPanel } from './ExplanationPanel';
 import { FeaturesPanel } from './FeaturesPanel';
+import { PlanReportCard } from './PlanReportCard';
 import { StrategyPanel } from './StrategyPanel';
 import { sideLabel, type Preview } from './shared';
 
@@ -79,9 +80,12 @@ export function ReviewPanel(p: Props) {
   } else if (tab === 'move') {
     body = <ExplanationPanel review={review} ply={ply} rating={p.rating} boardFen={p.boardFen} preview={p.preview} onPreview={p.onPreview} onSavePuzzle={p.onSavePuzzle} />;
   } else if (tab === 'plan') {
-    body = strategy
+    const perMove = strategy
       ? <StrategyPanel review={review} strategy={strategy} ply={ply} userColor={userColor} rating={p.rating} boardFen={p.boardFen} preview={p.preview} onPreview={p.onPreview} onSavePuzzle={p.onSavePuzzle} />
       : <div className="rv-empty">이 국면에는 전략 정보가 없습니다. 오프닝을 벗어난 중반 국면에서 구조와 계획이 정리됩니다.</div>;
+    // A practice game gets its game-level plan report first (M7): what the student did with
+    // the structure's typical plans over the whole game.
+    body = game.source === 'practice' ? <><PlanReportCard gameId={game.id} />{perMove}</> : perMove;
   } else {
     // Column a of strategy.features is the side that moved (reasoning.strategy_view pov), b the opponent.
     body = <FeaturesPanel features={strategy?.features ?? []} aLabel={sideLabel(review.color)} bLabel={sideLabel(review.color === 'white' ? 'black' : 'white')} />;

@@ -17,7 +17,7 @@ const STATUS: Record<Plan['status'], { label: string; tone: 'good' | 'neutral' |
   unavailable: { label: '지금은 불가', tone: 'bad' },
 };
 
-function PlanRow({ plan }: { plan: Plan }) {
+export function PlanRow({ plan }: { plan: Plan }) {
   const s = STATUS[plan.status] ?? STATUS.later;
   return (
     <div className="rv-plan">
