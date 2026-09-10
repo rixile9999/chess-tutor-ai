@@ -1,0 +1,1084 @@
+<title>오프닝 지도 v2 시안</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Gowun+Batang:wght@400;700&display=swap">
+<style>
+:root {
+  --paper: #f4efe6; --surface: #fcf9f3; --surface-2: #f1ebdf;
+  --ink: #2b2622; --ink-2: #6b6259; --ink-3: #9b9187;
+  --line: #e4dbcb; --line-strong: #cdc1ab;
+  --good: #2478a6; --good-bg: rgba(36,120,166,.10);
+  --bad: #c25a3c; --bad-bg: rgba(194,90,60,.12);
+  --warn: #a8731c; --warn-bg: rgba(168,115,28,.12);
+  --board-light: #ecdfc5; --board-dark: #a98b68;
+  --sel: rgba(36,120,166,.45); --last: rgba(168,115,28,.30);
+  --font-ui: 'IBM Plex Sans KR','Apple SD Gothic Neo','Noto Sans KR',system-ui,sans-serif;
+  --font-display: 'Gowun Batang','Apple Myungjo','Noto Serif KR',Georgia,serif;
+  --font-mono: 'IBM Plex Mono','SF Mono',Menlo,Consolas,monospace;
+  --note: #6a3fb5; --note-bg: rgba(106,63,181,.12);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #1e1b18; --surface: #27231f; --surface-2: #2f2a25;
+    --ink: #ece5d8; --ink-2: #b3a898; --ink-3: #7d746a;
+    --line: #3a342e; --line-strong: #4d453c;
+    --good: #5aa0cc; --good-bg: rgba(90,160,204,.16);
+    --bad: #d97a5c; --bad-bg: rgba(217,122,92,.16);
+    --warn: #d1a04a; --warn-bg: rgba(209,160,74,.16);
+    --board-light: #b9a583; --board-dark: #7a5f45;
+    --sel: rgba(90,160,204,.5); --last: rgba(209,160,74,.32);
+    --note: #b596ea; --note-bg: rgba(181,150,234,.16);
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #1e1b18; --surface: #27231f; --surface-2: #2f2a25;
+  --ink: #ece5d8; --ink-2: #b3a898; --ink-3: #7d746a;
+  --line: #3a342e; --line-strong: #4d453c;
+  --good: #5aa0cc; --good-bg: rgba(90,160,204,.16);
+  --bad: #d97a5c; --bad-bg: rgba(217,122,92,.16);
+  --warn: #d1a04a; --warn-bg: rgba(209,160,74,.16);
+  --board-light: #b9a583; --board-dark: #7a5f45;
+  --sel: rgba(90,160,204,.5); --last: rgba(209,160,74,.32);
+  --note: #b596ea; --note-bg: rgba(181,150,234,.16);
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--font-ui); font-size: 14px; line-height: 1.5; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--good); outline-offset: 2px; }
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.small { font-size: 12px; } .muted { color: var(--ink-2); } .faint { color: var(--ink-3); }
+.mv { font-family: var(--font-mono); font-weight: 500; }
+
+.page { max-width: 1180px; margin: 0 auto; padding-block: 18px 48px; padding-inline: 20px; display: flex; flex-direction: column; gap: 14px; }
+
+/* ---------- intro strip ---------- */
+.intro { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; padding: 10px 14px; border: 1px dashed var(--note); border-radius: 8px; background: var(--note-bg); }
+.intro b { color: var(--note); }
+.intro .keys { display: flex; flex-wrap: wrap; gap: 6px 12px; font-size: 12px; }
+.intro label { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; font-size: 12px; cursor: pointer; }
+.req { display: none; position: absolute; top: -9px; right: 10px; z-index: 3; background: var(--note); color: #fff; font-size: 11px; font-weight: 600; letter-spacing: .04em; padding: 2px 8px; border-radius: 999px; }
+body.show-req .req { display: inline-block; }
+.req.inline { position: static; margin-left: 6px; vertical-align: middle; }
+
+/* ---------- head ---------- */
+.head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; }
+.title { font-family: var(--font-display); font-size: 26px; font-weight: 700; letter-spacing: -.01em; }
+.sub { color: var(--ink-2); }
+.spacer { flex: 1; }
+.controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border: 1px solid var(--line-strong); border-radius: 999px; background: var(--surface); font-size: 12px; }
+.chip .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--good); }
+.seg { display: inline-flex; border: 1px solid var(--line-strong); border-radius: 6px; overflow: hidden; background: var(--surface); }
+.seg button { padding: 4px 12px; font-size: 12px; color: var(--ink-2); }
+.seg button.on { background: var(--ink); color: var(--paper); }
+.chipbtn { height: 26px; padding: 0 10px; border: 1px solid var(--line-strong); border-radius: 999px; background: var(--surface); font-size: 12px; color: var(--ink-2); }
+.chipbtn.on { border-color: var(--ink); color: var(--ink); font-weight: 600; }
+
+/* ---------- cards ---------- */
+.card { position: relative; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+.card-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 10px; }
+.h3 { font-weight: 600; font-size: 15px; }
+.grow { flex: 1; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12px; color: var(--ink-2); padding-top: 6px; border-top: 1px solid var(--line); }
+
+/* ---------- strip ---------- */
+.strip { position: relative; width: 100%; height: 132px; overflow: hidden; border-radius: 6px; background: var(--surface-2); }
+.strip .cell { position: absolute; height: 20px; border-right: 1px solid var(--surface); border-bottom: 1px solid var(--surface); font-size: 11px; line-height: 20px; padding: 0 5px; overflow: hidden; white-space: nowrap; color: #fff; text-align: left; }
+.strip .cell.on-path { outline: 2px solid var(--ink); outline-offset: -2px; }
+.strip .cell.focus { box-shadow: inset 0 0 0 3px var(--paper); }
+
+/* ---------- explore ---------- */
+.explore { display: grid; grid-template-columns: minmax(300px, 440px) minmax(320px, 1fr); gap: 18px 24px; align-items: start; }
+.board-col { display: flex; flex-direction: column; gap: 10px; }
+.board-wrap { position: relative; width: 100%; max-width: 440px; aspect-ratio: 1; }
+.board { display: grid; grid-template-columns: repeat(8, 1fr); grid-template-rows: repeat(8, 1fr); width: 100%; height: 100%; border-radius: 4px; overflow: hidden; box-shadow: 0 1px 0 var(--line-strong); user-select: none; }
+.sq { position: relative; display: flex; align-items: center; justify-content: center; font-size: clamp(22px, 5.2vw, 38px); line-height: 1; cursor: default; }
+.sq.l { background: var(--board-light); } .sq.d { background: var(--board-dark); }
+.sq.last { background-image: linear-gradient(var(--last), var(--last)); }
+.sq.sel { background-image: linear-gradient(var(--sel), var(--sel)); }
+.sq.dest::after { content: ""; position: absolute; width: 26%; height: 26%; border-radius: 50%; background: rgba(0,0,0,.28); }
+.sq.dest.cap::after { width: 84%; height: 84%; background: none; border: 4px solid rgba(0,0,0,.28); box-sizing: border-box; }
+.sq.movable { cursor: grab; }
+.sq .p { font-family: 'Noto Sans Symbols 2', 'Segoe UI Symbol', 'Apple Symbols', 'DejaVu Sans', sans-serif; text-shadow: 0 1px 0 rgba(255,255,255,.25); }
+.sq .p.w { color: #fffdf7; text-shadow: 0 0 2px #3a2f24, 0 0 1px #3a2f24, 0 1px 1px #3a2f24; }
+.sq .p.b { color: #2a221c; }
+.sq .co { position: absolute; font-size: 9px; font-family: var(--font-mono); opacity: .7; }
+.sq .co.f { right: 3px; bottom: 1px; } .sq .co.r { left: 3px; top: 1px; }
+.sq.l .co { color: var(--board-dark); } .sq.d .co { color: var(--board-light); }
+.arrows { position: absolute; inset: 0; pointer-events: none; }
+.board-line { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; min-height: 26px; }
+.board-line .badge { margin-left: 2px; }
+.ctrl { display: flex; flex-wrap: wrap; gap: 6px; }
+.btn { height: 30px; padding: 0 10px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--surface); font-size: 12px; color: var(--ink); display: inline-flex; align-items: center; gap: 6px; }
+.btn:hover { background: var(--surface-2); }
+.btn:disabled { opacity: .45; cursor: default; }
+.btn.primary { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.btn.icon { width: 30px; padding: 0; justify-content: center; }
+
+.badge { display: inline-flex; align-items: center; height: 20px; padding: 0 7px; border-radius: 4px; font-size: 11px; font-weight: 600; letter-spacing: .01em; white-space: nowrap; }
+.badge.good { background: var(--good-bg); color: var(--good); }
+.badge.bad { background: var(--bad-bg); color: var(--bad); }
+.badge.warn { background: var(--warn-bg); color: var(--warn); }
+.badge.neutral { background: var(--surface-2); color: var(--ink-2); border: 1px solid var(--line); }
+.badge.dashed { border: 1px dashed var(--line-strong); background: none; color: var(--ink-2); }
+
+/* candidates */
+.cands { display: flex; flex-direction: column; gap: 8px; }
+.cand-head { display: flex; align-items: baseline; gap: 8px; }
+.cand-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(212px, 1fr)); gap: 8px; max-height: 372px; overflow-y: auto; overscroll-behavior: contain; padding: 2px 6px 2px 2px; scrollbar-gutter: stable; }
+.cand-wrap { position: relative; }
+.cand-wrap::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 28px; background: linear-gradient(to bottom, transparent, var(--surface)); pointer-events: none; border-radius: 0 0 8px 8px; }
+.cand-wrap.end::after { display: none; }
+.sortseg { display: inline-flex; border: 1px solid var(--line-strong); border-radius: 6px; overflow: hidden; background: var(--surface); margin-left: auto; }
+.sortseg button { padding: 3px 9px; font-size: 12px; color: var(--ink-2); }
+.sortseg button.on { background: var(--ink); color: var(--paper); }
+.cand { display: grid; grid-template-columns: 72px 1fr; gap: 9px; padding: 7px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); text-align: left; align-items: start; transition: border-color .12s, transform .12s; }
+.cand:hover { border-color: var(--ink-3); transform: translateY(-1px); }
+.cand.master { border-style: dashed; }
+.cand .mini { width: 72px; height: 72px; }
+.cand .meta { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.cand .row { display: flex; align-items: baseline; gap: 6px; }
+.cand .lbl { font-size: 14px; }
+.cand .name { color: var(--ink); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cand .name.via { color: var(--ink-2); font-weight: 400; }
+.cand .eco { color: var(--ink-3); font-size: 11px; }
+.rec { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink-2); }
+.bar { width: 56px; height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.bar i { display: block; height: 100%; }
+.more { align-self: flex-start; font-size: 12px; color: var(--ink-2); padding: 4px 8px; border-radius: 6px; }
+.more:hover { background: var(--surface-2); }
+.empty { padding: 14px; border: 1px dashed var(--line-strong); border-radius: 8px; color: var(--ink-2); font-size: 13px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+
+.mini { display: grid; grid-template-columns: repeat(8, 1fr); grid-template-rows: repeat(8, 1fr); border-radius: 3px; overflow: hidden; }
+.mini span { display: flex; align-items: center; justify-content: center; font-size: 9px; line-height: 1; font-family: 'Noto Sans Symbols 2', 'Segoe UI Symbol', 'Apple Symbols', sans-serif; }
+.mini span.l { background: var(--board-light); } .mini span.d { background: var(--board-dark); }
+.mini span.w { color: #fffdf7; text-shadow: 0 0 1px #3a2f24, 0 0 1px #3a2f24; } .mini span.b { color: #2a221c; }
+.mini span.hl { box-shadow: inset 0 0 0 20px var(--last); }
+
+/* setups */
+.setups { display: flex; flex-direction: column; gap: 8px; }
+.setup { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; padding: 8px 10px; border-radius: 8px; background: var(--surface-2); }
+.setup .nm { font-weight: 600; }
+.setup .prog { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink-2); }
+.setup .pips { display: inline-flex; gap: 2px; }
+.setup .pips i { width: 9px; height: 9px; border-radius: 2px; background: var(--line-strong); }
+.setup .pips i.on { background: var(--good); }
+.setup .pips i.bad { background: var(--bad); }
+.setup .rest { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 4px; font-size: 12px; color: var(--ink-2); }
+.setup .rest .mv { padding: 1px 6px; border: 1px solid var(--line); border-radius: 4px; background: var(--surface); }
+.setup .rest .mv.done { text-decoration: line-through; color: var(--ink-3); }
+.setup .plan { grid-column: 1 / -1; font-size: 12px; color: var(--ink-2); }
+.setup.blocked { opacity: .8; }
+.setup.blocked .why { grid-column: 1 / -1; font-size: 12px; color: var(--bad); }
+.setup.completed { outline: 1px solid var(--good); }
+
+/* journal */
+.journal { display: flex; flex-direction: column; gap: 2px; }
+.entry { display: grid; grid-template-columns: 74px 1fr auto; gap: 4px 12px; padding: 8px 10px; border-radius: 8px; text-align: left; align-items: start; border: 1px solid transparent; }
+.entry:hover { background: var(--surface-2); }
+.entry.cur { border-color: var(--line-strong); background: var(--surface-2); }
+.entry.future { opacity: .55; }
+.entry .lab { font-size: 15px; padding-top: 1px; }
+.entry .body { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.entry .tags { display: flex; flex-wrap: wrap; gap: 4px; }
+.entry .txt { max-width: 68ch; }
+.entry .txt.pending { color: var(--ink-3); font-style: italic; }
+.entry .eng { font-size: 12px; color: var(--ink-2); padding: 6px 8px; border-left: 3px solid var(--line-strong); background: var(--surface); border-radius: 0 6px 6px 0; }
+.entry .eng.bad { border-left-color: var(--bad); }
+.entry .eng.warn { border-left-color: var(--warn); }
+.entry .eng.ok { border-left-color: var(--good); }
+.entry .acts { display: flex; gap: 4px; }
+.entry .acts .btn { height: 26px; font-size: 11px; }
+.entry.rewind { grid-template-columns: 74px 1fr; color: var(--ink-2); font-size: 12px; padding-block: 4px; }
+.entry.rewind .lab { color: var(--ink-3); font-size: 13px; }
+.entry.jump { grid-template-columns: 74px 1fr; color: var(--ink-2); font-size: 12px; padding-block: 4px; }
+.jhead .small { margin-left: auto; }
+
+/* below */
+.below { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.below .card { opacity: .85; }
+.heat { display: grid; grid-template-columns: repeat(8, 16px); grid-template-rows: repeat(8, 16px); gap: 1px; }
+.heat i { display: block; background: var(--board-light); } .heat i.d { background: var(--board-dark); }
+.brk { display: flex; flex-direction: column; gap: 4px; font-size: 12px; }
+.brk div { display: grid; grid-template-columns: 52px 1fr; gap: 8px; align-items: center; }
+.brk b { height: 8px; border-radius: 4px; background: var(--good-bg); position: relative; display: block; }
+.brk b::after { content: ""; position: absolute; top: -2px; width: 3px; height: 12px; background: var(--good); left: var(--x); }
+
+/* explanation panel beside the board */
+.explore { grid-template-columns: minmax(300px, 440px) minmax(360px, 1fr); }
+.explain { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.explain-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.explain-head .lab { font-size: 22px; font-family: var(--font-display); font-weight: 700; }
+.explain-head .lab .mv { font-family: var(--font-mono); font-weight: 500; font-size: 20px; }
+.depth { display: inline-flex; border: 1px solid var(--line-strong); border-radius: 6px; overflow: hidden; background: var(--surface); margin-left: auto; }
+.depth button { padding: 3px 10px; font-size: 12px; color: var(--ink-2); }
+.depth button.on { background: var(--ink); color: var(--paper); }
+.summary { font-size: 15px; line-height: 1.65; max-width: 62ch; }
+.sec { border-top: 1px solid var(--line); }
+.sec summary { list-style: none; display: flex; align-items: center; gap: 8px; padding: 9px 0; cursor: pointer; font-weight: 600; }
+.sec summary::-webkit-details-marker { display: none; }
+.sec summary::before { content: "▸"; color: var(--ink-3); font-size: 11px; transition: transform .12s; }
+.sec[open] summary::before { transform: rotate(90deg); }
+.sec summary .n { font-weight: 400; color: var(--ink-3); font-size: 12px; }
+.sec .body { display: flex; flex-direction: column; gap: 8px; padding-bottom: 12px; max-width: 64ch; line-height: 1.65; }
+.sec p { margin: 0; }
+.v { border-bottom: 1px dotted var(--good); }
+.v::after { content: "✓"; font-size: 10px; color: var(--good); margin-left: 2px; vertical-align: super; }
+.alt { display: grid; grid-template-columns: 64px 1fr; gap: 8px; align-items: baseline; }
+.alt .mv { font-size: 14px; }
+.alt.good .mv { color: var(--good); }
+.trap { padding: 8px 10px; border-radius: 8px; background: var(--surface-2); display: flex; flex-direction: column; gap: 6px; }
+.trap .tt { font-weight: 600; }
+.trap .steps { display: flex; flex-wrap: wrap; gap: 4px; }
+.trap .steps button { padding: 1px 7px; border: 1px solid var(--line); border-radius: 4px; background: var(--surface); font-family: var(--font-mono); font-size: 12px; }
+.trap .steps button.on { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.sources { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding-top: 8px; border-top: 1px solid var(--line); font-size: 12px; color: var(--ink-2); }
+.sources .badge { font-weight: 500; }
+.gen { display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px dashed var(--line-strong); border-radius: 8px; color: var(--ink-2); }
+.preview-chip { position: absolute; top: 8px; left: 8px; z-index: 2; background: var(--ink); color: var(--paper); font-size: 11px; padding: 2px 8px; border-radius: 999px; }
+.entry .txt { max-width: 68ch; }
+.entry .txt.brief { color: var(--ink-2); }
+.entry .detail { font-size: 12px; color: var(--good); white-space: nowrap; }
+
+@media (max-width: 900px) {
+  .explore { grid-template-columns: 1fr; }
+  .below { grid-template-columns: 1fr; }
+  .entry { grid-template-columns: 62px 1fr; }
+  .entry .acts { grid-column: 2; }
+}
+@media (prefers-reduced-motion: reduce) { .cand { transition: none; } }
+</style>
+
+<div class="page">
+  <div class="intro">
+    <span><b>시안</b> · 오프닝 지도 v2. 실제로 눌러 볼 수 있습니다: 보드에서 수를 두거나 오른쪽 후보 카드를 누르세요. 데이터(내 기록·마스터·엔진 판정)는 <b>예시 값</b>입니다.</span>
+    <span class="keys">
+      <span>① 메인 보드</span><span>② 다음 네임드 국면</span><span>③ 의도 해설(보드 옆 패널 + 일지 색인)</span><span>④ 책 밖 수 해설</span><span>⑤ 셋업 플레이</span>
+    </span>
+    <label><input type="checkbox" id="reqToggle" checked> 요구사항 번호 표시</label>
+  </div>
+
+  <div class="head">
+    <div class="title">오프닝 지도</div>
+    <span class="sub" id="subtitle">백 · 내 286판 위에 책과 마스터 DB를 겹침</span>
+    <div class="spacer"></div>
+    <div class="controls">
+      <span class="chip"><span class="dot"></span><span class="mono">rixile</span></span>
+      <div class="seg" role="group" aria-label="색">
+        <button type="button" class="on" id="colW">백</button><button type="button" id="colB">흑</button>
+      </div>
+      <span class="small muted">최소 판수</span>
+      <button type="button" class="chipbtn on">2</button><button type="button" class="chipbtn">3</button><button type="button" class="chipbtn">5</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <span class="h3">레퍼토리 개요</span>
+      <span class="small muted">그대로. 칸을 누르면 아래 보드가 그 수순으로 점프하고, 그 수순 전체가 일지에 한꺼번에 붙습니다</span>
+      <div class="grow"></div>
+      <span class="small faint mono" id="stripMeta"></span>
+    </div>
+    <div class="strip" id="strip" aria-label="아이시클 개요"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <span class="h3">국면 탐색</span>
+      <span class="small muted">보드에서 직접 두거나 후보를 누르세요. 책에 없는 수도 둘 수 있습니다</span>
+      <div class="grow"></div>
+      <span class="small faint mono" id="urlHint">/openings?color=white&amp;moves=</span>
+    </div>
+    <div class="explore">
+      <div class="board-col">
+        <div class="board-wrap">
+          <span class="req">① 메인 보드</span>
+          <div class="board" id="board" tabindex="0" aria-label="메인 보드"></div>
+          <svg class="arrows" id="arrows" viewBox="0 0 8 8"></svg>
+        </div>
+        <div class="board-line" id="posLine"></div>
+        <div class="ctrl">
+          <button type="button" class="btn icon" id="btnFirst" title="처음">⏮</button>
+          <button type="button" class="btn icon" id="btnPrev" title="이전">◀</button>
+          <button type="button" class="btn icon" id="btnNext" title="다음">▶</button>
+          <button type="button" class="btn icon" id="btnLast" title="끝">⏭</button>
+          <button type="button" class="btn" id="btnFlip">뒤집기</button>
+          <button type="button" class="btn" id="btnReset">새 수순</button>
+          <div class="grow"></div>
+          <button type="button" class="btn primary" id="btnPlay">여기서부터 두기 →</button>
+        </div>
+        <div class="card-head" style="margin-top:6px; position:relative">
+          <span class="h3">셋업</span>
+          <span class="small muted" id="setupSide"></span>
+          <span class="req">⑤ 셋업 플레이</span>
+        </div>
+        <div class="setups" id="setups"></div>
+      </div>
+
+      <div class="explain" id="explain" style="position:relative">
+        <span class="req">③ 의도 해설 · 깊이 조절</span>
+      </div>
+    </div>
+
+    <div class="cands" style="position:relative; padding-top: 12px; border-top: 1px solid var(--line)">
+      <div class="cand-head">
+        <span class="h3">다음 갈 수 있는 네임드 국면</span>
+        <span class="small muted" id="candMeta"></span>
+        <span class="req">② 후보 국면</span>
+        <div class="sortseg" role="group" aria-label="정렬" id="candSort">
+          <button type="button" data-sort="mine" class="on">내 판수</button><button type="button" data-sort="master">마스터</button><button type="button" data-sort="name">이름</button>
+        </div>
+      </div>
+      <div class="cand-wrap" id="candWrap"><div class="cand-list" id="cands"></div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head jhead">
+      <span class="h3">해설 일지</span>
+      <span class="small muted">둔 수의 시간순 색인. 한 줄 요약만 두고, 항목을 누르면 보드가 그 국면으로 가며 옆의 해설 패널이 그 수의 깊은 해설로 바뀝니다. 되돌아가 다른 수를 두면 ↶ 항목이 덧붙고 이전 항목은 지워지지 않습니다</span>
+      <span class="req">③ 일지(색인) · ④ 책 밖 수</span>
+    </div>
+    <div class="journal" id="journal"></div>
+  </div>
+
+  <div class="below">
+    <div class="card">
+      <div class="card-head"><span class="h3">기물 목적지</span><span class="small muted">15수까지 · 변경 없음</span></div>
+      <div class="heat" id="heat"></div>
+    </div>
+    <div class="card">
+      <div class="card-head"><span class="h3">폰 브레이크 시점</span><span class="small muted">백 · 변경 없음</span></div>
+      <div class="brk">
+        <div><span class="mono">e4-e5</span><b style="--x:38%"></b></div>
+        <div><span class="mono">d4-d5</span><b style="--x:55%"></b></div>
+        <div><span class="mono">f4-f5</span><b style="--x:70%"></b></div>
+        <div><span class="mono">c4-c5</span><b style="--x:46%"></b></div>
+        <div><span class="mono">b2-b4</span><b style="--x:30%"></b></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+<script>
+(function () {
+  'use strict';
+  // ---------- sample book: lines with names, my record (games, score), master score, naturalness, intent text ----------
+  // Only the text and numbers are hand-written for this mockup; in the product they come from the TSV, the map DAG,
+  // the Lichess explorer and the intent detectors.
+  const LINES = [
+    ['e4', '킹즈 폰 오프닝', 'B00', 212, .53, .55, 44, '중앙 d5·f5를 통제하고 f1 비숍과 퀸의 길을 엽니다.', ['중앙', '전개 준비']],
+    ['d4', '퀸즈 폰 오프닝', 'D00', 61, .49, .55, 35, '중앙 c5·e5를 통제하고 c1 비숍의 길을 엽니다. d4 폰은 퀸이 지킵니다.', ['중앙', '전개 준비']],
+    ['c4', '잉글리시 오프닝', 'A10', 9, .44, .56, 9, 'd5를 옆에서 통제합니다. 중앙 폰을 아껴 두고 피안케토로 갈 준비.', ['중앙']],
+    ['Nf3', '주커토르트 오프닝', 'A04', 4, .50, .55, 8, 'e5·d4를 통제하며 기물부터 전개합니다. 어느 구조로도 갈 수 있는 수.', ['전개', '중앙']],
+    ['e4 e5', '킹즈 폰 게임', 'C20', 120, .55, .53, 0, '같은 방식으로 맞서 d4·f4를 통제하고 e4 폰의 전진을 막습니다.', ['중앙']],
+    ['e4 c5', '시실리안 디펜스', 'B20', 58, .48, .52, 0, 'd4를 옆에서 노려 백의 d4 전진에 c파일 교환으로 답할 준비. 비대칭 구조를 택합니다.', ['중앙']],
+    ['e4 e6', '프렌치 디펜스', 'C00', 20, .50, .53, 0, '…d5로 e4에 도전할 준비를 합니다. c8 비숍은 폰 사슬 뒤에 남습니다.', ['중앙 준비']],
+    ['e4 c6', '카로칸 디펜스', 'B10', 10, .40, .52, 0, '…d5로 e4에 도전하되 c8 비숍의 길은 열어 둡니다.', ['중앙 준비']],
+    ['e4 e5 Nf3', '킹즈 나이트 오프닝', 'C40', 118, .55, .54, 62, 'e5 폰을 공격하며 첫 기물을 전개합니다. 캐슬링 준비.', ['전개', '공격 e5']],
+    ['e4 e5 Bc4', '비숍 오프닝', 'C23', 2, .50, .53, 8, 'f7을 겨누는 대각선에 비숍을 놓습니다.', ['전개']],
+    ['e4 e5 Nc3', '비엔나 게임', 'C25', 0, 0, .52, 6, 'e4를 지키며 전개. f4 전진을 준비합니다.', ['전개']],
+    ['e4 e5 Nf3 Nc6', '킹즈 나이트 오프닝: 노멀', 'C44', 96, .56, .54, 0, 'e5를 지킵니다. f3 나이트가 노리는 e5에 수비를 하나 더합니다.', ['전개', '수비 e5']],
+    ['e4 e5 Nf3 Nf6', '페트로프 디펜스', 'C42', 14, .50, .53, 0, 'e5를 지키는 대신 e4를 맞공격합니다. 대칭으로 긴장을 만듭니다.', ['전개', '공격 e4']],
+    ['e4 e5 Nf3 d6', '필리도르 디펜스', 'C41', 6, .58, .55, 0, '폰으로 e5를 지킵니다. f8 비숍의 길이 좁아집니다.', ['수비 e5']],
+    ['e4 e5 Nf3 Nc6 Bb5', '루이 로페즈', 'C60', 41, .56, .56, 47, 'e5를 지키는 c6 나이트를 공격해 e5의 수비를 흔듭니다. 두 번째 기물 전개, 캐슬링 준비 완료.', ['⚑ 이름', '공격 c6', '전개']],
+    ['e4 e5 Nf3 Nc6 Bc4', '이탈리안 게임', 'C50', 30, .48, .54, 33, 'f7을 겨누는 대각선에 비숍을 놓습니다. 이탈리안 배치 3/6.', ['⚑ 이름', '전개', '셋업']],
+    ['e4 e5 Nf3 Nc6 d4', '스카치 게임', 'C44', 12, .50, .54, 12, 'e5 폰과 곧바로 부딪혀 중앙을 엽니다. …exd4 뒤 Nxd4로 중앙 나이트를 세웁니다.', ['⚑ 이름', '긴장', '중앙']],
+    ['e4 e5 Nf3 Nc6 Nc3', '쓰리 나이츠 오프닝', 'C46', 5, .60, .53, 5, 'e4를 지키며 전개. 조용한 수.', ['전개']],
+    ['e4 e5 Nf3 Nc6 c3', '폰지아니 오프닝', 'C44', 0, 0, .52, 2, 'd4 전진을 폰으로 받칠 준비. 전개가 한 수 늦습니다.', ['중앙 준비']],
+    ['e4 e5 Nf3 Nc6 Bb5 a6', '루이 로페즈: 모피 방어', 'C70', 30, .55, .56, 71, '비숍에게 물러설지(Ba4) 바꿀지(Bxc6) 묻습니다.', ['⚑ 이름', '질문']],
+    ['e4 e5 Nf3 Nc6 Bb5 Nf6', '루이 로페즈: 베를린 방어', 'C65', 6, .42, .55, 14, 'e4를 맞공격하며 전개. 백이 O-O로 e4를 내주면 …Nxe4로 엔드게임 계열.', ['⚑ 이름', '공격 e4']],
+    ['e4 e5 Nf3 Nc6 Bb5 d6', '루이 로페즈: 스타이니츠 방어', 'C62', 2, .50, .53, 5, '폰으로 e5를 굳힙니다. 수동적이지만 단단합니다.', ['⚑ 이름', '수비 e5']],
+    ['e4 e5 Nf3 Nc6 Bb5 Bc5', '루이 로페즈: 클래시컬', 'C64', 2, .50, .53, 6, 'g1-a7 대각선에 비숍을 두어 캐슬링 뒤 f2를 겨눕니다.', ['⚑ 이름', '전개']],
+    ['e4 e5 Nf3 Nc6 Bb5 Nd4', '루이 로페즈: 버드 방어', 'C61', 0, 0, .52, 1, 'f3 나이트와 맞바꾸기를 제안합니다. 드문 수.', ['⚑ 이름']],
+    ['e4 e5 Nf3 Nc6 Bb5 a6 Ba4', '루이 로페즈: 모피 방어', 'C70', 26, .56, .56, 82, '핀 압박을 유지하며 물러섭니다. …b5로 다시 쫓기면 Bb3에서 f7 대각선을 얻습니다.', ['후퇴', '압박 유지']],
+    ['e4 e5 Nf3 Nc6 Bb5 a6 Bxc6', '루이 로페즈: 익스체인지', 'C68', 4, .50, .55, 15, '비숍을 나이트와 바꿔 흑 폰 구조를 더블 폰으로 만듭니다(c6·c7). 계획: d4 교환 뒤 폰 다수 엔드게임.', ['⚑ 이름', '교환', '구조']],
+    ['e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Nf6', '루이 로페즈: 모피 방어', 'C78', 22, .55, .56, 61, 'e4를 공격하며 전개. 백이 O-O로 e4를 내버려 두면 오픈 변화.', ['전개', '공격 e4']],
+    ['e4 e5 Nf3 Nc6 Bb5 a6 Ba4 d6', '루이 로페즈: 모던 스타이니츠', 'C71', 3, .33, .54, 9, 'e5를 폰으로 굳히고 …b5·…Na5로 비숍을 쫓을 준비.', ['⚑ 이름', '수비 e5']],
+    ['e4 e5 Nf3 Nc6 Bb5 a6 Ba4 b5', '루이 로페즈: 모피 방어, 카로 변화', 'C70', 1, 0, .55, 7, '비숍을 b3로 쫓아 c4·f7 대각선으로 보냅니다. 퀸사이드 폰이 앞서 나갑니다.', ['⚑ 이름', '템포']],
+    ['e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Nf6 O-O', '루이 로페즈: 클로즈드', 'C84', 20, .55, .57, 73, '킹을 안전하게 옮깁니다. e4는 Re1로 되찾을 준비. 클로즈드 계열로.', ['⚑ 이름', '캐슬링']],
+    ['e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Nf6 d3', '루이 로페즈: 모피 방어, 앤더슨 변화', 'C77', 2, .50, .54, 12, 'e4를 폰으로 지켜 마샬 어택 계열을 피합니다. 느린 계획.', ['⚑ 이름', '수비 e4']],
+    ['e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Nf6 O-O Be7', '루이 로페즈: 클로즈드', 'C84', 15, .57, .57, 58, '캐슬링 준비. e5를 지키는 나이트를 핀에서 풀기 위해 …b5도 준비합니다.', ['전개']],
+    ['e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Nf6 O-O Nxe4', '루이 로페즈: 오픈', 'C80', 5, .50, .55, 20, 'e4 폰을 잡습니다. 백은 d4로 중앙을 열어 되찾습니다. 오픈 변화.', ['⚑ 이름', '잡기']],
+    ['e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Nf6 O-O Be7 Re1', '루이 로페즈: 클로즈드', 'C84', 12, .58, .57, 66, 'e4를 룩으로 지킵니다. 이제 Bxc6 뒤 Nxe5 위협이 살아납니다.', ['수비 e4', '위협']],
+    ['e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Nf6 O-O Be7 Re1 b5', '루이 로페즈: 클로즈드', 'C84', 11, .59, .57, 84, '비숍을 쫓아 Nxe5 위협을 없앱니다. 퀸사이드 공간을 얻습니다.', ['템포', '수비']],
+    ['e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Nf6 O-O Be7 Re1 b5 Bb3', '루이 로페즈: 클로즈드', 'C84', 11, .59, .57, 98, 'f7 대각선으로 물러섭니다. d5 공격이 다음 계획.', ['후퇴']],
+    ['e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Nf6 O-O Be7 Re1 b5 Bb3 d6', '루이 로페즈: 클로즈드', 'C84', 9, .61, .57, 72, 'e5를 굳히고 c8 비숍의 길을 엽니다. …Na5로 b3 비숍을 노릴 준비.', ['수비 e5']],
+    ['e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Nf6 O-O Be7 Re1 b5 Bb3 d6 c3', '루이 로페즈: 클로즈드', 'C84', 9, .61, .57, 79, 'd4 전진을 받치고 b3 비숍의 퇴로(c2)를 만듭니다. …Na5에 대비.', ['중앙 준비', '예방']],
+    ['e4 e5 Nf3 Nc6 Bc4 Bc5', '지오코 피아노', 'C50', 22, .50, .54, 52, '같은 대각선으로 맞섭니다. f2 겨눔.', ['⚑ 이름', '전개']],
+    ['e4 e5 Nf3 Nc6 Bc4 Nf6', '투 나이츠 디펜스', 'C55', 8, .44, .53, 38, 'e4를 공격하며 전개. Ng5의 f7 공격을 허용하는 날카로운 선택.', ['⚑ 이름', '공격 e4']],
+    ['e4 e5 Nf3 Nc6 Bc4 Bc5 c3', '지오코 피아노: 메인', 'C53', 14, .50, .54, 41, 'd4 전진을 받칩니다. 중앙 폰 둘로 c5 비숍을 밀어낼 계획.', ['중앙 준비']],
+    ['e4 e5 Nf3 Nc6 Bc4 Bc5 d3', '지오코 피아니시모', 'C50', 6, .50, .55, 30, 'e4를 폰으로 지켜 천천히 갑니다. 이탈리안 배치 5/6.', ['⚑ 이름', '셋업']],
+    ['e4 e5 Nf3 Nc6 Bc4 Bc5 b4', '에반스 갬빗', 'C51', 2, .50, .52, 6, '폰을 내어 주고 c3·d4로 중앙을 차지할 템포를 삽니다.', ['⚑ 이름', '갬빗']],
+    ['d4 d5', '퀸즈 폰 게임', 'D00', 40, .50, .55, 0, '같은 방식으로 맞서 e4를 막습니다.', ['중앙']],
+    ['d4 Nf6', '인디언 디펜스', 'A45', 18, .47, .55, 0, 'e4를 막으며 전개. 폰 구조는 나중에 정합니다.', ['전개']],
+    ['d4 d5 c4', '퀸즈 갬빗', 'D06', 25, .50, .56, 58, 'd5에 긴장을 만듭니다. 잡히면 e4를 얻고, 안 잡히면 c파일을 엽니다.', ['⚑ 이름', '긴장']],
+    ['d4 d5 Bf4', '런던 시스템', 'D02', 10, .55, .54, 21, 'e3보다 먼저 비숍을 폰 사슬 밖으로 꺼냅니다. 런던 배치 2/7.', ['⚑ 이름', '셋업', '전개']],
+    ['d4 d5 Nf3', '퀸즈 폰 게임: 주커토르트', 'D02', 5, .40, .55, 17, '전개부터. 콜레·런던·카탈란 어느 쪽으로도 갈 수 있습니다.', ['전개']],
+    ['d4 d5 c4 e6', '퀸즈 갬빗 디클라인드', 'D30', 15, .53, .55, 0, 'd5를 폰으로 받칩니다. c8 비숍은 뒤에 남습니다.', ['⚑ 이름', '수비 d5']],
+    ['d4 d5 c4 c6', '슬라브 디펜스', 'D10', 6, .42, .55, 0, 'd5를 받치되 c8 비숍의 길은 열어 둡니다.', ['⚑ 이름', '수비 d5']],
+    ['d4 d5 c4 dxc4', '퀸즈 갬빗 억셉티드', 'D20', 4, .50, .55, 0, '폰을 잡고 중앙을 내어 줍니다. 백은 e4로 넓은 중앙을 얻습니다.', ['⚑ 이름', '잡기']],
+    ['d4 d5 Bf4 Nf6', '런던 시스템', 'D02', 8, .56, .54, 0, '전개. 백의 런던 배치를 그대로 두고 …c5로 d4를 흔들 준비.', ['전개']],
+    ['d4 d5 Bf4 c5', '런던 시스템: …c5', 'D02', 2, .50, .53, 0, 'd4에 곧바로 도전합니다. 백은 e3로 받칩니다.', ['긴장']],
+    ['d4 d5 Bf4 Nf6 e3', '런던 시스템', 'D02', 7, .57, .54, 44, 'f4 비숍 뒤에서 d4를 받칩니다. 런던 배치 3/7.', ['셋업', '수비 d4']],
+    ['d4 d5 Bf4 Nf6 Nf3', '런던 시스템', 'D02', 1, 0, .54, 30, '전개. 런던 배치 3/7.', ['셋업', '전개']],
+    ['g3', '킹스 피안케토 오프닝', 'A00', 0, 0, .53, 3, 'g2 비숍을 긴 대각선에 놓을 준비. 중앙은 나중에.', ['피안케토 준비']],
+    ['b3', '님조-라르센 어택', 'A01', 0, 0, .52, 2, 'b2 비숍으로 e5를 멀리서 누릅니다.', ['피안케토 준비']],
+    ['f4', '버드 오프닝', 'A02', 0, 0, .50, 2, 'e5를 옆에서 통제합니다. 킹사이드가 조금 약해집니다.', ['중앙']],
+    ['Nc3', '반 게트 오프닝', 'A00', 0, 0, .50, 1, '전개부터. e4나 d4로 이어집니다.', ['전개']],
+    ['d3', '미에제스 오프닝', 'A00', 0, 0, .48, 1, '느린 시작. e4·g3 구조로 갑니다.', []],
+    ['e3', '반트 크루이스 오프닝', 'A00', 0, 0, .48, 1, '느린 시작. d4·c4로 이어집니다.', []],
+    ['b4', '폴리시 오프닝', 'A00', 0, 0, .47, 1, 'b2 비숍 길을 열고 퀸사이드 공간을 얻습니다. 폰 구조가 헐거워집니다.', ['퀸사이드']],
+    ['e4 d5', '스칸디나비안 디펜스', 'B01', 8, .50, .55, 0, 'e4에 곧바로 도전합니다. exd5 뒤 퀸이 일찍 나옵니다.', ['긴장']],
+    ['e4 d6', '피르츠 디펜스', 'B07', 6, .50, .55, 0, '중앙을 내주고 …Nf6 …g6로 압박할 준비. 피르츠 배치 1/4.', ['셋업']],
+    ['e4 Nf6', '알레힌 디펜스', 'B02', 3, .33, .55, 0, 'e4 폰을 나이트로 유인해 백 폰을 앞으로 끌어냅니다.', ['공격 e4']],
+    ['e4 g6', '모던 디펜스', 'B06', 4, .50, .55, 0, 'g7 비숍 우선. 중앙은 뒤에서 흔듭니다.', ['피안케토 준비']],
+    ['e4 Nc6', '님조위치 디펜스', 'B00', 2, .50, .57, 0, '드문 수. …e5 또는 …d5를 준비합니다.', ['전개']],
+    ['e4 b6', '오웬 디펜스', 'B00', 0, 0, .58, 0, 'b7 비숍으로 e4를 노립니다. 중앙을 크게 내줍니다.', ['피안케토 준비']],
+    ['e4 a6', '세인트 조지 디펜스', 'B00', 0, 0, .58, 0, '…b5로 c4 칸을 막을 준비. 드문 수.', []],
+    ['e4 e5 f4', '킹스 갬빗', 'C30', 1, .50, .50, 4, '폰을 내주고 f파일을 엽니다. 날카로운 선택.', ['갬빗']],
+    ['e4 e5 d4', '센터 게임', 'C21', 1, 0, .50, 3, '즉시 중앙 교환. exd4 Qxd4 뒤 …Nc6로 퀸이 쫓깁니다.', ['긴장']],
+    ['e4 e5 Qh5', '패럼 어택', 'C20', 0, 0, .35, 1, '조기 퀸 출동. 흑이 전개하며 쫓으면 템포를 잃습니다.', ['조기 퀸']],
+    ['e4 e5 d3', '킹즈 폰 게임: 레오나르디스', 'C20', 0, 0, .48, 1, 'e4를 폰으로 미리 지킵니다. 느립니다.', []],
+    ['e4 e5 Ne2', '알라핀 오프닝', 'C20', 0, 0, .45, 0, '드문 전개. f3를 비워 f4 계획.', []],
+    ['e4 e5 Nf3 f5', '라트비안 갬빗', 'C40', 0, 0, .48, 1, 'e5 대신 e4를 노리는 역갬빗. 위험합니다.', ['갬빗']],
+    ['e4 e5 Nf3 Bc5', '부시-가스 갬빗', 'C40', 0, 0, .52, 2, 'e5를 내주고 전개로 보상. 4.Nxe5 Nc6.', ['갬빗']],
+    ['e4 e5 Nf3 f6', '담야노 디펜스', 'C40', 0, 0, .45, 1, '폰으로 e5를 지키지만 3.Nxe5! fxe5 4.Qh5+가 있습니다.', ['약점 h5-e8']],
+    ['e4 e5 Nf3 Nc6 Be2', '인버티드 헝가리언', 'C44', 0, 0, .52, 2, '조용한 전개. 흑이 편하게 균형을 잡습니다.', ['전개']],
+    ['e4 e5 Nf3 Nc6 g3', '킹즈 나이트: 콘스탄티노플', 'C44', 0, 0, .52, 1, '피안케토 준비. 느립니다.', ['피안케토 준비']],
+    ['e4 e5 Nf3 Nc6 d3', '킹즈 나이트: 준클래시컬', 'C44', 0, 0, .50, 1, 'e4를 미리 지키고 천천히 갑니다.', []],
+    ['e4 e5 Nf3 Nc6 Bb5 f5', '루이 로페즈: 슐리만 디펜스', 'C63', 1, 0, .55, 4, 'e4에 곧바로 폰으로 도전하는 역갬빗. 4.Nc3가 정수.', ['⚑ 이름', '긴장']],
+    ['e4 e5 Nf3 Nc6 Bb5 Nge7', '루이 로페즈: 코지오 디펜스', 'C60', 0, 0, .56, 2, 'e7 나이트로 c6를 다시 지킵니다. …g6 …Bg7 준비.', ['⚑ 이름', '수비 c6']],
+    ['e4 e5 Nf3 Nc6 Bb5 g6', '루이 로페즈: 스미슬로프 디펜스', 'C60', 1, 1.0, .55, 3, 'g7 비숍으로 e5를 멀리서 받칩니다.', ['⚑ 이름', '피안케토 준비']],
+    ['e4 e5 Nf3 Nc6 Bb5 Bb4', '루이 로페즈: 알라핀 디펜스', 'C60', 0, 0, .58, 1, 'd2를 겨눕니다. c3에 쫓기면 템포를 잃습니다.', ['⚑ 이름']],
+    ['e4 e5 Nf3 Nc6 Bb5 Qe7', '루이 로페즈: 비노그라도프', 'C60', 0, 0, .58, 1, '퀸으로 e5를 받칩니다. f8 비숍이 갇힙니다.', ['⚑ 이름', '수비 e5']],
+    ['e4 e5 Nf3 Nc6 Bb5 Qf6', '루이 로페즈: 누네스 디펜스', 'C60', 0, 0, .60, 1, '퀸으로 e5 수비. 조기 퀸 출동.', ['⚑ 이름', '조기 퀸']],
+    ['e4 e5 Nf3 Nc6 Bb5 Na5', '루이 로페즈: 브렌타노 디펜스', 'C60', 0, 0, .62, 1, 'e5 수비를 스스로 버립니다. 4.Nxe5.', ['⚑ 이름']],
+    ['e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Nge7', '루이 로페즈: 모피, 코지오', 'C70', 0, 0, .56, 3, 'c6를 다시 지키고 …g6 준비.', ['⚑ 이름', '수비 c6']],
+    ['e4 e5 Nf3 Nc6 Bb5 a6 Ba4 f5', '루이 로페즈: 모피, 슐리만 지연', 'C70', 0, 0, .55, 2, '역갬빗. …a6가 들어간 만큼 백의 Bxc6가 늘 가능합니다.', ['⚑ 이름', '긴장']],
+    ['e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Bc5', '루이 로페즈: 모피, 클래시컬 지연', 'C70', 1, .50, .56, 5, 'f2 겨냥. 5.c3로 d4를 준비하면 비숍이 목표.', ['⚑ 이름', '전개']],
+    ['e4 e5 Nf3 Nc6 Bb5 a6 Ba4 g6', '루이 로페즈: 모피, 피안케토', 'C70', 0, 0, .55, 3, 'g7 비숍으로 e5를 받칩니다.', ['⚑ 이름', '피안케토 준비']],
+  ];
+
+  const SETUPS = [
+    { id: 'london', name: '런던 시스템', side: 'w', targets: [['d4', 'p'], ['f4', 'b'], ['e3', 'p'], ['f3', 'n'], ['c3', 'p'], ['d2', 'n'], ['d3', 'b']], before: [['f4', 'e3', 'e3를 먼저 두어 c1 비숍이 폰 사슬 안에 갇혔습니다']], plans: ['Ne5와 Qf3·h4 킹사이드 공격', 'c4 브레이크(…c5에 대응)'] },
+    { id: 'colle', name: '콜레-쥐케르토르트', side: 'w', targets: [['d4', 'p'], ['f3', 'n'], ['e3', 'p'], ['d3', 'b'], ['b3', 'p'], ['b2', 'b'], ['d2', 'n']], before: [], plans: ['Ne5, f4, Rf3 킹사이드 공격'] },
+    { id: 'italian', name: '이탈리안 배치', side: 'w', targets: [['e4', 'p'], ['f3', 'n'], ['c4', 'b'], ['c3', 'p'], ['d3', 'p'], ['g1', 'k']], before: [], plans: ['Nbd2-f1-g3 재배치', 'd4 브레이크 또는 a4·b4 퀸사이드'] },
+    { id: 'kia', name: '킹스 인디언 어택', side: 'w', targets: [['f3', 'n'], ['g3', 'p'], ['g2', 'b'], ['g1', 'k'], ['d3', 'p'], ['d2', 'n'], ['e4', 'p']], before: [], plans: ['e5 쐐기 뒤 Nf1-h2, g4, Qe2 킹사이드'] },
+    { id: 'kid', name: '킹스 인디언 배치', side: 'b', targets: [['f6', 'n'], ['g6', 'p'], ['g7', 'b'], ['d6', 'p'], ['g8', 'k']], before: [], plans: ['…e5 뒤 …f5 킹사이드 공격'] },
+    { id: 'hedgehog', name: '헤지호그', side: 'b', targets: [['a6', 'p'], ['b6', 'p'], ['b7', 'b'], ['d6', 'p'], ['e6', 'p'], ['e7', 'b'], ['d7', 'n']], before: [], plans: ['…d5 / …b5 브레이크 대기', '세 번째 줄 뒤 기물 정렬'] },
+    { id: 'pirc', name: '피르츠/모던 배치', side: 'b', targets: [['d6', 'p'], ['f6', 'n'], ['g6', 'p'], ['g7', 'b']], before: [], plans: ['…e5 또는 …c5로 중앙에 도전'] },
+  ];
+
+  // ---------- deep notes (sample). [[...]] marks a sentence the verifier confirmed on the board; the rest is
+  // book / structure knowledge and LLM prose. In the product these are generated once per (position, move),
+  // cached, and regenerated only on request.
+  const NOTES = {
+    '': {
+      summary: '시작 국면입니다. 첫 수는 구조를 정하는 수가 아니라 어떤 종류의 게임을 원하는지 정하는 수입니다.',
+      why: ['e4는 오픈 게임과 빠른 기물 전개, d4는 구조와 공간, c4·Nf3는 유연함을 고릅니다. 내 기보 286판 중 212판이 1.e4로 시작하니 이 페이지의 대부분은 e4 이야기가 됩니다.'],
+      replies: [['e4', '가장 직접적. 오픈 게임 지향.'], ['d4', '구조 중심. 폰이 오래 남습니다.'], ['c4', '중앙 폰을 아껴 두는 유연한 시작.'], ['Nf3', '어느 구조로도 갈 수 있는 수.']],
+      alternatives: [], traps: [], mine: '286판 · 승률 52%. 백 승률은 e4에서 53%, d4에서 49%(예시).',
+    },
+    'e4': {
+      summary: '[[e4 폰이 d5와 f5를 통제합니다.]] f1 비숍과 퀸의 대각선이 열려 빠른 전개와 캐슬링으로 이어집니다.',
+      why: [
+        '백의 첫 수 중 가장 직접적입니다. 중앙 폰 하나를 4열에 세워 흑의 …d5를 어렵게 하고, 다음 수 d4로 폰 중앙(e4+d4)을 노립니다.',
+        '대신 [[e4 폰을 지키는 기물은 퀸뿐입니다.]] 흑은 …Nf6, …d5로 곧바로 도전할 수 있고, 그래서 1.e4 뒤의 오프닝은 대부분 "백은 e4를 어떻게 지키고 흑은 어떻게 흔드는가"의 이야기입니다.',
+      ],
+      alternatives: [['d4', '[[d4 폰은 퀸이 지킵니다.]] 도전받아도 되잡을 수 있어 구조가 오래 남고 게임이 느리게 흐릅니다.'], ['c4', '중앙 폰을 아끼고 d5를 옆에서 누릅니다. 피안케토와 묶는 유연한 구조.'], ['Nf3', '상대 준비를 피하기 좋지만 중앙 주도권은 늦게 옵니다.']],
+      replies: [['e5', '대칭. e4·d4 전진을 막고 같은 권리를 요구합니다 → 루이 로페즈·이탈리안·스카치.'], ['c5', '비대칭. 백의 d4에 …cxd4로 응수해 중앙 폰을 c폰과 바꿉니다 → 시실리안.'], ['e6', '…d5 준비. c8 비숍이 답답한 대신 구조가 단단합니다 → 프렌치.'], ['c6', '…d5 준비하되 c8 비숍 길은 열어 둡니다 → 카로칸.']],
+      traps: [{ title: '2.Qh5? — 초보 퀸 출동', line: ['e5', 'Qh5', 'Nc6', 'Bc4', 'g6'], text: '[[Qh5는 e5 폰을 공격합니다.]] 하지만 흑이 …Nc6, …g6로 전개하며 퀸을 쫓으면 백만 템포를 잃습니다. 퀸을 일찍 꺼내면 안 되는 이유의 표본.' }],
+      mine: '212판 · 승률 53%. 1.e4 e5에서 55%, 1.e4 c5에서 48% — 시실리안 상대가 약한 편입니다(예시).',
+    },
+    'e4 e5': {
+      summary: '[[e5 폰이 d4와 f4를 통제합니다.]] 백과 같은 권리를 주장하는 가장 오래된 응수입니다.',
+      why: ['백의 d4를 폰으로 막아 두면 백은 d4를 두려면 c3나 Nf3로 준비해야 합니다. 대신 e5 폰이 f3 나이트의 첫 목표가 되어 흑은 곧바로 "누가 e5를 지키는가" 문제를 풀어야 합니다.'],
+      alternatives: [['c5', '비대칭 시실리안. 승률은 비슷하고 게임은 더 복잡합니다.'], ['e6', '프렌치. 구조 싸움.']],
+      replies: [['Nf3', 'e5 공격. 가장 자연스러운 전개(118판).'], ['Bc4', 'f7 겨냥. 흑이 …Nf6로 e4를 맞공격하기 쉽습니다.'], ['Nc3', '비엔나. f4를 준비합니다.']],
+      traps: [], mine: '120판 · 승률 55%.',
+    },
+    'e4 e5 Nf3': {
+      summary: '[[f3 나이트가 e5 폰을 공격합니다.]] 첫 기물 전개이자 캐슬링 준비. 흑은 e5를 어떻게 지킬지 정해야 합니다.',
+      why: [
+        '위협을 담은 전개입니다. 흑이 e5를 방치하면 Nxe5로 폰을 얻습니다. 흑의 선택은 나이트로 지키기(…Nc6, 가장 자연스러움), 폰으로 지키기(…d6, f8 비숍 길을 막음), 맞공격(…Nf6, 페트로프)입니다.',
+        '어느 쪽이든 흑의 다음 수를 하나 강제한 셈이라 백이 한 템포 앞서 갑니다. "위협하면서 전개한다"는 오프닝 원칙의 표본.',
+      ],
+      alternatives: [['Bc4', '위협 없는 전개. 흑이 …Nf6로 e4를 먼저 건드립니다.'], ['Nc3', 'e4를 먼저 지킵니다. f4 계획이지만 …Nf6 …Bb4로 균형.']],
+      replies: [['Nc6', '나이트 수비. 96판, 가장 흔합니다.'], ['Nf6', '맞공격(페트로프). 대칭 구조로 무승부 경향.'], ['d6', '폰 수비(필리도르). f8 비숍이 e7에 머뭅니다.']],
+      traps: [{ title: '페트로프에서 곧바로 되잡으면', line: ['Nf6', 'Nxe5', 'Nxe4', 'Qe2', 'Nf6', 'Nc6+'], text: '2…Nf6 3.Nxe5 Nxe4? 4.Qe2 — [[Qe2가 e4 나이트를 공격합니다.]] 여기서 4…Nf6?로 물러나면 5.Nc6+ 디스커버드 체크로 d8 퀸을 잃습니다. 흑은 3…d6로 백 나이트를 먼저 쫓아야 합니다.' }],
+      mine: '118판 · 승률 55%.',
+    },
+    'e4 e5 Nf3 Nc6': {
+      summary: '[[c6 나이트가 e5를 지킵니다.]] 가장 자연스러운 수비이자 전개. 이제 백이 비숍을 어디에 두느냐로 오프닝 이름이 갈립니다.',
+      why: ['나이트로 지키면 f8 비숍 길이 열린 채로 남고, d파일 폰도 자유롭습니다. 대신 c6 나이트 자체가 백의 다음 목표(Bb5)가 됩니다.'],
+      alternatives: [['Nf6', '페트로프. 수비 대신 맞공격.'], ['d6', '필리도르. 단단하지만 수동적.']],
+      replies: [['Bb5', '루이 로페즈. e5의 수비수 c6를 건드립니다(41판).'], ['Bc4', '이탈리안. f7을 겨눕니다(30판).'], ['d4', '스카치. 중앙을 즉시 엽니다(12판).'], ['Nc3', '쓰리 나이츠. 조용한 수.']],
+      traps: [{ title: '투 나이츠 4.Ng5 — 프리드 리버 방향', line: ['Bc4', 'Nf6', 'Ng5', 'd5', 'exd5', 'Nxd5', 'Nxf7'], text: '3.Bc4 Nf6 4.Ng5는 [[g5 나이트와 c4 비숍이 f7을 함께 공격합니다.]] 흑은 4…d5로 비숍을 막아야 하고, 5.exd5 Nxd5?는 6.Nxf7(프리드 리버)로 위험합니다. 이론의 수는 5…Na5.' }],
+      mine: '96판 · 승률 56%.',
+    },
+    'e4 e5 Nf3 Nc6 Bb5': {
+      summary: '[[b5 비숍이 c6 나이트를 공격합니다.]] c6는 e5의 유일한 수비수이므로 e5 폰을 간접적으로 압박하는 셈입니다. 두 번째 기물 전개, 캐슬링 준비 완료.',
+      why: [
+        '지금 당장 Bxc6 dxc6 Nxe5로 폰을 따는 위협은 아닙니다. 흑이 …Qd4나 …Qg5로 e4 폰을 되찾기 때문입니다(아래 함정). 이 수의 뜻은 즉시 위협이 아니라 장기 압박입니다. 흑은 앞으로 e5를 지키느라 …d6, …Nf6 같은 수를 골라야 하고, 백은 그 사이 O-O, Re1, c3, d4로 중앙을 준비합니다.',
+        '비숍은 …a6에 Ba4로 물러나 압박을 유지하고, …b5에 Bb3로 가서 f7 대각선을 얻습니다. 물러설수록 강해지는 비숍이라 "스페인식 고문"이라는 별명이 붙었습니다.',
+        '이탈리안(Bc4)과의 차이: Bc4는 f7을 직접 겨누지만 흑이 …Nf6 …Bc5로 대등하게 전개합니다. Bb5는 흑에게 "어떻게 e5를 지킬 것인가"라는 문제를 계속 냅니다.',
+      ],
+      alternatives: [['Bc4', 'f7 직접 겨냥. 흑이 대칭 전개로 균형을 잡기 쉽습니다(내 48%).'], ['d4', '스카치. 중앙을 즉시 열어 기물이 빨리 교환됩니다. 압박이 오래가지 않습니다.'], ['Nc3', '쓰리 나이츠. 무난하지만 흑에게 문제를 내지 않습니다.']],
+      replies: [['a6', '모피 방어(71%). 비숍에게 물러설지 바꿀지 묻습니다. 메인 라인.'], ['Nf6', '베를린. 4.O-O Nxe4 5.Re1 Nd6로 엔드게임 지향.'], ['d6', '스타이니츠. 단단하지만 f8 비숍이 답답합니다.'], ['Bc5', '클래시컬. 4.c3로 d4를 준비하면 비숍이 목표가 됩니다.'], ['Nd4', '버드. 나이트 교환 제안, 드문 수.']],
+      traps: [
+        { title: '왜 지금 폰을 딸 수 없는가', line: ['a6', 'Bxc6', 'dxc6', 'Nxe5', 'Qd4'], text: '4.Bxc6 dxc6 5.Nxe5? Qd4! — [[d4 퀸이 e5 나이트와 e4 폰을 동시에 공격합니다.]] 백은 나이트를 살리면 e4를 잃습니다. 그래서 Bb5는 폰 위협이 아니라 압박입니다.' },
+        { title: '베를린 4.O-O Nxe4', line: ['Nf6', 'O-O', 'Nxe4', 'Re1', 'Nd6', 'Nxe5'], text: '흑이 e4를 잡아도 5.Re1로 [[e1 룩이 e4 나이트를 공격합니다.]] 5…Nd6 6.Nxe5로 폰을 되찾고 6…Be7 7.Bf1이 베를린 엔드게임 방향입니다.' },
+      ],
+      mine: '41판 · 승률 56%. 흑이 …a6 …b5 뒤 …Na5로 b3 비숍을 바꾸는 라인에서 3승 5패. 비숍을 c2로 물릴 시점을 놓친 판이 많습니다(예시).',
+    },
+    'e4 e5 Nf3 Nc6 Bb5 a6': {
+      summary: '비숍에게 결정을 요구합니다. 물러서면(Ba4) …b5로 템포를 벌고, 바꾸면(Bxc6) 비숍 쌍을 얻습니다.',
+      why: [
+        '[[a6 폰이 b5 비숍을 공격합니다.]] 백은 지금 정해야 합니다. Ba4면 흑은 언제든 …b5로 비숍을 한 번 더 쫓아 퀸사이드 공간을 얻고, Bxc6면 흑은 더블 폰(c6·c7) 대신 비숍 쌍과 열린 d파일을 얻습니다.',
+        '모피 방어라 부르는 이유는 흑이 "비숍 위치를 먼저 묻는다"는 원칙 때문입니다. 나머지 흑 수(…Nf6, …d6)는 그 뒤에 두어도 늦지 않습니다.',
+      ],
+      alternatives: [['Nf6', '베를린. 비숍을 묻지 않고 e4를 맞공격. 엔드게임 성향.'], ['d6', '스타이니츠. 수동적.']],
+      replies: [['Ba4', '메인(82%). 압박 유지.'], ['Bxc6', '익스체인지. 구조 싸움, d4 교환 뒤 폰 다수 엔드게임 계획.']],
+      traps: [{ title: '노아의 방주 — 비숍이 갇히는 함정', line: ['Ba4', 'd6', 'd4', 'b5', 'Bb3', 'Nxd4', 'Nxd4', 'exd4', 'Qxd4', 'c5', 'Qd5', 'Be6', 'Qc6+', 'Bd7', 'Qd5', 'c4'], text: '4.Ba4 d6 5.d4? b5 6.Bb3 Nxd4 7.Nxd4 exd4 8.Qxd4? c5! 9.Qd5 Be6 10.Qc6+ Bd7 11.Qd5 c4 — [[c4 폰이 b3 비숍의 퇴로를 막습니다.]] 흑 폰 a6·b5·c4가 비숍을 가둡니다. 백은 5.d4 대신 5.c3나 5.Bxc6+로 가야 합니다.' }],
+      mine: '30판 · 승률 55%.',
+    },
+    'e4 e5 Nf3 Nc6 Bb5 a6 Bc4': {
+      offBook: true,
+      summary: '책에 없는 후퇴입니다. 3.Bc4 이탈리안으로 갈 수 있었던 국면에 흑이 …a6를 공짜로 둔 셈이라, 나쁜 수라기보다 뜻이 없는 수입니다.',
+      why: [
+        '[[c4 비숍은 f7을 겨눕니다.]] 그러나 같은 국면을 이탈리안(3.Bc4)으로 만들었다면 흑의 …a6는 없었습니다. …a6는 나중에 …b5로 이 비숍을 한 번 더 쫓는 데 쓰이므로 흑에게만 유리한 덤입니다.',
+        '책 수 Ba4는 같은 대각선(a4-e8)에 남아 c6 압박을 잇고, …b5 뒤에는 Bb3로 어차피 f7 대각선을 얻습니다. 즉 Ba4는 Bc4가 얻는 것을 나중에 다 얻으면서 압박까지 유지합니다.',
+      ],
+      alternatives: [['Ba4', '책의 메인. 압박 유지, …b5 뒤 Bb3.'], ['Bxc6', '책의 둘째 수. 구조 싸움으로 전환.']],
+      replies: [['Nf6', '[[f6 나이트가 e4를 공격합니다.]] 백은 d3나 Nc3로 지켜야 하고, 흑은 …b5 …Bc5로 편하게 전개합니다.'], ['Bc5', '대칭 전개. 흑이 한 템포 앞선 이탈리안.']],
+      traps: [],
+      engine: '엔진(예시, 깊이 12): 부정확 · 승률 손실 3% · 최선 Ba4. 물질 손실은 없고 템포 손실만 있어 "실수"까지는 아닙니다.',
+      mine: '내 기보에 없는 수입니다.',
+    },
+    'e4 e5 Nf3 Nc6 Bb5 a6 Ba4': {
+      summary: '압박을 유지하는 후퇴입니다. [[a4 비숍은 여전히 c6 나이트를 공격합니다.]] …b5에는 Bb3로 f7 대각선을 얻습니다.',
+      why: [
+        'Bxc6로 구조를 바꾸는 대신 긴 게임을 고릅니다. 비숍은 a4에서 c6를 계속 노리고, 백은 O-O, Re1, c3, d4로 중앙을 준비합니다. 흑이 …b5로 쫓으면 Bb3, …Na5로 바꾸려 하면 c3 뒤 Bc2로 물러날 자리를 미리 만듭니다.',
+        '주의할 점은 딱 하나, d4를 너무 일찍 열지 않는 것입니다. 노아의 방주(아래)가 그 벌칙입니다.',
+      ],
+      alternatives: [['Bxc6', '익스체인지. 흑 더블 폰, 백은 d4 교환 뒤 킹사이드 폰 다수로 엔드게임을 노립니다.']],
+      replies: [['Nf6', '메인(61%). e4 공격, 5.O-O로 클로즈드 또는 오픈.'], ['d6', '모던 스타이니츠. …b5 …Na5 준비.'], ['b5', '즉시 쫓기. Bb3 뒤 …Na5나 …Bc5.'], ['Nge7', '코르드엘. 드문 수.']],
+      traps: [{ title: '노아의 방주', line: ['d6', 'd4', 'b5', 'Bb3', 'Nxd4', 'Nxd4', 'exd4', 'Qxd4', 'c5', 'Qd5', 'Be6', 'Qc6+', 'Bd7', 'Qd5', 'c4'], text: '4…d6 5.d4? b5 6.Bb3 Nxd4 7.Nxd4 exd4 8.Qxd4? c5! … 11…c4로 [[c4 폰이 b3 비숍의 퇴로를 막습니다.]] 5.c3가 안전한 준비 수.' }],
+      mine: '26판 · 승률 56%.',
+    },
+  };
+
+  const GLYPH = { k: '♚', q: '♛', r: '♜', b: '♝', n: '♞', p: '♟' };
+  const PIECE_KO = { k: '킹', q: '퀸', r: '룩', b: '비숍', n: '나이트', p: '폰' };
+  const FILES = 'abcdefgh';
+  const key = (fen) => fen.split(' ').slice(0, 4).join(' ');
+  const label = (ply, san) => (ply % 2 === 1 ? `${(ply + 1) / 2}.${san}` : `${ply / 2}…${san}`);
+  const pct = (s) => `${Math.round(s * 100)}%`;
+  const scoreColor = (s) => {
+    const t = Math.max(-1, Math.min(1, (s - 0.5) / 0.2));
+    const hue = t < 0 ? 'var(--bad)' : 'var(--good)';
+    return `color-mix(in srgb, ${hue} ${Math.round(Math.abs(t) * 100)}%, var(--ink-3))`;
+  };
+
+  // ---------- build the book by position key (so transpositions resolve) ----------
+  const BOOK = new Map();     // key -> { name, eco, my, score, master, nat, text, facts, children: Map(san -> key) }
+  const START = new Chess().fen();
+  BOOK.set(key(START), { name: null, eco: null, my: 286, score: .52, children: new Map(), sans: [] });
+  for (const [seq, name, eco, my, score, master, nat, text, facts] of LINES) {
+    const c = new Chess();
+    const sans = seq.split(' ');
+    let parent = key(c.fen());
+    for (let i = 0; i < sans.length; i++) {
+      const mv = c.move(sans[i]);
+      const k = key(c.fen());
+      const isLast = i === sans.length - 1;
+      if (!BOOK.has(k)) BOOK.set(k, { name: null, eco: null, my: 0, score: 0, master: null, nat: null, text: null, facts: [], children: new Map(), sans: sans.slice(0, i + 1) });
+      const node = BOOK.get(k);
+      if (isLast) Object.assign(node, { name, eco, my, score, master, nat, text, facts });
+      BOOK.get(parent).children.set(mv.san, { san: mv.san, uci: mv.from + mv.to, key: k });
+      parent = k;
+    }
+  }
+
+  // ---------- state ----------
+  const state = { plies: [], cursor: 0, journal: [], flip: false, color: 'white', sel: null, showAll: false, focusPly: 0, depth: 'normal', preview: null, generated: {}, sort: 'mine' };
+  // preview: { fen, sans, at } while a trap line is being stepped through on the board
+  // ply: { san, uci, fen(after), fenBefore, label }
+
+  const chessAt = (cursor) => { const c = new Chess(); for (let i = 0; i < cursor; i++) c.move(state.plies[i].san); return c; };
+  const curFen = () => (state.cursor ? state.plies[state.cursor - 1].fen : START);
+
+  // ---------- intent (mock detectors, real chess facts) ----------
+  function annotate(before, mv, ply) {
+    const after = new Chess(before.fen()); after.move(mv.san);
+    const k = key(after.fen());
+    const node = BOOK.get(k);
+    const parentNode = BOOK.get(key(before.fen()));
+    const inBook = !!node && !!(parentNode && parentNode.children.has(mv.san));
+    const tags = [];
+    const parts = [];
+    const prevName = parentNode?.name;
+    if (inBook) {
+      if (node.name && node.name !== prevName) tags.push(['good', `⚑ ${node.name}`]);
+      else if (node.name) tags.push(['neutral', node.name]);
+      if (node.text) parts.push(node.text);
+      for (const f of node.facts || []) if (!f.startsWith('⚑')) tags.push(['neutral', f]);
+      if (node.nat) tags.push(['neutral', `이 레이팅대 ${node.nat}%가 두는 수`]);
+    } else {
+      tags.push(['warn', '⚠ 책 밖']);
+      const alts = parentNode ? [...parentNode.children.values()].slice(0, 3) : [];
+      if (alts.length) parts.push(`책에 없는 수입니다. 책 수는 ${alts.map((a) => `${a.san}(${BOOK.get(a.key).name || '이름 없음'})`).join(', ')}.`);
+      else parts.push('책에서 이미 벗어난 국면입니다.');
+    }
+    // generic facts from the move itself (what the detectors would say)
+    const who = before.turn() === 'w' ? '백' : '흑';
+    const generic = [];
+    if (mv.flags.includes('k') || mv.flags.includes('q')) { generic.push('캐슬링. 킹을 안전한 곳으로 옮기고 룩을 연결합니다.'); tags.push(['neutral', '캐슬링']); }
+    else if (mv.piece === 'k') { generic.push('킹이 움직여 캐슬링 권리를 잃습니다.'); tags.push(['bad', '캐슬링 권리 상실']); }
+    if (mv.captured && !inBook) generic.push(`${mv.to}의 ${PIECE_KO[mv.captured]}을 ${PIECE_KO[mv.piece]}으로 잡습니다.`);
+    if (after.in_check()) { generic.push('체크입니다.'); tags.push(['neutral', '체크']); }
+    if (mv.piece === 'q' && ply <= 6 && !inBook) { generic.push('퀸을 일찍 꺼냅니다. 상대가 전개하며 템포로 쫓기 쉽습니다.'); tags.push(['warn', '조기 퀸']); }
+    if (!inBook && mv.piece === 'p' && ['d4', 'e4', 'd5', 'e5'].includes(mv.to)) generic.push('중앙 폰을 전진합니다.');
+    if (!inBook && (mv.piece === 'n' || mv.piece === 'b') && /[18]$/.test(mv.from)) generic.push(`${PIECE_KO[mv.piece]}을 전개합니다.`);
+    if (mv.piece === 'b' && ['g2', 'b2', 'g7', 'b7'].includes(mv.to)) { generic.push('비숍을 긴 대각선에 놓습니다.'); tags.push(['neutral', '피안케토']); }
+    // attacked pieces after the move (side-to-move swapped probe)
+    const probe = new Chess(swapTurn(after.fen()));
+    const hits = probe.moves({ square: mv.to, verbose: true }).filter((m) => m.captured && m.captured !== 'p' && m.captured !== 'k');
+    if (hits.length && !inBook) generic.push(`${hits.map((h) => `${h.to} ${PIECE_KO[h.captured]}`).join('·')}을 공격합니다.`);
+    parts.push(...generic);
+    // setups
+    const adv = setupAdvance(before, after, mv);
+    for (const a of adv) { tags.push([a.kind === 'blocked' ? 'bad' : 'neutral', a.kind === 'blocked' ? `셋업 막힘: ${a.name}` : `셋업 ${a.name} ${a.done}/${a.total}`]); if (a.kind === 'blocked') parts.push(`이 수로 ${a.name} 배치는 물 건너갑니다(${a.why}).`); }
+    // engine (mock, off-book only)
+    let engine = null;
+    if (!inBook) {
+      const h = [...mv.san].reduce((a, ch) => a + ch.charCodeAt(0), ply * 7) % 100;
+      const loss = mv.piece === 'k' && !mv.flags.includes('k') && !mv.flags.includes('q') ? 9 + (h % 8) : (h % 14);
+      const best = parentNode && parentNode.children.size ? [...parentNode.children.keys()][0] : null;
+      engine = { loss, best, cls: loss >= 10 ? '실수' : loss >= 4 ? '부정확' : '괜찮은 수' };
+    }
+    return { ply, label: label(ply, mv.san), san: mv.san, uci: mv.from + mv.to, inBook, name: node?.name || null, tags, text: parts.join(' '), my: inBook && node.my ? { games: node.my, score: node.score } : null, engine, who };
+  }
+  function swapTurn(fen) { const f = fen.split(' '); f[1] = f[1] === 'w' ? 'b' : 'w'; f[3] = '-'; return f.join(' '); }
+
+  // ---------- setups ----------
+  function setupStatus(spec, chess) {
+    const fen = chess.fen();
+    const rights = fen.split(' ')[2];
+    const own = (sq) => { const p = chess.get(sq); return p && p.color === spec.side ? p : null; };
+    const items = spec.targets.map(([sq, t]) => {
+      const p = own(sq);
+      if (p && p.type === t) return { sq, t, s: 'done' };
+      if (t === 'k') { const ok = spec.side === 'w' ? rights.includes('K') : rights.includes('k'); return { sq, t, s: ok ? 'possible' : 'blocked', why: '캐슬링 권리를 잃었습니다' }; }
+      if (t === 'p') {
+        const file = sq[0], rank = +sq[1];
+        const ranks = spec.side === 'w' ? [rank - 1, rank - 2] : [rank + 1, rank + 2];
+        const behind = ranks.some((r) => r >= 1 && r <= 8 && (own(file + r)?.type === 'p'));
+        return { sq, t, s: behind ? 'possible' : 'blocked', why: `${file}파일 폰이 이미 지나갔거나 없습니다` };
+      }
+      const anyPiece = FILES.split('').some((f) => [1, 2, 3, 4, 5, 6, 7, 8].some((r) => own(f + r)?.type === t));
+      return { sq, t, s: anyPiece ? 'possible' : 'blocked', why: `${PIECE_KO[t]}이 없습니다` };
+    });
+    for (const [pieceSq, pawnSq, why] of spec.before) {
+      const pi = items.find((i) => i.sq === pieceSq);
+      const pawnThere = own(pawnSq)?.type === 'p';
+      const home = 'c1';
+      if (pi && pi.s !== 'done' && pawnThere && own(home)?.type === pi.t) { pi.s = 'blocked'; pi.why = why || `${pawnSq} 폰이 먼저 놓여 ${home} 비숍이 갇혔습니다`; }
+    }
+    const done = items.filter((i) => i.s === 'done').length;
+    const blocked = items.find((i) => i.s === 'blocked');
+    const status = done === items.length ? 'completed' : blocked ? 'blocked' : done > 0 ? 'in_progress' : 'possible';
+    return { spec, items, done, total: items.length, status, why: blocked?.why || null };
+  }
+  function setupAdvance(before, after, mv) {
+    const out = [];
+    const side = before.turn();
+    for (const spec of SETUPS) {
+      if (spec.side !== side) continue;
+      const a = setupStatus(spec, before), b = setupStatus(spec, after);
+      if (b.done > a.done && b.status !== 'blocked') out.push({ kind: 'advance', name: spec.name, done: b.done, total: b.total });
+      if (a.status !== 'blocked' && b.status === 'blocked' && a.done > 0) out.push({ kind: 'blocked', name: spec.name, why: b.why });
+    }
+    return out;
+  }
+  const targetLabel = (i) => (i.t === 'p' ? i.sq : i.t === 'k' ? 'O-O' : i.t.toUpperCase() + i.sq);
+
+  // ---------- actions ----------
+  function play(uci, san) {
+    const before = chessAt(state.cursor);
+    const mv = san ? before.move(san) : before.move({ from: uci.slice(0, 2), to: uci.slice(2, 4), promotion: 'q' });
+    if (!mv) return;
+    const ply = state.cursor + 1;
+    if (state.cursor < state.plies.length) {
+      const was = state.plies[state.cursor];
+      state.journal.push({ kind: 'rewind', toPly: state.cursor, was: was.label, instead: label(ply, mv.san) });
+      state.plies = state.plies.slice(0, state.cursor);
+    }
+    const beforeChess = chessAt(state.cursor);
+    const ann = annotate(beforeChess, mv, ply);
+    state.plies.push({ san: mv.san, uci: mv.from + mv.to, fen: before.fen(), label: ann.label });
+    state.cursor = state.plies.length;
+    state.journal.push({ kind: 'move', ply, ann, pending: true, seq: state.plies.map((p) => p.san).join(' ') });
+    state.sel = null; state.focusPly = ply; state.preview = null;
+    render();
+    // the product answers POST /openings/annotate; here the delay only shows the pending state
+    const entry = state.journal[state.journal.length - 1];
+    setTimeout(() => { entry.pending = false; renderJournal(); }, 350);
+  }
+  function jumpTo(sans) {
+    const c = new Chess();
+    const plies = [];
+    for (let i = 0; i < sans.length; i++) { const mv = c.move(sans[i]); if (!mv) break; plies.push({ san: mv.san, uci: mv.from + mv.to, fen: c.fen(), label: label(i + 1, mv.san) }); }
+    state.journal.push({ kind: 'jump', sans: plies.map((p) => p.label) });
+    state.plies = plies; state.cursor = plies.length; state.sel = null; state.focusPly = plies.length; state.preview = null;
+    const c2 = new Chess();
+    plies.forEach((p, i) => { const b = new Chess(c2.fen()); const mv = c2.move(p.san); state.journal.push({ kind: 'move', ply: i + 1, ann: annotate(b, mv, i + 1), pending: false, seq: c2.history().join(' ') }); });
+    render();
+  }
+  function goto(cursor) { state.cursor = Math.max(0, Math.min(state.plies.length, cursor)); state.sel = null; state.focusPly = state.cursor; state.preview = null; render(); }
+
+  // ---------- render: board ----------
+  const boardEl = document.getElementById('board');
+  const arrowsEl = document.getElementById('arrows');
+  function renderBoard() {
+    const pv = state.preview;
+    const c = pv ? new Chess(pv.fen) : chessAt(state.cursor);
+    const last = pv ? (pv.last ? { uci: pv.last } : null) : (state.cursor ? state.plies[state.cursor - 1] : null);
+    const dests = state.sel && !pv ? c.moves({ square: state.sel, verbose: true }) : [];
+    const old = document.querySelector('.preview-chip'); if (old) old.remove();
+    if (pv) boardEl.parentElement.insertAdjacentHTML('afterbegin', `<span class="preview-chip">미리보기 · ${pv.title}</span>`);
+    const turn = c.turn();
+    boardEl.innerHTML = '';
+    const ranks = state.flip ? [1, 2, 3, 4, 5, 6, 7, 8] : [8, 7, 6, 5, 4, 3, 2, 1];
+    const files = state.flip ? [...FILES].reverse() : [...FILES];
+    for (const r of ranks) for (const f of files) {
+      const sq = f + r;
+      const p = c.get(sq);
+      const light = (FILES.indexOf(f) + r) % 2 === 1;
+      const el = document.createElement('div');
+      el.className = `sq ${light ? 'l' : 'd'}`;
+      if (last && (last.uci.slice(0, 2) === sq || last.uci.slice(2, 4) === sq)) el.classList.add('last');
+      if (state.sel === sq) el.classList.add('sel');
+      const d = dests.find((m) => m.to === sq);
+      if (d) { el.classList.add('dest'); if (d.captured) el.classList.add('cap'); }
+      if (p && p.color === turn) el.classList.add('movable');
+      if (p) el.innerHTML = `<span class="p ${p.color}">${GLYPH[p.type]}</span>`;
+      if (f === files[0]) el.insertAdjacentHTML('beforeend', `<span class="co r">${r}</span>`);
+      if (r === ranks[7]) el.insertAdjacentHTML('beforeend', `<span class="co f">${f}</span>`);
+      el.dataset.sq = sq;
+      boardEl.appendChild(el);
+    }
+    arrowsEl.innerHTML = '';
+  }
+  boardEl.addEventListener('click', (e) => {
+    const sq = e.target.closest('.sq')?.dataset.sq; if (!sq) return;
+    if (state.preview) { state.preview = null; render(); return; }
+    const c = chessAt(state.cursor);
+    if (state.sel) {
+      const mv = c.moves({ square: state.sel, verbose: true }).find((m) => m.to === sq);
+      if (mv) { play(mv.from + mv.to); return; }
+    }
+    const p = c.get(sq);
+    state.sel = p && p.color === c.turn() && sq !== state.sel ? sq : null;
+    renderBoard();
+  });
+  function drawArrow(uci) {
+    const pt = (s) => { const f = FILES.indexOf(s[0]), r = +s[1]; const x = state.flip ? 7 - f : f; const y = state.flip ? r - 1 : 8 - r; return [x + 0.5, y + 0.5]; };
+    const [x1, y1] = pt(uci.slice(0, 2)), [x2, y2] = pt(uci.slice(2, 4));
+    const dx = x2 - x1, dy = y2 - y1, len = Math.hypot(dx, dy) || 1;
+    const ux = dx / len, uy = dy / len;
+    const ex = x2 - ux * 0.35, ey = y2 - uy * 0.35;
+    arrowsEl.innerHTML = `<line x1="${x1}" y1="${y1}" x2="${ex}" y2="${ey}" stroke="var(--good)" stroke-width="0.16" stroke-linecap="round" opacity=".85"/>` +
+      `<polygon points="${x2},${y2} ${ex - uy * 0.22},${ey + ux * 0.22} ${ex + uy * 0.22},${ey - ux * 0.22}" fill="var(--good)" opacity=".85"/>`;
+  }
+
+  // ---------- render: position line, candidates ----------
+  function miniBoard(fen, hl) {
+    const c = new Chess(fen);
+    let html = '<div class="mini">';
+    const ranks = state.flip ? [1, 2, 3, 4, 5, 6, 7, 8] : [8, 7, 6, 5, 4, 3, 2, 1];
+    const files = state.flip ? [...FILES].reverse() : [...FILES];
+    for (const r of ranks) for (const f of files) {
+      const p = c.get(f + r); const light = (FILES.indexOf(f) + r) % 2 === 1;
+      html += `<span class="${light ? 'l' : 'd'}${p ? ' ' + p.color : ''}${hl && hl.includes(f + r) ? ' hl' : ''}">${p ? GLYPH[p.type] : ''}</span>`;
+    }
+    return html + '</div>';
+  }
+  function renderPos() {
+    const fen = curFen();
+    const node = BOOK.get(key(fen));
+    const c = chessAt(state.cursor);
+    const line = state.plies.slice(0, state.cursor).map((p) => p.label).join(' ');
+    const turn = c.turn() === 'w' ? '백' : '흑';
+    const el = document.getElementById('posLine');
+    if (state.preview) {
+      el.innerHTML = `<span class="badge neutral">미리보기</span><span class="mv">${state.preview.title}</span><button type="button" class="btn" id="pvBack" style="height:24px">현재 국면으로</button>`;
+      document.getElementById('pvBack').onclick = () => { state.preview = null; render(); };
+    } else
+    el.innerHTML = `<span class="mv">${line || '시작 국면'}</span><span class="faint">▸ ${turn} 차례</span>` +
+      (node?.name ? `<span class="badge good">${node.name}</span><span class="mono faint small">${node.eco}</span>` : (node ? '' : '<span class="badge warn">책 밖</span>')) +
+      (node && node.my ? `<span class="small muted mono">내 ${node.my}판 · 승률 ${pct(node.score)}</span>` : '');
+    document.getElementById('urlHint').textContent = `/openings?color=${state.color}&moves=${state.plies.slice(0, state.cursor).map((p) => p.san).join(',')}`;
+    document.getElementById('btnPrev').disabled = state.cursor === 0;
+    document.getElementById('btnFirst').disabled = state.cursor === 0;
+    document.getElementById('btnNext').disabled = state.cursor >= state.plies.length;
+    document.getElementById('btnLast').disabled = state.cursor >= state.plies.length;
+
+    const list = document.getElementById('cands');
+    const wrap = document.getElementById('candWrap');
+    list.innerHTML = '';
+    if (!node || !node.children.size) {
+      const lastBook = [...state.plies.slice(0, state.cursor).keys()].reverse().find((i) => BOOK.get(key(state.plies[i].fen)));
+      list.innerHTML = `<div class="empty" style="grid-column:1/-1"><span>이 국면 다음 수는 책에 없습니다. 보드에서 계속 둘 수 있고, 수마다 해설은 계속 붙습니다.</span>` +
+        `<button type="button" class="btn" id="backBook">↶ 마지막 책 국면으로 (${lastBook == null ? '시작 국면' : state.plies[lastBook].label})</button></div>`;
+      document.getElementById('backBook').onclick = () => goto(lastBook == null ? 0 : lastBook + 1);
+      document.getElementById('candMeta').textContent = '';
+      wrap.classList.add('end');
+      return;
+    }
+    const ply = state.cursor + 1;
+    const cands = [...node.children.values()].map((ch) => ({ ...ch, node: BOOK.get(ch.key) }));
+    const by = {
+      mine: (a, b) => (b.node.my - a.node.my) || ((b.node.master || 0) - (a.node.master || 0)),
+      master: (a, b) => ((b.node.nat || 0) - (a.node.nat || 0)) || ((b.node.master || 0) - (a.node.master || 0)) || (b.node.my - a.node.my),
+      name: (a, b) => (Number(!!b.node.name) - Number(!!a.node.name)) || (a.node.name || '').localeCompare(b.node.name || '', 'ko'),
+    }[state.sort];
+    cands.sort(by);
+    for (const ch of cands) {
+      const n = ch.node;
+      const named = !!n.name;
+      const via = !named && n.sans ? (() => { let k = ch.key, steps = []; for (let i = 0; i < 4; i++) { const nn = BOOK.get(k); if (nn.name) return { name: nn.name, steps }; if (nn.children.size !== 1) return null; const nx = [...nn.children.values()][0]; steps.push(nx.san); k = nx.key; } return null; })() : null;
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = `cand${n.my === 0 ? ' master' : ''}`;
+      const afterFen = (() => { const cc = new Chess(fen); cc.move(ch.san); return cc.fen(); })();
+      b.innerHTML = miniBoard(afterFen, [ch.uci.slice(0, 2), ch.uci.slice(2, 4)]) +
+        `<div class="meta"><div class="row"><span class="mv lbl">${label(ply, ch.san)}</span><span class="eco mono">${n.eco || ''}</span></div>` +
+        `<div class="name${named ? '' : ' via'}">${named ? n.name : (via ? `${via.steps.join(' ')} 뒤 ${via.name}` : '(이름 없는 중간 국면)')}</div>` +
+        (n.my ? `<div class="rec"><span class="bar"><i style="width:${Math.round(n.score * 100)}%;background:${scoreColor(n.score)}"></i></span><span class="mono">내 ${n.my}판 ${pct(n.score)}</span></div>` : `<div class="rec faint">내 기보 없음</div>`) +
+        (n.master ? `<div class="rec faint"><span class="mono">마스터 ${pct(n.master)}</span>${n.nat ? `<span>· 이 레이팅대 ${n.nat}%</span>` : ''}</div>` : '') +
+        `</div>`;
+      b.addEventListener('mouseenter', () => drawArrow(ch.uci));
+      b.addEventListener('mouseleave', () => { arrowsEl.innerHTML = ''; });
+      b.addEventListener('focus', () => drawArrow(ch.uci));
+      b.addEventListener('click', () => play(ch.uci, ch.san));
+      list.appendChild(b);
+    }
+    const mine = cands.filter((c) => c.node.my > 0).length;
+    document.getElementById('candMeta').textContent = `${cands.length}가지 · 내 기보 ${mine}가지 · 책·마스터 ${cands.length - mine}가지 · 전부 표시, 스크롤`;
+    const fade = () => wrap.classList.toggle('end', list.scrollHeight - list.scrollTop - list.clientHeight < 8);
+    list.onscroll = fade; fade();
+  }
+
+  // ---------- render: setups ----------
+  function renderSetups() {
+    const c = chessAt(state.cursor);
+    const side = c.turn();
+    document.getElementById('setupSide').textContent = `${side === 'w' ? '백' : '흑'} 차례 기준 · 배치 완성까지 남은 수`;
+    const rows = SETUPS.filter((s) => s.side === side).map((s) => setupStatus(s, c));
+    const order = { completed: 0, in_progress: 1, possible: 2, blocked: 3 };
+    rows.sort((a, b) => order[a.status] - order[b.status] || b.done - a.done);
+    const el = document.getElementById('setups');
+    el.innerHTML = '';
+    const STATUS = { completed: ['good', '완성'], in_progress: ['neutral', '진행 중'], possible: ['dashed', '가능'], blocked: ['bad', '막힘'] };
+    for (const r of rows.slice(0, 4)) {
+      const d = document.createElement('div');
+      d.className = `setup ${r.status}`;
+      const [tone, word] = STATUS[r.status];
+      const pips = r.items.map((i) => `<i class="${i.s === 'done' ? 'on' : i.s === 'blocked' ? 'bad' : ''}"></i>`).join('');
+      d.innerHTML = `<span class="nm">${r.spec.name} <span class="badge ${tone}">${word}</span></span>` +
+        `<span class="prog"><span class="pips">${pips}</span><span class="mono">${r.done}/${r.total}</span></span>` +
+        (r.status === 'blocked' ? `<span class="why">${r.why}</span>` : '') +
+        `<span class="rest">${r.status === 'completed' ? '배치 완성' : '남은 배치'} ${r.items.map((i) => `<span class="mv${i.s === 'done' ? ' done' : ''}" data-sq="${i.sq}">${targetLabel(i)}</span>`).join('')}</span>` +
+        `<span class="plan">계획: ${r.spec.plans.join(' · ')}</span>`;
+      el.appendChild(d);
+    }
+    if (!rows.length) el.innerHTML = '<div class="empty">이 쪽의 셋업은 아직 등록되어 있지 않습니다.</div>';
+  }
+
+  // ---------- render: explanation panel (beside the board) ----------
+  const mark = (s) => s.replace(/\[\[(.+?)\]\]/g, '<span class="v">$1</span>');
+  const seqAt = (ply) => state.plies.slice(0, ply).map((p) => p.san).join(' ');
+  function renderExplain() {
+    const el = document.getElementById('explain');
+    const ply = Math.min(state.focusPly, state.plies.length);
+    const seq = seqAt(ply);
+    const entry = ply ? [...state.journal].reverse().find((e) => e.kind === 'move' && e.ply === ply && e.ann.san === state.plies[ply - 1].san) : null;
+    const ann = entry?.ann || null;
+    const note = NOTES[seq] || state.generated[seq] || null;
+    const node = BOOK.get(key(ply ? state.plies[ply - 1].fen : START));
+    const depth = state.depth;
+    const open = (lvl) => (['brief', 'normal', 'deep'].indexOf(depth) >= ['brief', 'normal', 'deep'].indexOf(lvl) ? ' open' : '');
+    const nameBadge = node?.name ? `<span class="badge good">${node.name}</span><span class="mono faint small">${node.eco}</span>` : (ann && !ann.inBook ? '<span class="badge warn">⚠ 책 밖</span>' : '');
+    let html = `<span class="req">③ 의도 해설 · 깊이 조절</span>` +
+      `<div class="explain-head"><span class="lab">${ply ? `<span class="mv">${state.plies[ply - 1].label}</span>` : '시작 국면'}</span>${nameBadge}` +
+      `<div class="depth" role="group" aria-label="해설 깊이">${[['brief', '요약'], ['normal', '보통'], ['deep', '깊이']].map(([k, t]) => `<button type="button" data-depth="${k}" class="${depth === k ? 'on' : ''}">${t}</button>`).join('')}</div></div>`;
+
+    if (!note) {
+      // no cached note: the deterministic facts now, the deep note on request (the product calls the LLM here)
+      html += `<div class="summary">${ann ? ann.text : '아직 이 국면의 해설이 없습니다.'}</div>` +
+        (ann && ann.tags.length ? `<div class="tags" style="display:flex;flex-wrap:wrap;gap:4px">${ann.tags.map(([t, s]) => `<span class="badge ${t}">${s}</span>`).join('')}</div>` : '') +
+        `<div class="gen"><span>위 문장은 보드에서 바로 뽑은 사실입니다. 깊은 해설(왜 이 수인가, 대안 비교, 상대의 계획, 함정, 내 기보)은 처음 볼 때 한 번 만들고 저장해 둡니다.</span>` +
+        `<button type="button" class="btn primary" id="genBtn" style="align-self:flex-start">깊은 해설 만들기 · 10초 안팎</button></div>`;
+      el.innerHTML = html;
+      wireDepth(el);
+      document.getElementById('genBtn').onclick = () => {
+        const btn = document.getElementById('genBtn'); btn.disabled = true; btn.textContent = '책 수·엔진 라인·구조 계획을 확인하며 쓰는 중…';
+        setTimeout(() => {
+          state.generated[seq] = {
+            summary: ann ? ann.text : '시작 국면.', generated: true,
+            why: ['(시안) 실제 제품에서는 이 자리에 LLM이 책 수, 엔진 라인, 구조·계획 KB, 마이아 확률을 도구로 확인하며 쓴 두세 문단이 들어갑니다. 칸·기물을 말하는 문장은 검증기를 통과한 것만 남고(✓), 전략 판단은 "책·LLM 견해"로 표시됩니다.'],
+            alternatives: node ? [...node.children.values()].slice(0, 3).map((c) => [c.san, BOOK.get(c.key).name || '이름 없는 중간 국면']) : [],
+            replies: [], traps: [], mine: node && node.my ? `${node.my}판 · 승률 ${pct(node.score)}` : '내 기보에 없는 국면입니다.',
+          };
+          renderExplain();
+        }, 1400);
+      };
+      return;
+    }
+
+    const sec = (title, lvl, count, body) => `<details class="sec"${open(lvl)}><summary>${title}${count ? `<span class="n">${count}</span>` : ''}</summary><div class="body">${body}</div></details>`;
+    html += `<div class="summary">${mark(note.summary)}</div>`;
+    if (note.engine) html += `<div class="eng warn" style="font-size:12px;color:var(--ink-2);padding:6px 8px;border-left:3px solid var(--warn);background:var(--surface);border-radius:0 6px 6px 0">${note.engine}</div>`;
+    html += sec(note.offBook ? '왜 책이 아닌가' : '왜 이 수인가', 'normal', '', note.why.map((p) => `<p>${mark(p)}</p>`).join(''));
+    if (note.replies.length) html += sec('상대의 응수와 계획', 'normal', `${note.replies.length}가지`, note.replies.map(([s, t]) => `<div class="alt"><span class="mv">${s}</span><span>${mark(t)}</span></div>`).join(''));
+    if (note.alternatives.length) html += sec(note.offBook ? '책 수와 비교' : '대안과 비교', 'deep', `${note.alternatives.length}가지`, note.alternatives.map(([s, t]) => `<div class="alt${note.offBook ? ' good' : ''}"><span class="mv">${s}</span><span>${mark(t)}</span></div>`).join(''));
+    if (note.traps.length) html += sec('전형적인 실수와 함정', 'deep', `${note.traps.length}개`, note.traps.map((t, i) => {
+      const base = ply; // the trap line starts from this position
+      const steps = t.line.map((san, j) => `<button type="button" data-trap="${i}" data-step="${j + 1}" class="${state.preview && state.preview.key === `${i}:${j + 1}` ? 'on' : ''}">${label(base + j + 1, san)}</button>`).join('');
+      return `<div class="trap"><span class="tt">${t.title}</span><div class="steps">${steps}</div><span class="small">${mark(t.text)} <span class="faint">수를 누르면 보드에 미리보기</span></span></div>`;
+    }).join(''));
+    if (note.mine) html += sec('내 기보에서', 'deep', '', `<p>${note.mine}</p>`);
+    html += sec('더 깊이', 'deep', '', `<div class="ctrl"><button type="button" class="btn">엔진 라인 3개 보기</button><button type="button" class="btn">마스터 통계</button><button type="button" class="btn">튜터에게 질문 →</button><button type="button" class="btn">해설 다시 만들기</button></div>`);
+    html += `<div class="sources"><span>근거:</span><span class="badge neutral">책 · lichess TSV</span><span class="badge neutral">구조·계획 KB</span><span class="badge neutral">엔진 깊이 12</span><span class="badge neutral">마이아 1500</span><span class="badge ${note.generated ? 'dashed' : 'neutral'}">LLM 해설</span><span class="grow"></span><span><span class="v">문장</span> = 보드에서 확인된 사실 · 나머지는 책·LLM 견해</span></div>`;
+    el.innerHTML = html;
+    wireDepth(el);
+    el.querySelectorAll('[data-trap]').forEach((b) => b.addEventListener('click', () => {
+      const t = note.traps[+b.dataset.trap]; const n = +b.dataset.step;
+      const c = chessAt(ply); let last = null;
+      for (let j = 0; j < n; j++) { const mv = c.move(t.line[j]); if (!mv) break; last = mv.from + mv.to; }
+      state.preview = { fen: c.fen(), title: `${t.title} · ${t.line.slice(0, n).map((s, j) => label(ply + j + 1, s)).join(' ')}`, last, key: `${b.dataset.trap}:${n}` };
+      renderBoard(); renderPos(); renderExplain();
+    }));
+  }
+  function wireDepth(el) { el.querySelectorAll('[data-depth]').forEach((b) => b.addEventListener('click', () => { state.depth = b.dataset.depth; renderExplain(); })); }
+
+  // ---------- render: journal (chronological index; one line per move) ----------
+  function renderJournal() {
+    const el = document.getElementById('journal');
+    el.innerHTML = '';
+    if (!state.journal.length) { el.innerHTML = '<div class="empty">아직 둔 수가 없습니다. 첫 수를 두면 여기에 해설이 쌓입니다.</div>'; return; }
+    for (const e of state.journal) {
+      const d = document.createElement('div');
+      if (e.kind === 'rewind') { d.className = 'entry rewind'; d.innerHTML = `<span class="lab mono">↶</span><span>${e.toPly}수로 돌아가 <span class="mv">${e.was}</span> 대신 <span class="mv">${e.instead}</span></span>`; el.appendChild(d); continue; }
+      if (e.kind === 'jump') { d.className = 'entry jump'; d.innerHTML = `<span class="lab mono">↷</span><span>개요에서 점프: <span class="mv">${e.sans.join(' ')}</span> — 수순 전체를 한 번에 해설</span>`; el.appendChild(d); continue; }
+      const a = e.ann;
+      const onLine = state.plies[a.ply - 1] && state.plies[a.ply - 1].san === a.san && isOnLine(e);
+      const focused = onLine && a.ply === state.focusPly;
+      d.className = `entry${focused ? ' cur' : ''}${!onLine ? ' future' : ''}`;
+      d.setAttribute('role', 'button'); d.tabIndex = 0;
+      const tags = a.tags.slice(0, 4).map(([t, s]) => `<span class="badge ${t}">${s}</span>`).join('');
+      const note = NOTES[seqAtEntry(e)];
+      const brief = note ? note.summary.replace(/\[\[|\]\]/g, '') : a.text;
+      const first = brief.split(/(?<=\.)\s/)[0];
+      const eng = a.engine ? `<span class="badge ${a.engine.loss >= 10 ? 'bad' : a.engine.loss >= 4 ? 'warn' : 'neutral'}">엔진 ${a.engine.cls} −${a.engine.loss}%</span>` : '';
+      d.innerHTML = `<span class="lab mv">${a.label}</span>` +
+        `<div class="body"><div class="tags">${tags}${eng}</div>` +
+        `<div class="txt brief${e.pending ? ' pending' : ''}">${e.pending ? '해설을 만드는 중…' : first}</div></div>` +
+        `<span class="detail">${focused ? '◀ 옆 패널에 표시 중' : '자세히 →'}</span>`;
+      d.addEventListener('click', () => { if (onLine) goto(a.ply); });
+      d.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' && onLine) goto(a.ply); });
+      el.appendChild(d);
+    }
+  }
+  function seqAtEntry(e) {
+    // the SAN sequence this entry's move completed (from the current line when it is on it)
+    return e.seq ?? state.plies.slice(0, e.ply).map((p) => p.san).join(' ');
+  }
+  function isOnLine(entry) {
+    // an entry is on the current line if no later rewind cut below its ply
+    const i = state.journal.indexOf(entry);
+    for (let j = i + 1; j < state.journal.length; j++) { const e = state.journal[j]; if ((e.kind === 'rewind' && e.toPly < entry.ply) || e.kind === 'jump') return false; }
+    return true;
+  }
+
+  // ---------- render: strip (icicle over my games) ----------
+  function renderStrip() {
+    const el = document.getElementById('strip');
+    const W = el.clientWidth || 900;
+    el.innerHTML = '';
+    const pathKeys = new Set(state.plies.slice(0, state.cursor).map((p) => key(p.fen)));
+    const curKey = key(curFen());
+    const rootKey = key(START);
+    let row = [{ k: rootKey, x: 0, w: W, sans: [] }];
+    const cell = (c, ply, name, games, score) => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = `cell${pathKeys.has(c.k) ? ' on-path' : ''}${c.k === curKey ? ' focus' : ''}`;
+      b.style.cssText = `left:${c.x}px;top:${ply * 22}px;width:${Math.max(4, c.w - 1)}px;background:${scoreColor(score)}`;
+      b.textContent = c.w > 40 ? name : '';
+      b.title = `${name} · ${games}판 · 승률 ${pct(score)}`;
+      b.addEventListener('click', () => jumpTo(c.sans));
+      el.appendChild(b);
+    };
+    cell(row[0], 0, '시작', 286, .52);
+    for (let ply = 1; ply <= 5; ply++) {
+      const next = [];
+      for (const parent of row) {
+        const node = BOOK.get(parent.k); if (!node) continue;
+        const total = node.my || 1;
+        let x = parent.x;
+        const kids = [...node.children.values()].map((c) => ({ ...c, n: BOOK.get(c.key) })).filter((c) => c.n.my > 0).sort((a, b) => b.n.my - a.n.my);
+        for (const kid of kids) {
+          const w = parent.w * Math.min(1, kid.n.my / total);
+          if (w < 5) continue;
+          const c = { k: kid.key, x, w, sans: [...parent.sans, kid.san] };
+          cell(c, ply, label(ply, kid.san), kid.n.my, kid.n.score);
+          next.push(c); x += w;
+        }
+      }
+      row = next; if (!row.length) break;
+    }
+    document.getElementById('stripMeta').textContent = `${BOOK.size}노드 · 예시 데이터`;
+  }
+
+  // ---------- heat placeholder ----------
+  (function () { const h = document.getElementById('heat'); const hot = { c4: .5, e2: .2, b5: .15, d3: .1 }; for (let r = 8; r >= 1; r--) for (let f = 0; f < 8; f++) { const sq = FILES[f] + r; const i = document.createElement('i'); if ((f + r) % 2 === 0) i.className = 'd'; if (hot[sq]) i.style.background = `color-mix(in srgb, var(--good) ${Math.round(hot[sq] * 100)}%, ${(f + r) % 2 ? 'var(--board-light)' : 'var(--board-dark)'})`; h.appendChild(i); } })();
+
+  // ---------- controls ----------
+  document.getElementById('btnFirst').onclick = () => goto(0);
+  document.getElementById('btnPrev').onclick = () => goto(state.cursor - 1);
+  document.getElementById('btnNext').onclick = () => goto(state.cursor + 1);
+  document.getElementById('btnLast').onclick = () => goto(state.plies.length);
+  document.getElementById('btnFlip').onclick = () => { state.flip = !state.flip; render(); };
+  document.getElementById('btnReset').onclick = () => { if (state.plies.length) state.journal.push({ kind: 'jump', sans: ['새 수순'] }); state.plies = []; state.cursor = 0; state.sel = null; render(); };
+  document.getElementById('btnPlay').onclick = () => alert(`/play?fen=${encodeURIComponent(curFen())}\n\n(시안) 대국 화면으로 이어집니다.`);
+  document.getElementById('colW').onclick = () => setColor('white');
+  document.getElementById('colB').onclick = () => setColor('black');
+  function setColor(c) { state.color = c; state.flip = c === 'black'; document.getElementById('colW').classList.toggle('on', c === 'white'); document.getElementById('colB').classList.toggle('on', c === 'black'); document.getElementById('subtitle').textContent = `${c === 'white' ? '백' : '흑'} · 내 286판 위에 책과 마스터 DB를 겹침`; render(); }
+  document.querySelectorAll('#candSort [data-sort]').forEach((b) => b.addEventListener('click', () => { state.sort = b.dataset.sort; document.querySelectorAll('#candSort [data-sort]').forEach((x) => x.classList.toggle('on', x === b)); renderPos(); }));
+  document.getElementById('reqToggle').addEventListener('change', (e) => document.body.classList.toggle('show-req', e.target.checked));
+  document.body.classList.add('show-req');
+  boardEl.addEventListener('keydown', (e) => { if (e.key === 'ArrowLeft') goto(state.cursor - 1); if (e.key === 'ArrowRight') goto(state.cursor + 1); });
+  window.addEventListener('resize', renderStrip);
+
+  function render() { renderBoard(); renderPos(); renderSetups(); renderExplain(); renderJournal(); renderStrip(); }
+
+  // ---------- boot with a plausible session so the page shows what it does ----------
+  function start(saved) {
+    if (saved && saved.plies) { Object.assign(state, saved); render(); return; }
+    jumpTo(['e4', 'e5', 'Nf3', 'Nc6', 'Bb5', 'a6']);
+    state.journal.length = 0;                        // the seeded line reads as if played move by move
+    const c = new Chess();
+    ['e4', 'e5', 'Nf3', 'Nc6', 'Bb5', 'a6'].forEach((san, i) => { const b = new Chess(c.fen()); const mv = c.move(san); state.journal.push({ kind: 'move', ply: i + 1, ann: annotate(b, mv, i + 1), pending: false, seq: c.history().join(' ') }); });
+    // one off-book excursion, then the rewind back to the book: shows ④ and the journal rule
+    play('', 'Bc4');
+    state.journal[state.journal.length - 1].pending = false;
+    goto(6);
+    play('', 'Ba4');
+    state.journal[state.journal.length - 1].pending = false;
+    render();
+  }
+  try { window.claude?.hot?.snapshot?.(() => ({ plies: state.plies, cursor: state.cursor, journal: state.journal, flip: state.flip, color: state.color })); } catch (e) { /* no runtime */ }
+  if (window.claude?.hot?.ready) window.claude.hot.ready(start); else start(window.claude?.hot?.data ?? null);
+})();
+</script>
