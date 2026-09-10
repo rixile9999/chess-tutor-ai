@@ -6,6 +6,7 @@ import { api } from '../../api/client';
 import type { PuzzleOut } from '../../api/types';
 import { Board, type BoardShape } from '../../components/Board';
 import { MiniBoard } from '../../components/MiniBoard';
+import { PromotionPicker, type PromotionPiece } from '../../components/PromotionPicker';
 import { applyUci, legalDests, sideToMove } from '../../lib/chess';
 import { motifLabel, plyLabel } from '../../lib/labels';
 import { IconArrow, IconBulb, IconCheck, IconClock, IconSkip } from './icons';
@@ -36,6 +37,7 @@ type Run = {
 type Action =
   | { type: 'advance'; to: number; lastMove: [string, string]; total: number; fen: string }
   | { type: 'wrong' }
+  | { type: 'cancel' }
   | { type: 'hint' }
   | { type: 'view'; i: number | null };
 
@@ -54,6 +56,8 @@ function reduce(run: Run, a: Action): Run {
       const failed = wrong >= 2;
       return { ...run, wrong, nonce: run.nonce + 1, hint: false, phase: failed ? 'failed' : 'wrong', finishedAt: failed ? Date.now() : run.finishedAt };
     }
+    // A cancelled promotion is not a wrong answer; the board just snaps back.
+    case 'cancel': return { ...run, nonce: run.nonce + 1 };
     case 'hint': return { ...run, hint: true };
     case 'view': return { ...run, view: a.i };
   }
@@ -88,6 +92,7 @@ function Solver({ puzzle, remaining, upcoming, onFinished }: { puzzle: PuzzleOut
   const [attemptError, setAttemptError] = useState<string | null>(null);
   const [settled, setSettled] = useState(false);
   const [minWait, setMinWait] = useState(false);
+  const [promo, setPromo] = useState<{ orig: string; dest: string } | null>(null);
 
   const active = run.phase === 'solving' || run.phase === 'wrong';
   const solverSide = sideToMove(puzzle.fen);
@@ -152,17 +157,27 @@ function Solver({ puzzle, remaining, upcoming, onFinished }: { puzzle: PuzzleOut
     return [{ orig: step.from as Key, customSvg: { html: HINT_SVG } }];
   }, [run.hint, run.k, active, solution]);
 
+  const judge = useCallback((uci: string) => {
+    const expected = solution[run.k];
+    if (!expected) return;
+    const ok = uci === expected.uci || (uci.length === 4 && expected.uci.slice(0, 4) === uci);
+    if (ok) dispatch({ type: 'advance', to: run.k + 1, lastMove: [uci.slice(0, 2), uci.slice(2, 4)], total: solution.length, fen: expected.fen });
+    else dispatch({ type: 'wrong' });
+  }, [run.k, solution]);
+
   const onMove = useCallback((orig: string, dest: string) => {
     if (!active || run.busy || run.view !== null) return;
     const expected = solution[run.k];
     if (!expected) return;
     let promo = false;
     try { promo = new Chess(run.fen).get(orig as Square)?.type === 'p' && (dest[1] === '8' || dest[1] === '1'); } catch { /* ignore */ }
-    const uci = orig + dest + (promo ? 'q' : '');
-    const ok = uci === expected.uci || (promo && expected.uci.slice(0, 4) === orig + dest);
-    if (ok) dispatch({ type: 'advance', to: run.k + 1, lastMove: [orig, dest], total: solution.length, fen: expected.fen });
-    else dispatch({ type: 'wrong' });
-  }, [active, run.busy, run.view, run.k, run.fen, solution]);
+    if (!promo) { judge(orig + dest); return; }
+    // The solution decides the piece when it is a promotion here (under-promotions are the point of
+    // those puzzles); otherwise the solver picks, same as in 대국.
+    const solved = expected.uci.slice(0, 4) === orig + dest ? expected.uci[4] : '';
+    if (solved) { judge(orig + dest + solved); return; }
+    setPromo({ orig, dest });
+  }, [active, run.busy, run.view, run.k, run.fen, solution, judge]);
 
   const startPly = useMemo(() => {
     const parts = puzzle.fen.split(' ');
@@ -195,6 +210,16 @@ function Solver({ puzzle, remaining, upcoming, onFinished }: { puzzle: PuzzleOut
       <div className="tr-left" ref={ref}>
         <div className={`tr-board${shake ? ' shake' : ''}`}>
           <Board fen={boardFen} orientation={puzzle.orientation ?? solverSide} size={size} movable={movable} onMove={onMove} shapes={shapes} lastMove={boardLast} />
+          {promo && (
+            <PromotionPicker
+              color={sideToMove(run.fen)}
+              orientation={puzzle.orientation ?? solverSide}
+              square={promo.dest}
+              size={size}
+              onPick={(p: PromotionPiece) => { const { orig, dest } = promo; setPromo(null); judge(orig + dest + p); }}
+              onCancel={() => { setPromo(null); dispatch({ type: 'cancel' }); }}
+            />
+          )}
         </div>
         <div className="tr-controls">
           <button type="button" className="btn btn-ghost compact" onClick={() => dispatch({ type: 'hint' })} disabled={!active || run.hint || run.busy || broken}>

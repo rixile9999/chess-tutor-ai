@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import type { Color, MoveReviewOut, Plan, StrategyView } from '../../api/types';
 import { playSans } from '../../lib/chess';
 import { formatScore, plyLabel } from '../../lib/labels';
-import { maiaLabel, trainingHref } from './ExplanationPanel';
+import { maiaLabel, playHref } from './ExplanationPanel';
 import { ClassBadge, IconArrow, IconCheck, IconPlay, IconSave, LineChips, VerifyRow, pct, sideLabel, type Preview } from './shared';
 
 type Props = {
@@ -130,7 +130,7 @@ export function StrategyPanel({ review, strategy, ply, userColor, rating, boardF
       )}
 
       <VerifyRow explanation={review.explanation}>
-        <Link className="btn btn-primary" to={trainingHref(boardFen, rating)}><IconPlay /> 이 국면에서 이어 두기{maiaLabel(rating)}</Link>
+        <Link className="btn btn-primary" to={playHref(boardFen, rating, review.game_id, ply)}><IconPlay /> 이 국면에서 두기{maiaLabel(rating)}</Link>
         <button type="button" className="btn btn-ghost" onClick={onSavePuzzle}><IconSave /> 이 게임에서 퍼즐 만들기</button>
       </VerifyRow>
     </>

@@ -1,0 +1,12 @@
+/* Promotion popover drawn on top of a chessground board; the parent must be position: relative. */
+.pp-veil { position: absolute; inset: 0; z-index: 30; background: rgba(43, 38, 34, 0.35); }
+.pp-col { position: absolute; display: flex; flex-direction: column; border-radius: 6px; overflow: hidden; box-shadow: 0 6px 20px rgba(43, 38, 34, 0.35); }
+.pp-cell { position: relative; width: 100%; border: 0; padding: 0; background: var(--surface); cursor: pointer; }
+.pp-cell + .pp-cell { border-top: 1px solid var(--line); }
+.pp-cell:hover, .pp-cell:focus-visible { background: var(--paper); outline: none; }
+.pp-piece { position: absolute; inset: 6%; background-size: 100%; background-repeat: no-repeat; background-position: center; }
+.pp-key { position: absolute; right: 3px; bottom: 1px; font-family: var(--font-mono); font-size: 10px; color: var(--ink-3); }
+.pp-piece.wQ { background-image: var(--wQ); } .pp-piece.wN { background-image: var(--wN); }
+.pp-piece.wR { background-image: var(--wR); } .pp-piece.wB { background-image: var(--wB); }
+.pp-piece.bQ { background-image: var(--bQ); } .pp-piece.bN { background-image: var(--bN); }
+.pp-piece.bR { background-image: var(--bR); } .pp-piece.bB { background-image: var(--bB); }

@@ -1,11 +1,10 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, Navigate, useSearchParams } from 'react-router-dom';
 import { api } from '../../api/client';
 import type { PuzzleOut } from '../../api/types';
 import { getUsername, setUsername } from '../../lib/user';
 import { PuzzleSolver } from './PuzzleSolver';
-import { Sparring } from './Sparring';
 import { IconArrow, IconPlay } from './icons';
 import { errorText } from './util';
 import './training.css';
@@ -25,6 +24,13 @@ export default function TrainingPage() {
   const [metaEl, setMetaEl] = useState<HTMLElement | null>(null);
 
   useEffect(() => { setMetaEl(document.getElementById('topbar-meta')); }, []);
+
+  // 이어 두기 moved to /play (M7). Old links (?fen=…, ?tab=sparring) keep working by forwarding.
+  const playHref = useMemo(() => {
+    const n = new URLSearchParams();
+    for (const k of ['fen', 'rating', 'game', 'ply', 'color']) { const v = params.get(k); if (v) n.set(k, v); }
+    return `/play${n.size ? `?${n}` : ''}`;
+  }, [params]);
 
   useEffect(() => {
     if (!username) { setDue({ status: 'idle', puzzles: [], error: null }); return; }
@@ -55,7 +61,7 @@ export default function TrainingPage() {
       {metaEl && createPortal(
         <>
           <span style={{ color: 'var(--ink)', fontWeight: 600 }}>훈련</span>
-          <span>{tab === 'puzzles' ? '내 기보 퍼즐 · 간격 반복' : 'Maia와 이어 두기'}</span>
+          <span>{tab === 'puzzles' ? '내 기보 퍼즐 · 간격 반복' : '대국 화면으로 이동'}</span>
           {dueCount !== null && <span className="chip" style={{ height: 22 }}>복습 예정 {dueCount}</span>}
         </>,
         metaEl,
@@ -79,7 +85,13 @@ export default function TrainingPage() {
       </div>
 
       {tab === 'sparring' ? (
-        <Sparring key={fenParam ?? 'start'} />
+        fenParam !== null ? <Navigate to={playHref} replace /> : (
+          <div className="card tr-empty">
+            <div className="h3">이어 두기는 대국 화면으로 옮겼습니다</div>
+            <p className="muted">수동·AI 대국, 승급 선택, 코치 힌트, 저장해서 리뷰까지 대국 화면에서 이어집니다.</p>
+            <div className="tr-actions"><Link to={playHref} className="btn btn-primary"><IconPlay /> 대국 화면으로 <IconArrow /></Link></div>
+          </div>
+        )
       ) : !username ? (
         <UsernameGate onSubmit={submitUser} />
       ) : due.status === 'loading' || due.status === 'idle' ? (
@@ -90,7 +102,7 @@ export default function TrainingPage() {
           <p className="muted">{due.error}</p>
           <div className="tr-actions">
             <button type="button" className="btn btn-primary" onClick={() => setReload((n) => n + 1)}>다시 시도</button>
-            <button type="button" className="btn btn-ghost" onClick={() => setTab('sparring')}><IconPlay /> Maia와 이어 두기</button>
+            <Link to={playHref} className="btn btn-ghost"><IconPlay /> 대국하러 가기</Link>
           </div>
         </div>
       ) : due.puzzles.length === 0 ? (
@@ -99,7 +111,7 @@ export default function TrainingPage() {
           <p className="muted">리뷰 화면에서 실수한 수를 퍼즐로 저장하면 여기에 쌓입니다. 풀 때마다 간격이 늘어나고, 틀리면 다시 가까운 날짜에 돌아옵니다.</p>
           <div className="tr-actions">
             <Link to="/games" className="btn btn-primary">기보 보러 가기 <IconArrow /></Link>
-            <button type="button" className="btn btn-ghost" onClick={() => setTab('sparring')}><IconPlay /> Maia와 이어 두기</button>
+            <Link to={playHref} className="btn btn-ghost"><IconPlay /> 대국하러 가기</Link>
           </div>
         </div>
       ) : (

@@ -7,6 +7,7 @@ const NAV = [
   { to: '/openings', label: '오프닝', icon: IconOpenings },
   { to: '/profile', label: '프로필', icon: IconProfile },
   { to: '/training', label: '훈련', icon: IconTrain },
+  { to: '/play', label: '대국', icon: IconPlay },
 ];
 
 export function Shell() {
@@ -43,3 +44,5 @@ function IconReview() { return <svg {...S}><rect x="3" y="3" width="18" height="
 function IconOpenings() { return <svg {...S}><circle cx="5" cy="12" r="2.5" /><circle cx="19" cy="6" r="2.5" /><circle cx="19" cy="18" r="2.5" /><path d="M7.4 11L16.6 7M7.4 13l9.2 4" /></svg>; }
 function IconProfile() { return <svg {...S}><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7" /></svg>; }
 function IconTrain() { return <svg {...S}><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="4.5" /><circle cx="12" cy="12" r="1" /></svg>; }
+/** A pawn: the 대국 (practice game) screen. */
+function IconPlay() { return <svg {...S}><path d="M12 4a2.6 2.6 0 0 1 1.6 4.7c1.5.9 2.4 2.5 2.4 4.3h-8c0-1.8.9-3.4 2.4-4.3A2.6 2.6 0 0 1 12 4z" /><path d="M9 13c0 3-.7 5-2 7h10c-1.3-2-2-4-2-7" /></svg>; }

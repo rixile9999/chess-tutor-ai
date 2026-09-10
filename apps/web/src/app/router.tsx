@@ -5,6 +5,7 @@ import ReviewPage from '../pages/review';
 import ProfilePage from '../pages/profile';
 import OpeningsPage from '../pages/openings';
 import TrainingPage from '../pages/training';
+import PlayPage from '../pages/play';
 
 export const router = createBrowserRouter([
   {
@@ -20,6 +21,7 @@ export const router = createBrowserRouter([
       { path: 'profile/:username', element: <ProfilePage /> },
       { path: 'openings', element: <OpeningsPage /> },
       { path: 'training', element: <TrainingPage /> },
+      { path: 'play', element: <PlayPage /> },
     ],
   },
 ]);

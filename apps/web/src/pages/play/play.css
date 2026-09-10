@@ -1,0 +1,61 @@
+/* 대국 page. Layout comes from training.css (tr-page/tr-body/tr-left/tr-panel); this file adds the
+   pieces that only the play screen has: the 수동/AI segmented control, hint blocks and dialogs. */
+.pl-page .tr-panel { gap: 12px; }
+.pl-page .tr-tabs { margin: -4px 0 2px; }
+
+.pl-seg { display: inline-flex; border: 1px solid var(--line-strong); border-radius: 8px; overflow: hidden; align-self: flex-start; }
+.pl-seg-wide { align-self: stretch; }
+.pl-seg-btn { flex: 1; height: 32px; padding: 0 14px; font: inherit; font-size: 13px; font-weight: 600; font-family: var(--font-ui); color: var(--ink-2); background: var(--surface); border: 0; cursor: pointer; white-space: nowrap; }
+.pl-seg-btn + .pl-seg-btn { border-left: 1px solid var(--line); }
+.pl-seg-btn:hover { background: var(--paper); }
+.pl-seg-btn.on { background: var(--ink); color: var(--paper); }
+
+.pl-nav { width: 32px; height: 32px; border: 1px solid var(--line-strong); border-radius: 8px; background: transparent; color: var(--ink); font-size: 12px; cursor: pointer; }
+.pl-nav:hover:not(:disabled) { background: var(--surface); }
+.pl-nav:disabled { opacity: 0.4; cursor: default; }
+.pl-status { flex: 0 1 auto; min-height: 32px; padding: 0 12px; }
+
+.pl-tabbody { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.pl-movelist { max-height: 420px; }
+.pl-movelist .spacer { flex: 1; }
+.pl-mini { border: 0; background: none; color: var(--ink-3); font: inherit; font-size: 12px; cursor: pointer; padding: 0; }
+.pl-mini:disabled { opacity: 0.4; cursor: default; }
+button.tr-cell.pl-cell { border: 0; background: none; font: inherit; text-align: left; cursor: pointer; width: 100%; }
+button.tr-cell.pl-cell:hover { background: rgba(43, 38, 34, 0.06); }
+button.tr-cell.pl-cell.sel { background: rgba(43, 38, 34, 0.09); }
+.pl-tag { font-size: 10px; font-weight: 700; color: var(--ink-3); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; line-height: 15px; }
+.pl-tag.hint { color: var(--good); border-color: var(--good); }
+
+.pl-hints { display: flex; gap: 6px; flex-wrap: wrap; }
+.pl-hints .btn.on { border-color: var(--ink); background: var(--surface); }
+.pl-hints .badge { height: 16px; padding: 0 5px; font-size: 10px; }
+.pl-hint { display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); }
+.pl-text { margin: 0; font-size: 13.5px; line-height: 1.6; }
+.pl-plans { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+.pl-cand { display: flex; flex-direction: column; gap: 2px; }
+.pl-cand-why { margin: 0 0 2px 0; padding-left: 2px; }
+.pl-best { display: flex; flex-direction: column; gap: 6px; padding-top: 8px; border-top: 1px solid var(--line); }
+
+.pl-alert { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: 8px; background: var(--bad-bg); }
+.pl-alert.neutral { background: rgba(43, 38, 34, 0.06); }
+.pl-alert.good { background: var(--good-bg); }
+.pl-alert-why { display: flex; flex-direction: column; gap: 8px; padding-top: 8px; border-top: 1px solid var(--line); }
+.pl-drill .spacer { flex: 1; }
+
+.pl-check { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-2); cursor: pointer; }
+.pl-check input { accent-color: var(--ink); }
+
+.pl-families { display: flex; flex-direction: column; gap: 16px; }
+.pl-family { display: flex; flex-direction: column; gap: 8px; }
+.pl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+.pl-op { display: flex; gap: 12px; padding: 10px; align-items: flex-start; }
+.pl-op.on { border-color: var(--ink); }
+.pl-op-meta { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.pl-op-name { font-weight: 600; font-size: 13.5px; }
+.pl-op .btn { height: 26px; padding: 0 8px; font-size: 12px; }
+
+.pl-veil { position: fixed; inset: 0; z-index: 60; background: rgba(43, 38, 34, 0.4); display: flex; align-items: center; justify-content: center; padding: 24px; }
+.pl-dialog { width: min(560px, 100%); padding: 18px 20px; display: flex; flex-direction: column; gap: 10px; }
+.pl-dialog p { margin: 0; font-size: 13.5px; line-height: 1.6; }
+.pl-textarea { width: 100%; box-sizing: border-box; border: 1px solid var(--line-strong); border-radius: 8px; padding: 8px 10px; font-family: var(--font-mono); font-size: 12px; line-height: 1.6; background: var(--surface); color: var(--ink); resize: vertical; }
+.pl-textarea:focus { outline: 2px solid var(--ink); outline-offset: -1px; }

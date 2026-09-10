@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import type { MotifOut, MoveReviewOut } from '../../api/types';
+import { sideToMove } from '../../lib/chess';
 import { CLASS_TONE, formatScore, plyLabel } from '../../lib/labels';
 import { AlternativesSection, ComparisonSection, RefutationSection } from './ExplanationSections';
 import { ClassBadge, IconPlay, IconSave, VerifyRow, ratingBand, type Preview } from './shared';
@@ -10,8 +11,13 @@ type Props = {
   preview: Preview | null; onPreview: (p: Preview | null) => void; onSavePuzzle: () => void;
 };
 
-export function trainingHref(fen: string, rating: number | undefined): string {
-  return `/training?fen=${encodeURIComponent(fen)}${rating ? `&rating=${rating}` : ''}`;
+/** 이 국면에서 두기 → the 대국 screen (M7). `game`/`ply` let it link back to this review. */
+export function playHref(fen: string, rating: number | undefined, gameId?: number, ply?: number): string {
+  const q = new URLSearchParams({ fen, color: sideToMove(fen) });
+  if (rating) q.set('rating', String(rating));
+  if (gameId !== undefined) q.set('game', String(gameId));
+  if (ply !== undefined) q.set('ply', String(ply));
+  return `/play?${q}`;
 }
 export function maiaLabel(rating: number | undefined): string {
   return rating ? ` · Maia ${Math.round(rating / 100) * 100}` : '';
@@ -64,7 +70,7 @@ export function ExplanationPanel({ review, ply, rating, boardFen, preview, onPre
       )}
 
       <VerifyRow explanation={explanation}>
-        <Link className="btn btn-primary" to={trainingHref(boardFen, rating)}><IconPlay /> 이 국면에서 이어 두기{maiaLabel(rating)}</Link>
+        <Link className="btn btn-primary" to={playHref(boardFen, rating, review.game_id, ply)}><IconPlay /> 이 국면에서 두기{maiaLabel(rating)}</Link>
         <button type="button" className="btn btn-ghost" onClick={onSavePuzzle}><IconSave /> 이 게임에서 퍼즐 만들기</button>
       </VerifyRow>
     </>
