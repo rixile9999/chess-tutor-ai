@@ -1,21 +1,8 @@
-// Pure model behind the opening explorer: prune by game count, read the DAG as a tree,
-// fold single-child chains into steps, and lay the icicle overview out. No React here.
+// Pure model behind the opening map: prune by game count, read the DAG as a tree, walk a path back
+// to the root, and lay the icicle overview out. No React here.
 import type { OpeningEdge, OpeningMap, OpeningNode } from '../../api/types';
 
 export interface ChildEdge { edge: OpeningEdge; node: OpeningNode }
-
-/** One column cell: the move that starts a branch, folded up to the next decision point. */
-export interface Step {
-  start: OpeningNode;
-  end: OpeningNode;
-  /** start .. end inclusive; length 1 when nothing was folded. */
-  chain: OpeningNode[];
-  /** One SAN per ply of `chain`. */
-  sans: string[];
-  edgeGames: number;
-  edgeScore: number;
-  master: boolean;
-}
 
 export interface Tree {
   root: OpeningNode | null;
@@ -26,14 +13,11 @@ export interface Tree {
   primary: Map<string, string>;
   /** node id -> how many other parents reach it (>= 1 means a transposition merge). */
   others: Map<string, number>;
-  important: Set<string>;
-  /** anchor id -> its contracted children, memoised. */
-  steps: Map<string, Step[]>;
 }
 
 const EMPTY: Tree = {
   root: null, byId: new Map(), parents: new Map(), children: new Map(),
-  primary: new Map(), others: new Map(), important: new Set(), steps: new Map(),
+  primary: new Map(), others: new Map(),
 };
 
 const games = (n: OpeningNode | null | undefined) => n?.games ?? 0;
@@ -105,42 +89,7 @@ export function buildTree(map: OpeningMap | null | undefined, minGames: number):
     if (list.length > 1) others.set(id, list.length - 1);
   }
 
-  const important = new Set<string>();
-  for (const n of byId.values()) {
-    const kids = children.get(n.id) ?? [];
-    if (n.id === root.id || (n.name ?? '').trim() !== '' || n.is_tabiya || n.is_deviation
-      || n.master_only || kids.length !== 1) important.add(n.id);
-  }
-
-  return { root, byId, parents, children, primary, others, important, steps: new Map() };
-}
-
-/** The direct children of `anchor`, each followed through its single-child run to the next decision point. */
-export function stepsOf(tree: Tree, anchor: OpeningNode | null): Step[] {
-  if (!anchor) return [];
-  const hit = tree.steps.get(anchor.id);
-  if (hit) return hit;
-  const out: Step[] = [];
-  for (const first of tree.children.get(anchor.id) ?? []) {
-    const chain = [first.node];
-    const sans = [first.edge.san || first.node.san || ''];
-    const seen = new Set([anchor.id, first.node.id]);
-    let cur = first.node;
-    while (!tree.important.has(cur.id)) {
-      const kids = tree.children.get(cur.id) ?? [];
-      if (kids.length !== 1 || seen.has(kids[0].node.id)) break;
-      cur = kids[0].node;
-      seen.add(cur.id);
-      chain.push(cur);
-      sans.push(kids[0].edge.san || cur.san || '');
-    }
-    out.push({
-      start: first.node, end: cur, chain, sans,
-      edgeGames: first.edge.games ?? 0, edgeScore: first.edge.score, master: !!first.edge.master_only,
-    });
-  }
-  tree.steps.set(anchor.id, out);
-  return out;
+  return { root, byId, parents, children, primary, others };
 }
 
 /** root -> ... -> node, following the busiest parent at every ply. */
@@ -160,19 +109,17 @@ export function pathTo(tree: Tree, node: OpeningNode | null): OpeningNode[] {
   return out.reverse();
 }
 
-/** The nearest strict ancestor that is a decision point; null only for the root itself. */
-export function importantAncestor(tree: Tree, node: OpeningNode | null): OpeningNode | null {
+/** The SAN of every move on `pathTo(node)`, read off the edges so a transposition keeps its order. */
+export function pathSans(tree: Tree, node: OpeningNode | null): string[] {
   const path = pathTo(tree, node);
-  for (let i = path.length - 2; i >= 0; i--) if (tree.important.has(path[i].id)) return path[i];
-  return null;
-}
-
-/** The step under `importantAncestor(node)` whose chain passes through `node`. */
-export function currentStep(tree: Tree, node: OpeningNode | null): Step | null {
-  if (!node) return null;
-  const anchor = importantAncestor(tree, node);
-  if (!anchor) return null;
-  return stepsOf(tree, anchor).find((s) => s.chain.some((c) => c.id === node.id)) ?? null;
+  const out: string[] = [];
+  for (let i = 1; i < path.length; i += 1) {
+    const edge = (tree.children.get(path[i - 1].id) ?? []).find((c) => c.node.id === path[i].id);
+    const san = edge?.edge.san || path[i].san || '';
+    if (!san) break;
+    out.push(san);
+  }
+  return out;
 }
 
 // ---------- icicle overview ----------

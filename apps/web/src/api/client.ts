@@ -59,6 +59,18 @@ export const api = {
       get<T.PieceHeatmap>(`/openings/heatmap?username=${encodeURIComponent(username)}&color=${color}&piece=${piece}&through_move=${throughMove}`),
     breaks: (username: string, color: T.Color, structure?: string) =>
       get<T.BreakTiming[]>(`/openings/breaks?username=${encodeURIComponent(username)}&color=${color}${structure ? `&structure=${structure}` : ''}`),
+
+    /** Stateless: book candidates + setups for one position. Master numbers need a Lichess token server-side. */
+    position: (fen: string, color?: T.Color, masters = true) =>
+      get<T.PositionGuide>(
+        `/openings/position?fen=${encodeURIComponent(fen)}${color ? `&color=${color}` : ''}&masters=${masters ? 1 : 0}`,
+      ),
+    /** One move or a whole line; the answer keeps the order of `moves_san`. */
+    annotate: (body: T.AnnotateRequest) => post<T.AnnotateResponse>('/openings/annotate', body),
+    /** `{ status: "missing" }` (or 404) when no deep note was written for this (position, move) yet. */
+    note: (fen: string, san: string) =>
+      get<T.NoteLookup>(`/openings/note?fen=${encodeURIComponent(fen)}&san=${encodeURIComponent(san)}`),
+    makeNote: (body: T.NoteRequest) => post<T.OpeningNote>('/openings/note', body),
   },
 
   training: {

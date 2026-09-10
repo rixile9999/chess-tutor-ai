@@ -1,16 +1,29 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type FormEvent } from 'react';
 import { createPortal } from 'react-dom';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
+import type { Key } from 'chessground/types';
 import { api } from '../../api/client';
-import type { Color } from '../../api/types';
+import type { Color, TrapLine } from '../../api/types';
+import type { BoardShape } from '../../components/Board';
+import { applyUci } from '../../lib/chess';
 import { getUsername, setUsername } from '../../lib/user';
-import { Explorer } from './Explorer';
+import { errorText, useBoardSize } from '../training/util';
 import { Strip } from './Strip';
 import { Heatmap, defaultPiece, mirrorPiece, pieceOptions } from './Heatmap';
 import { BreakTimeline } from './BreakTimeline';
+import { Candidates, type MyMoves } from './Candidates';
+import { ExplainPanel } from './ExplainPanel';
+import { Journal } from './Journal';
+import { LineBoard, type PositionLine } from './LineBoard';
+import { SetupPanel } from './SetupPanel';
 import { useQuery } from './useQuery';
-import { buildTree, pathTo } from './model';
-import { plainLabel } from './colors';
+import { useGuide, positionKey } from './useGuide';
+import { cachedNote, rememberNote, useNote } from './useNote';
+import { buildTree, pathSans } from './model';
+import {
+  START_FEN, fenAt, initialLine, lastBookPly, lineReducer, moveLabel, onLine, pliesFrom, sansTo, seqKey,
+  type CandidateSort, type ExplainDepth,
+} from './line';
 import './openings.css';
 
 /** One fetch per (username, colour); the whole tree comes down and the chips prune it in the browser. */
@@ -18,15 +31,40 @@ const FETCH_DEPTH = 24;
 const FETCH_MIN_GAMES = 2;
 const MIN_GAMES = [2, 3, 5] as const;
 const THROUGH_MOVE = 15;
+const BOARD_MAX = 440;
 const COLOR_LABEL: Record<Color, string> = { white: '백', black: '흑' };
+const DEPTH_KEY = 'chess-tutor:openings:depth';
+
+function storedDepth(): ExplainDepth {
+  try {
+    const v = localStorage.getItem(DEPTH_KEY);
+    return v === 'brief' || v === 'deep' || v === 'normal' ? v : 'normal';
+  } catch { return 'normal'; }
+}
+
+/** `?color=white&moves=e4,e5,Nf3` — the line is restored from the URL on the first render (§4). */
+function readQuery(params: URLSearchParams): { color: Color | null; moves: string[] } {
+  const raw = params.get('color');
+  const moves = (params.get('moves') ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+  return { color: raw === 'white' || raw === 'black' ? raw : null, moves };
+}
 
 export default function OpeningsPage() {
+  const [params] = useSearchParams();
+  const boot = useRef<{ color: Color | null; moves: string[] } | null>(null);
+  if (!boot.current) boot.current = readQuery(params);
+
   const [username, setUser] = useState<string | null>(() => getUsername());
   const [editingUser, setEditingUser] = useState(false);
-  const [color, setColor] = useState<Color>('white');
+  const [color, setColor] = useState<Color>(boot.current.color ?? 'white');
   const [minGames, setMinGames] = useState<number>(FETCH_MIN_GAMES);
-  const [piece, setPiece] = useState<string>(() => defaultPiece('white'));
-  const [focusId, setFocusId] = useState<string | null>(null);
+  const [piece, setPiece] = useState<string>(() => defaultPiece(boot.current?.color ?? 'white'));
+  const [orientation, setOrientation] = useState<Color>(boot.current.color ?? 'white');
+  const [line, dispatch] = useReducer(lineReducer, undefined, () => initialLine(START_FEN, storedDepth()));
+  const [hover, setHover] = useState<string | null>(null);
+  const [marked, setMarked] = useState<string | null>(null);
+  const [generating, setGenerating] = useState(false);
+  const [genError, setGenError] = useState<string | null>(null);
 
   const mapQ = useQuery(
     () => (username ? api.openings.map(username, color, FETCH_DEPTH, FETCH_MIN_GAMES) : null),
@@ -38,40 +76,155 @@ export default function OpeningsPage() {
   const map = mapQ.data;
   const tree = useMemo(() => buildTree(map, minGames), [map, minGames]);
 
-  // Raising the threshold can prune the focus away; fall back along the path it used to be on.
-  const oldPath = useRef<string[]>([]);
-  const focus = useMemo(() => {
-    if (!tree.root) return null;
-    if (focusId) {
-      const hit = tree.byId.get(focusId);
-      if (hit) return hit;
-      for (let i = oldPath.current.length - 1; i >= 0; i--) {
-        const up = tree.byId.get(oldPath.current[i]);
-        if (up) return up;
-      }
-    }
-    return tree.root;
-  }, [tree, focusId]);
-  useEffect(() => { oldPath.current = pathTo(tree, focus).map((n) => n.id); }, [tree, focus]);
-  useEffect(() => { setFocusId(null); oldPath.current = []; }, [username, color, map]);
+  const cursorFen = fenAt(line, line.cursor);
+  const cursorKey = positionKey(cursorFen);
+  const guideQ = useGuide(cursorFen, color, true);
+  const guide = guideQ.data;
 
-  const pathIds = useMemo(() => new Set(pathTo(tree, focus).map((n) => n.id)), [tree, focus]);
+  // ---------- the line ----------
+  const annotate = useCallback((sans: string[]) => {
+    if (!sans.length) return;
+    dispatch({ type: 'annotating', sans });
+    // The whole line goes up every time: the server needs the move order to see transpositions,
+    // and it caps its own engine calls (ANNOTATE_ENGINE_CAP).
+    api.openings.annotate({ start_fen: START_FEN, moves_san: sans, color, engine: 'off_book', naturalness: true })
+      .then((res) => dispatch({ type: 'annotated', sans, annotations: res.annotations ?? [] }))
+      .catch((e: unknown) => dispatch({ type: 'annotateFailed', sans, message: errorText(e) }));
+  }, [color]);
+
+  const play = useCallback((uci: string) => {
+    const r = applyUci(fenAt(line, line.cursor), uci);
+    if (!r) return;
+    dispatch({ type: 'play', uci });
+    annotate([...sansTo(line, line.cursor), r.san]);
+  }, [line, annotate]);
+
+  const jumpTo = useCallback((sans: string[]) => {
+    dispatch({ type: 'jumpTo', sans });
+    annotate(pliesFrom(START_FEN, sans).map((p) => p.san));
+  }, [annotate]);
+
+  // First load only: restore ?moves= with one batch annotation.
+  const restored = useRef(false);
+  useEffect(() => {
+    if (restored.current) return;
+    restored.current = true;
+    if (boot.current?.moves.length) jumpTo(boot.current.moves);
+  }, [jumpTo]);
+
+  // Shareable URL without a navigation (the page state is the line, not the route).
+  useEffect(() => {
+    const q = new URLSearchParams({ color });
+    const sans = sansTo(line, line.cursor);
+    if (sans.length) q.set('moves', sans.join(','));
+    try { window.history.replaceState(null, '', `${window.location.pathname}?${q}`); } catch { /* ignore */ }
+  }, [color, line.plies, line.cursor]);
+
+  useEffect(() => { try { localStorage.setItem(DEPTH_KEY, line.depth); } catch { /* ignore */ } }, [line.depth]);
+
+  // ---------- the focused move and its deep note ----------
+  const focusPly = Math.min(line.focusPly, line.plies.length);
+  const focused = focusPly > 0 ? line.plies[focusPly - 1] : null;
+  const focusFenBefore = focusPly > 0 ? fenAt(line, focusPly - 1) : null;
+  const noteQ = useNote(focusFenBefore, focused?.san ?? null);
+
+  const generate = useCallback((regenerate: boolean) => {
+    if (!focused || !focusFenBefore) return;
+    setGenerating(true);
+    setGenError(null);
+    api.openings.makeNote({ fen: focusFenBefore, san: focused.san, username, regenerate })
+      .then((note) => { rememberNote(focusFenBefore, focused.san, note); noteQ.reload(); })
+      .catch((e: unknown) => setGenError(errorText(e)))
+      .finally(() => setGenerating(false));
+  }, [focused, focusFenBefore, username, noteQ]);
+
+  const onTrap = useCallback((trap: TrapLine, index: number, step: number) => {
+    const plies = pliesFrom(fenAt(line, focusPly), trap.line_san.slice(0, step));
+    if (!plies.length) return;
+    const last = plies[plies.length - 1];
+    dispatch({
+      type: 'preview',
+      preview: {
+        key: `${index}:${step}`,
+        fen: last.fen,
+        title: `${trap.title} · ${plies.map((p, i) => moveLabel(focusPly + i + 1, p.san)).join(' ')}`,
+        lastMove: [last.uci.slice(0, 2), last.uci.slice(2, 4)],
+      },
+    });
+  }, [line, focusPly]);
+
+  // ---------- board wiring ----------
+  const { ref: sideRef, size } = useBoardSize(BOARD_MAX);
+  const boardFen = line.preview ? line.preview.fen : cursorFen;
+  const lastMove = useMemo<[string, string] | null>(() => {
+    if (line.preview) return line.preview.lastMove;
+    const p = line.cursor > 0 ? line.plies[line.cursor - 1] : null;
+    return p && p.uci.length >= 4 ? [p.uci.slice(0, 2), p.uci.slice(2, 4)] : null;
+  }, [line.preview, line.cursor, line.plies]);
+  const shapes = useMemo<BoardShape[]>(() => {
+    const out: BoardShape[] = [];
+    if (hover && hover.length >= 4) out.push({ orig: hover.slice(0, 2) as Key, dest: hover.slice(2, 4) as Key, brush: 'blue' });
+    if (marked) out.push({ orig: marked as Key, brush: 'yellow' });
+    return out;
+  }, [hover, marked]);
+
+  // ---------- my record overlaid on this position (지도 DAG) ----------
+  const myMoves = useMemo<MyMoves>(() => {
+    const out: MyMoves = new Map();
+    for (const e of map?.edges ?? []) {
+      if (e.source === cursorKey && (e.games ?? 0) > 0) out.set(e.target, { games: e.games, score: e.score });
+    }
+    return out;
+  }, [map, cursorKey]);
+  const myNode = useMemo(() => map?.nodes?.find((n) => n.id === cursorKey) ?? null, [map, cursorKey]);
+
+  const position: PositionLine = {
+    text: line.plies.slice(0, line.cursor).map((p) => p.label).join(' '),
+    turn: cursorFen.split(' ')[1] === 'b' ? 'black' : 'white',
+    name: guide?.name ?? null,
+    eco: guide?.eco ?? null,
+    inBook: guide?.in_book ?? true,
+    record: myNode && (myNode.games ?? 0) > 0 ? { games: myNode.games, score: myNode.score } : null,
+    merges: (tree.others.get(cursorKey) ?? 0) + 1,
+  };
+
+  // Journal summaries: a stored note wins over the one-line annotation (§9.3). An entry left behind by
+  // a rewind still points at its own line, so its position is replayed from its `seq`.
+  const noteSummaries = useMemo(() => {
+    const out = new Map<string, string>();
+    for (const e of line.journal) {
+      if (e.kind !== 'move' || !e.seq.length) continue;
+      const key = seqKey(e.seq);
+      if (out.has(key)) continue;
+      const before = onLine(line, e) ? fenAt(line, e.ply - 1) : fenAfterSans(e.seq.slice(0, -1));
+      const note = before ? cachedNote(before, e.seq[e.seq.length - 1]) : null;
+      if (note) out.set(key, note.summary);
+    }
+    return out;
+  }, [line, noteQ.data]);
+
+  const bookPly = lastBookPly(line);
+  const pathIds = useMemo(
+    () => new Set([tree.root?.id ?? '', ...line.plies.slice(0, line.cursor).map((p) => positionKey(p.fen))].filter(Boolean)),
+    [tree, line.plies, line.cursor],
+  );
+
+  // Raising the threshold or switching colour never touches the line; only the strip is redrawn.
+  const changeColor = (c: Color) => {
+    if (c === color) return;
+    setColor(c);
+    setOrientation(c);
+    setPiece((p) => mirrorPiece(p, c));
+  };
 
   // First load: if the user has no games as the default colour, show the other colour instead of an empty map.
   const [autoSwitched, setAutoSwitched] = useState(false);
   useEffect(() => {
     if (autoSwitched || mapQ.status !== 404) return;
     setAutoSwitched(true);
-    const other: Color = color === 'white' ? 'black' : 'white';
-    setColor(other);
-    setPiece((p) => mirrorPiece(p, other));
+    changeColor(color === 'white' ? 'black' : 'white');
   }, [mapQ.status, autoSwitched, color]);
 
-  const changeColor = (c: Color) => {
-    if (c === color) return;
-    setColor(c);
-    setPiece((p) => mirrorPiece(p, c));
-  };
   const saveUser = (name: string) => {
     const v = name.trim();
     if (!v) return;
@@ -88,7 +241,8 @@ export default function OpeningsPage() {
   const subtitle = username
     ? [COLOR_LABEL[color], rootName, map ? `내 ${total}판 위에 마스터 DB를 겹침` : '내 기보 위에 마스터 DB를 겹침'].filter(Boolean).join(' · ')
     : '사용자명을 입력하면 내 기보 위에 마스터 DB를 겹쳐 보여줍니다';
-  const crumbLabel = focus ? plainLabel(focus.label) : '';
+  const crumbLabel = focused?.label ?? guide?.name ?? '';
+  const urlHint = `/openings?color=${color}${line.cursor ? `&moves=${sansTo(line, line.cursor).join(',')}` : ''}`;
 
   const [metaEl, setMetaEl] = useState<HTMLElement | null>(null);
   useEffect(() => { setMetaEl(document.getElementById('topbar-meta')); }, []);
@@ -136,7 +290,7 @@ export default function OpeningsPage() {
       <div className="card op-card">
         <div className="op-card-head" style={{ alignItems: 'baseline' }}>
           <span className="h3">레퍼토리 개요</span>
-          <span className="small muted">폭은 판수, 색은 내 승률. 칸을 누르면 아래 탐색기가 그 국면으로 이동합니다</span>
+          <span className="small muted">폭은 판수, 색은 내 승률. 칸을 누르면 보드가 그 수순으로 점프하고 수순 전체가 일지에 붙습니다</span>
           <div className="op-grow" />
           {map && !noGames && <span className="small faint mono">{(map.nodes ?? []).length}노드 · {(map.edges ?? []).length}가지</span>}
         </div>
@@ -156,18 +310,13 @@ export default function OpeningsPage() {
           </div>
         ) : mapQ.error ? (
           <ErrorState message={mapQ.error} status={mapQ.status} onRetry={mapQ.reload} />
-        ) : !map ? (
-          <div className="op-state"><div className="op-spinner" /></div>
-        ) : !focus ? (
+        ) : !tree.root ? (
           <div className="op-state">
             <div>표시할 가지가 없습니다.</div>
             <div className="small faint">최소 판수를 낮춰 보세요.</div>
           </div>
         ) : (
-          <>
-            <Strip tree={tree} focusId={focus.id} pathIds={pathIds} onFocus={(n) => setFocusId(n.id)} />
-            <Explorer tree={tree} focus={focus} color={color} onFocus={(n) => setFocusId(n.id)} />
-          </>
+          <Strip tree={tree} focusId={cursorKey} pathIds={pathIds} onFocus={(n) => jumpTo(pathSans(tree, n))} />
         )}
 
         <div className="op-legend">
@@ -177,6 +326,98 @@ export default function OpeningsPage() {
           <span className="item">합류 = 다른 수순으로도 도달</span>
           <span className="item"><span className="op-sw-dash" />점선 = 마스터 DB에만 있는 수</span>
         </div>
+      </div>
+
+      <div className="card op-card">
+        <div className="op-card-head">
+          <span className="h3">국면 탐색</span>
+          <span className="small muted">보드에서 직접 두거나 후보를 누르세요. 책에 없는 수도 둘 수 있습니다</span>
+          <div className="op-grow" />
+          <span className="small faint mono">{urlHint}</span>
+        </div>
+
+        <div className="op-line-explore">
+          <div className="op-line-side" ref={sideRef}>
+            <LineBoard
+              fen={boardFen}
+              orientation={orientation}
+              size={size}
+              canPlay={!line.preview}
+              onPlay={play}
+              lastMove={lastMove}
+              shapes={shapes}
+              preview={line.preview}
+              onClearPreview={() => dispatch({ type: 'preview', preview: null })}
+              cursor={line.cursor}
+              plyCount={line.plies.length}
+              onGoto={(c) => dispatch({ type: 'goto', cursor: c })}
+              onFlip={() => setOrientation((o) => (o === 'white' ? 'black' : 'white'))}
+              onReset={() => dispatch({ type: 'reset' })}
+              position={position}
+              playHref={`/play?fen=${encodeURIComponent(cursorFen)}&color=${color}`}
+            />
+            <SetupPanel
+              setups={guide?.setups ?? []}
+              side={position.turn}
+              loading={guideQ.loading}
+              marked={marked}
+              onMark={setMarked}
+            />
+          </div>
+
+          <ExplainPanel
+            ply={focusPly}
+            label={focused?.label ?? null}
+            annotation={focused?.annotation ?? null}
+            name={guide?.name ?? null}
+            eco={guide?.eco ?? null}
+            note={noteQ.data}
+            loading={noteQ.loading}
+            error={noteQ.error}
+            onRetry={noteQ.reload}
+            depth={line.depth}
+            onDepth={(d) => dispatch({ type: 'setDepth', depth: d })}
+            generating={generating}
+            genError={genError}
+            onGenerate={generate}
+            onTrap={onTrap}
+            previewKey={line.preview?.key ?? null}
+          />
+        </div>
+
+        <div className="op-cand-area">
+          <Candidates
+            candidates={guide?.candidates ?? []}
+            mine={myMoves}
+            sort={line.sort}
+            onSort={(s: CandidateSort) => dispatch({ type: 'setSort', sort: s })}
+            orientation={orientation}
+            onPlay={play}
+            onHover={setHover}
+            loading={guideQ.loading}
+            error={guideQ.error}
+            onRetry={guideQ.reload}
+            onBackToBook={() => dispatch({ type: 'goto', cursor: bookPly })}
+            backToBookLabel={bookPly ? line.plies[bookPly - 1].label : '시작 국면'}
+          />
+        </div>
+      </div>
+
+      <div className="card op-card">
+        <div className="op-card-head">
+          <span className="h3">해설 일지</span>
+          <span className="small muted">
+            둔 수의 시간순 색인. 항목을 누르면 보드가 그 국면으로 가고 옆 패널이 그 수의 해설로 바뀝니다. 되돌아가 다른 수를 두어도 이전 항목은 지워지지 않습니다
+          </span>
+        </div>
+        <Journal
+          journal={line.journal}
+          plies={line.plies}
+          focusPly={focusPly}
+          onGoto={(ply) => dispatch({ type: 'goto', cursor: ply })}
+          onRetry={annotate}
+          noteSummary={(seq) => noteSummaries.get(seqKey(seq)) ?? null}
+        />
       </div>
 
       <div className="op-below">
@@ -227,6 +468,13 @@ export default function OpeningsPage() {
       </div>
     </div>
   );
+}
+
+/** FEN after a SAN list from the start position; null when the list does not replay. */
+function fenAfterSans(sans: string[]): string | null {
+  if (!sans.length) return START_FEN;
+  const plies = pliesFrom(START_FEN, sans);
+  return plies.length === sans.length ? plies[plies.length - 1].fen : null;
 }
 
 function UsernameCard({ initial, onSave, onCancel }: { initial: string; onSave: (name: string) => void; onCancel?: () => void }) {

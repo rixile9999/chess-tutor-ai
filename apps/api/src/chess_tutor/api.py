@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import threading
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -15,7 +16,7 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 from chess_tutor import __version__
 from chess_tutor import openings as openings_book
 from chess_tutor.config import get_settings
-from chess_tutor.db import init_db
+from chess_tutor.db import init_db, session_factory
 from chess_tutor.engine import pool
 from chess_tutor.jobs import runner
 from chess_tutor.routers import (
@@ -23,6 +24,7 @@ from chess_tutor.routers import (
     chat,
     games,
     maia,
+    opening_guide,
     openings,
     play,
     positions,
@@ -30,7 +32,9 @@ from chess_tutor.routers import (
     review,
     training,
 )
-from chess_tutor.services import chat_tools
+from chess_tutor.services import chat_tools, opening_notes
+
+log = logging.getLogger(__name__)
 
 
 class _MCPMount:
@@ -72,9 +76,25 @@ def build_mcp_app() -> ASGIApp:
     )
 
 
+async def _seed_opening_notes() -> None:
+    """Store the hand-written opening notes that are not in the table yet (plan §9.2).
+
+    Idempotent and never fatal: the map still works without them, so a broken seed file costs a
+    warning, not the server."""
+    try:
+        async with session_factory()() as session:
+            added = await opening_notes.load_seed(session)
+    except Exception as exc:  # noqa: BLE001 - startup must survive a bad seed file
+        log.warning("opening notes: seed not loaded (%s)", exc)
+        return
+    if added:
+        log.info("opening notes: %d seeded notes stored", added)
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     await init_db()
+    await _seed_opening_notes()
     runner.start()
     # The opening book (3,810 TSV lines, every prefix indexed) takes ~2.5 s to build and is
     # only used by /play and /openings. A thread keeps startup instant and makes the first
@@ -92,7 +112,19 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 app = FastAPI(title="chess-tutor", version=__version__, lifespan=lifespan)
 
-for r in (positions, games, analysis, review, chat, profile, openings, training, maia, play):
+for r in (
+    positions,
+    games,
+    analysis,
+    review,
+    chat,
+    profile,
+    openings,
+    opening_guide,
+    training,
+    maia,
+    play,
+):
     app.include_router(r.router)
 
 app.mount("/mcp", mcp_mount, name="mcp")
