@@ -1,9 +1,13 @@
 import { useEffect, useMemo, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import type { Classification, GameAnalysis, GameDetail } from '../../api/types';
 import { plyLabel } from '../../lib/labels';
 import { ClassBadge } from './shared';
 
 type Props = { game: GameDetail; analysis: GameAnalysis | null; ply: number; onSelect: (ply: number) => void };
+
+/** The opening map reads a line, not a game: 24 plies is where the map stops being about the opening. */
+const MAP_PLIES = 24;
 
 function resultText(game: GameDetail): string {
   const moves = Math.ceil(game.moves.length / 2);
@@ -51,9 +55,22 @@ export function MoveList({ game, analysis, ply, onSelect }: Props) {
     );
   };
 
+  // 오프닝 지도에서 보기 (M8 §6.3): the first plies of this game as a line on the opening map.
+  const mapHref = useMemo(() => {
+    const sans = game.moves.slice(0, MAP_PLIES).map((mv) => mv.san).filter(Boolean);
+    if (!sans.length) return null;
+    const q = new URLSearchParams({ moves: sans.join(',') });
+    if (game.user_color) q.set('color', game.user_color);
+    return `/openings?${q}`;
+  }, [game.moves, game.user_color]);
+
   return (
     <div className="card rv-moves">
-      <div className="rv-moves-head"><span className="eyebrow">기보</span><span className="small muted" title={note}>{note}</span></div>
+      <div className="rv-moves-head">
+        <span className="eyebrow">기보</span>
+        <span className="small muted" title={note}>{note}</span>
+        {mapHref && <Link className="small rv-map-link" to={mapHref}>오프닝 지도에서 보기</Link>}
+      </div>
       <div className="rv-row">
         <div className="mono faint rv-row-n">0.</div>
         <button type="button" ref={ply === 0 ? selectedRef : undefined} className={`rv-cell start${ply === 0 ? ' selected' : ''}`} onClick={() => onSelect(0)}>
