@@ -1,5 +1,6 @@
+import { useState } from 'react';
 import type { CoachPreset, OpponentKind, OpponentSpec } from '../../api/types';
-import { ALERT_LABEL, CONTROL_LABEL, PRESETS, PRESET_LABEL, type AlertMode, type CoachSettings, type Control } from './state';
+import { ALERT_LABEL, CONTROL_LABEL, PRESETS, PRESET_LABEL, type AlertMode, type CoachSettings, type Control, type TimeControl } from './state';
 
 /** Rating ranges the backends actually support (docs 5.2): Maia-2 buckets, Stockfish UCI_Elo. */
 export const OPPONENT_RANGE: Record<OpponentKind, { min: number; max: number; step: number }> = {
@@ -24,6 +25,19 @@ const PRESET_NOTE: Record<CoachPreset, string> = {
   free: '알림 없이 자유롭게. 분석판 용도입니다.',
 };
 
+/** 시간 제한 presets (4.2). 직접 입력 is the escape hatch for anything else. */
+export const TIME_PRESETS: { label: string; tc: TimeControl | null }[] = [
+  { label: '없음', tc: null },
+  { label: '5+0', tc: { initial: 300, increment: 0 } },
+  { label: '10+0', tc: { initial: 600, increment: 0 } },
+  { label: '15+10', tc: { initial: 900, increment: 10 } },
+];
+
+function samePreset(a: TimeControl | null, b: TimeControl | null): boolean {
+  if (!a || !b) return a === b;
+  return a.initial === b.initial && a.increment === b.increment;
+}
+
 type Props = {
   control: Control;
   onControl: (c: Control) => void;
@@ -32,13 +46,15 @@ type Props = {
   coach: CoachSettings;
   onPreset: (p: CoachPreset) => void;
   onCoach: (c: Partial<CoachSettings>) => void;
+  timeControl: TimeControl | null;
+  onTimeControl: (tc: TimeControl | null) => void;
   username: string | null;
   onUsername: (name: string) => void;
   onNewGame: () => void;
 };
 
 /** 설정 tab: who holds the pieces, who the opponent is, and how much the coach says. */
-export function SettingsPanel({ control, onControl, opponent, onOpponent, coach, onPreset, onCoach, username, onUsername, onNewGame }: Props) {
+export function SettingsPanel({ control, onControl, opponent, onOpponent, coach, onPreset, onCoach, timeControl, onTimeControl, username, onUsername, onNewGame }: Props) {
   const range = OPPONENT_RANGE[opponent.kind];
   return (
     <div className="pl-tabbody">
@@ -110,6 +126,14 @@ export function SettingsPanel({ control, onControl, opponent, onOpponent, coach,
       </div>
 
       <div className="tr-section">
+        <span className="eyebrow">시간 제한</span>
+        <TimePicker value={timeControl} onChange={onTimeControl} />
+        <span className="small faint">
+          시간을 바꾸면 양쪽 시계가 처음부터 다시 갑니다. 내 시계가 0이 되면 시간패로 게임이 끝납니다 — 상대 시계는 참고용이라 떨어져도 계속 둡니다.
+        </span>
+      </div>
+
+      <div className="tr-section">
         <span className="eyebrow">저장</span>
         <form
           className="tr-actions"
@@ -125,5 +149,39 @@ export function SettingsPanel({ control, onControl, opponent, onOpponent, coach,
         <button type="button" className="btn btn-ghost compact" onClick={onNewGame}>새 게임</button>
       </div>
     </div>
+  );
+}
+
+/** 없음 / 5+0 / 10+0 / 15+10 / 직접 입력(분 + 초 가산). */
+function TimePicker({ value, onChange }: { value: TimeControl | null; onChange: (tc: TimeControl | null) => void }) {
+  const preset = TIME_PRESETS.find((p) => samePreset(p.tc, value)) ?? null;
+  const [custom, setCustom] = useState(() => ({
+    minutes: value ? Math.max(1, Math.round(value.initial / 60)) : 10,
+    increment: value?.increment ?? 5,
+  }));
+  const customOn = value !== null && preset === null;
+  const apply = (next: { minutes: number; increment: number }) => {
+    setCustom(next);
+    onChange({ initial: Math.max(1, Math.round(next.minutes)) * 60, increment: Math.max(0, Math.round(next.increment)) });
+  };
+  return (
+    <>
+      <div className="pl-seg">
+        {TIME_PRESETS.map((p) => (
+          <button key={p.label} type="button" className={`pl-seg-btn${!customOn && samePreset(p.tc, value) ? ' on' : ''}`} onClick={() => onChange(p.tc)}>{p.label}</button>
+        ))}
+        <button type="button" className={`pl-seg-btn${customOn ? ' on' : ''}`} onClick={() => apply(custom)}>직접</button>
+      </div>
+      {customOn && (
+        <div className="tr-field">
+          <label htmlFor="pl-tc-min">분</label>
+          <input id="pl-tc-min" className="tr-input" style={{ width: 64 }} type="number" min={1} max={180} value={custom.minutes}
+            onChange={(e) => apply({ ...custom, minutes: Number(e.target.value) || 1 })} />
+          <label htmlFor="pl-tc-inc">가산(초)</label>
+          <input id="pl-tc-inc" className="tr-input" style={{ width: 64 }} type="number" min={0} max={60} value={custom.increment}
+            onChange={(e) => apply({ ...custom, increment: Number(e.target.value) || 0 })} />
+        </div>
+      )}
+    </>
   );
 }

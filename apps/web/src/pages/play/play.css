@@ -59,3 +59,19 @@ button.tr-cell.pl-cell.sel { background: rgba(43, 38, 34, 0.09); }
 .pl-dialog p { margin: 0; font-size: 13.5px; line-height: 1.6; }
 .pl-textarea { width: 100%; box-sizing: border-box; border: 1px solid var(--line-strong); border-radius: 8px; padding: 8px 10px; font-family: var(--font-mono); font-size: 12px; line-height: 1.6; background: var(--surface); color: var(--ink); resize: vertical; }
 .pl-textarea:focus { outline: 2px solid var(--ink); outline-offset: -1px; }
+
+/* 시계 (M7d). Top chip is the opponent, bottom is the user, both following the board orientation. */
+.pl-clock { display: flex; align-items: center; gap: 10px; align-self: stretch; padding: 6px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+.pl-clock.on { border-color: var(--ink); background: var(--paper); }
+.pl-clock-label { font-size: 12.5px; color: var(--ink-2); }
+.pl-clock-time { margin-left: auto; font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: 0.5px; }
+.pl-clock.low .pl-clock-time { color: var(--bad); }
+.pl-clock.low.on { border-color: var(--bad); }
+
+/* 튜터에게 질문 tab. The transcript scrolls inside the panel instead of stretching the page. */
+.pl-tabnote { margin-top: -6px; }
+.pl-chat { min-height: 320px; }
+.pl-chat .ch-chat-log { max-height: 520px; }
+.pl-chip-btn { cursor: pointer; font-family: var(--font-ui); text-align: left; }
+.pl-chip-btn:hover:not(:disabled) { border-color: var(--ink); color: var(--ink); }
+.pl-chip-btn:disabled { opacity: 0.5; cursor: default; }

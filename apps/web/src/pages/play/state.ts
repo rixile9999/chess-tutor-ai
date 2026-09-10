@@ -21,6 +21,8 @@ export type Ply = {
 };
 
 export type CoachSettings = { preset: CoachPreset; alerts: AlertMode; takebacks: boolean; hints: boolean };
+/** Seconds on the clock at the start and added after each move (M7d). */
+export type TimeControl = { initial: number; increment: number };
 export type OpeningState = { id: string; name: string; line: string[]; tabiyaFen: string; drill: boolean };
 export type DrillDeviation = { expected: string; played: string; fenBefore: string };
 
@@ -47,7 +49,11 @@ export type PlayState = {
   drillLeft: boolean;
   drawOffer: DrawOffer;
   savedGameId: number | null;
-  /** M7d slot: per-ply remaining seconds. Nothing writes it yet. */
+  /** Null = 시간 없음. Kept across restarts like the other table settings. */
+  timeControl: TimeControl | null;
+  /** Milliseconds left per side, null without a time control. The page ticks it down. */
+  remaining: { white: number; black: number } | null;
+  /** Seconds left for the mover after each ply (index = ply); the save turns these into %clk. */
   clocks: number[] | null;
 };
 
@@ -82,6 +88,9 @@ export type PlayAction =
   | { type: 'alert'; check: PlayCheckResponse }
   | { type: 'dismissAlert' }
   | { type: 'hintShown'; level: HintLevel; fen: string }
+  | { type: 'askedTutor' }
+  | { type: 'setTimeControl'; timeControl: TimeControl | null }
+  | { type: 'tick'; ms: number }
   | { type: 'saved'; gameId: number };
 
 export function validFen(fen: string | null | undefined): string | null {
@@ -144,6 +153,31 @@ export function detectEnd(c: Chess): { result: PlayResult; termination: string }
   return { result: '1/2-1/2', termination: '무승부' };
 }
 
+/** "600+0" for the PGN TimeControl header; null when the game had no clocks. */
+export function timeControlText(tc: TimeControl | null): string | null {
+  return tc ? `${Math.round(tc.initial)}+${Math.round(tc.increment)}` : null;
+}
+
+export function startingRemaining(tc: TimeControl | null): { white: number; black: number } | null {
+  return tc ? { white: tc.initial * 1000, black: tc.initial * 1000 } : null;
+}
+
+/** Both clocks after `n` plies, read back from the recorded per-ply seconds (물리기·잘라내기). */
+export function remainingAfter(s: PlayState, n: number): { white: number; black: number } | null {
+  const out = startingRemaining(s.timeControl);
+  if (!out) return null;
+  const clocks = s.clocks ?? [];
+  for (let i = 0; i < n && i < clocks.length && i < s.plies.length; i += 1) {
+    out[sideToMoveOf(i === 0 ? s.startFen : s.plies[i - 1].fen)] = Math.max(0, clocks[i]) * 1000;
+  }
+  return out;
+}
+
+/** Clock state after a move list was cut back to `n` plies. */
+function rewindClocks(s: PlayState, n: number): Pick<PlayState, 'remaining' | 'clocks'> {
+  return { remaining: remainingAfter(s, n), clocks: s.clocks ? s.clocks.slice(0, n) : null };
+}
+
 export function practiceModeOf(s: Pick<PlayState, 'opening'>): PracticeMode {
   if (!s.opening) return 'free';
   return s.opening.drill ? 'drill' : 'tabiya';
@@ -182,10 +216,14 @@ export function initialState(over: Partial<PlayState> = {}): PlayState {
     drillLeft: false,
     drawOffer: 'none',
     savedGameId: null,
-    clocks: null,
+    timeControl: null,
     ...over,
     // A restored payload may carry an unreadable FEN or a cursor past the end of the move list.
     startFen,
+    // A restored payload may carry a time control without the clocks that go with it.
+    ...(over.timeControl
+      ? { remaining: over.remaining ?? startingRemaining(over.timeControl), clocks: over.clocks ?? [] }
+      : { remaining: null, clocks: null }),
     ...(over.plies ? { cursor: Math.max(0, Math.min(over.plies.length, over.cursor ?? over.plies.length)) } : null),
   };
 }
@@ -207,7 +245,8 @@ function reset(s: PlayState, over: Partial<PlayState>): PlayState {
     drillLeft: false,
     drawOffer: 'none',
     savedGameId: null,
-    clocks: null,
+    remaining: startingRemaining(s.timeControl),
+    clocks: s.timeControl ? [] : null,
     ...over,
   };
 }
@@ -238,6 +277,15 @@ function push(s: PlayState, plies: Ply[], ply: Ply): PlayState {
     hintsShown: [],
     hintFen: null,
   };
+  // The mover keeps what is left plus the increment, and that is what the PGN records for this ply.
+  if (s.timeControl && s.remaining) {
+    const mover = sideToMoveOf(plies.length ? plies[plies.length - 1].fen : s.startFen);
+    const left = Math.max(0, s.remaining[mover]) + s.timeControl.increment * 1000;
+    const past = (s.clocks ?? []).slice(0, plies.length);
+    while (past.length < plies.length) past.push(Math.round(s.timeControl.initial));
+    next.remaining = { ...s.remaining, [mover]: left };
+    next.clocks = [...past, Math.round(left / 1000)];
+  }
   const expected = s.opening && !s.drillLeft && s.opening.drill ? s.opening.line[plies.length] : undefined;
   if (ply.by === 'user' && expected && expected !== ply.san) {
     next.drillDeviation = { expected, played: ply.san, fenBefore: plies.length ? plies[plies.length - 1].fen : s.startFen };
@@ -256,7 +304,8 @@ export function playReducer(s: PlayState, a: PlayAction): PlayState {
       if (a.type === 'move' && s.cursor !== s.plies.length) return s;
       const r = playUci(liveFen({ startFen: s.startFen, plies }), a.uci);
       if (!r) return s;
-      return push(s, plies, { ...r, by: 'user', source: null, prob: null, hintLevel: a.hintLevel ?? null });
+      const base = a.type === 'truncateAndMove' ? { ...s, ...rewindClocks(s, s.cursor) } : s;
+      return push(base, plies, { ...r, by: 'user', source: null, prob: null, hintLevel: a.hintLevel ?? null });
     }
     case 'aiMove': {
       if (s.status !== 'playing') return s;
@@ -291,6 +340,7 @@ export function playReducer(s: PlayState, a: PlayAction): PlayState {
         drawOffer: 'none',
         hintsShown: [],
         hintFen: null,
+        ...rewindClocks(s, plies.length),
         stats: { ...s.stats, takebacks: s.stats.takebacks + 1 },
       };
     }
@@ -325,7 +375,7 @@ export function playReducer(s: PlayState, a: PlayAction): PlayState {
       if (!s.drillDeviation) return s;
       const plies = s.plies.slice(0, -1);
       return {
-        ...s, plies, cursor: plies.length, drillDeviation: null,
+        ...s, plies, cursor: plies.length, drillDeviation: null, ...rewindClocks(s, plies.length),
         status: 'playing', result: '*', termination: null, pendingAlert: null, hintsShown: [], hintFen: null,
       };
     }
@@ -343,6 +393,35 @@ export function playReducer(s: PlayState, a: PlayAction): PlayState {
         hintFen: a.fen,
         hintsShown: same ? [...s.hintsShown, a.level] : [a.level],
         stats: { ...s.stats, hints: s.stats.hints + 1 },
+      };
+    }
+    case 'askedTutor':
+      // A live question is help, so it counts like a hint in the header and the profile (4.5).
+      return { ...s, stats: { ...s.stats, hints: s.stats.hints + 1 } };
+    case 'setTimeControl':
+      // Moves played before the clock existed keep the full time, so index = ply stays true.
+      return {
+        ...s,
+        timeControl: a.timeControl,
+        remaining: startingRemaining(a.timeControl),
+        clocks: a.timeControl ? s.plies.map(() => Math.round(a.timeControl!.initial)) : null,
+      };
+    case 'tick': {
+      if (s.status !== 'playing' || !s.timeControl || !s.remaining) return s;
+      const side = sideToMoveOf(liveFen(s));
+      const left = s.remaining[side] - Math.max(0, a.ms);
+      if (left > 0) return { ...s, remaining: { ...s.remaining, [side]: left } };
+      // The AI's clock is decorative (docs §10): it stops at zero and the game goes on.
+      const user = userColorOf(s.control);
+      if (user !== null && side !== user) return s.remaining[side] === 0 ? s : { ...s, remaining: { ...s.remaining, [side]: 0 } };
+      return {
+        ...s,
+        remaining: { ...s.remaining, [side]: 0 },
+        status: 'over',
+        result: side === 'white' ? '0-1' : '1-0',
+        termination: '시간 초과',
+        pendingAlert: null,
+        drawOffer: 'none',
       };
     }
     case 'saved':

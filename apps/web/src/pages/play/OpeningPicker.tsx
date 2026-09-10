@@ -9,7 +9,17 @@ type PickerProps = {
   username: string | null;
   current: OpeningState | null;
   onPick: (card: OpeningCard, color: Color, drill: boolean) => void;
+  /** Seed for the search box, e.g. the 레퍼토리 구멍 the profile linked from (?q=). */
+  query?: string;
 };
+
+/** Case-insensitive substring over the Korean name, the English name and the ECO code. */
+export function matchesQuery(card: OpeningCard, q: string): boolean {
+  const needle = q.trim().toLowerCase();
+  if (!needle) return true;
+  return [card.name, card.name_en, card.eco, card.family_label]
+    .some((field) => (field ?? '').toLowerCase().includes(needle));
+}
 
 function recordText(card: OpeningCard): string | null {
   const r = card.record;
@@ -21,10 +31,12 @@ function recordText(card: OpeningCard): string | null {
 }
 
 /** 카탈로그 그리드 (4.4). Every card's line and tabiya FEN come from the server, not from this file. */
-export function OpeningPicker({ username, current, onPick }: PickerProps) {
+export function OpeningPicker({ username, current, onPick, query }: PickerProps) {
   const [cards, setCards] = useState<OpeningCard[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [retry, setRetry] = useState(0);
+  const [q, setQ] = useState(query ?? '');
+  useEffect(() => { setQ(query ?? ''); }, [query]);
 
   useEffect(() => {
     let cancelled = false;
@@ -38,13 +50,13 @@ export function OpeningPicker({ username, current, onPick }: PickerProps) {
 
   const families = useMemo(() => {
     const out: { key: string; label: string; items: OpeningCard[] }[] = [];
-    for (const c of cards ?? []) {
+    for (const c of (cards ?? []).filter((c) => matchesQuery(c, q))) {
       let f = out.find((x) => x.key === c.family);
       if (!f) { f = { key: c.family, label: c.family_label || c.family, items: [] }; out.push(f); }
       f.items.push(c);
     }
     return out;
-  }, [cards]);
+  }, [cards, q]);
 
   if (error) {
     return (
@@ -66,6 +78,13 @@ export function OpeningPicker({ username, current, onPick }: PickerProps) {
 
   return (
     <div className="pl-families">
+      <div className="tr-field">
+        <label htmlFor="pl-op-q">검색</label>
+        <input id="pl-op-q" className="tr-input" style={{ flex: 1 }} value={q} placeholder="이름·영문명·ECO"
+          onChange={(e) => setQ(e.target.value)} />
+        {q && <button type="button" className="btn btn-ghost compact" onClick={() => setQ('')}>지우기</button>}
+      </div>
+      {families.length === 0 && <p className="small faint">"{q}"와 맞는 오프닝이 없습니다. 검색어를 지우면 전체가 보입니다.</p>}
       {families.map((f) => (
         <section key={f.key} className="pl-family">
           <div className="tr-section-head"><span className="eyebrow">{f.label}</span><span className="small faint">{f.items.length}개</span></div>

@@ -8,12 +8,15 @@ import type { BookMoves, Color, HintLevel, OpeningCard, OpponentKind } from '../
 import { Board, type BoardShape } from '../../components/Board';
 import { PromotionPicker, type PromotionPiece } from '../../components/PromotionPicker';
 import { legalDests, sideToMove } from '../../lib/chess';
+import type { Preview } from '../../lib/shapes';
 import { getUsername, setUsername } from '../../lib/user';
 import { IconArrow, IconFlip, IconRestart, IconUndo } from '../training/icons';
 import { SIDE_LABEL, errorText, useBoardSize } from '../training/util';
 import '../training/training.css';
 import './play.css';
 import { AlertBanner, CoachPanel, type HintState } from './CoachPanel';
+import { ClockChip } from './Clock';
+import { LiveChatPanel } from './LiveChatPanel';
 import { MoveList } from './MoveList';
 import { OpeningTab } from './OpeningPicker';
 import { OPPONENT_RANGE, SettingsPanel, clampRating, opponentName } from './SettingsPanel';
@@ -24,10 +27,13 @@ const STORE_KEY = 'chess-tutor:play:current';
 const TABS = [
   { id: 'moves', label: '수 목록' },
   { id: 'coach', label: '코치' },
+  { id: 'chat', label: '튜터에게 질문' },
   { id: 'opening', label: '오프닝' },
   { id: 'settings', label: '설정' },
 ] as const;
 type Tab = (typeof TABS)[number]['id'];
+/** 진지하게 turns off in-game questions (docs 10). */
+const SERIOUS_NOTE = '진지하게 프리셋에서는 게임 중 질문이 꺼져 있습니다';
 
 function clearStore() { try { localStorage.removeItem(STORE_KEY); } catch { /* ignore */ } }
 
@@ -49,13 +55,15 @@ function colorParamOf(raw: string | null): Color | null {
 }
 
 /** Start position and table settings from the query (4.1), else the game left in localStorage. */
-type Boot = { state: S.PlayState; started: boolean };
+type Boot = { state: S.PlayState; started: boolean; tab: Tab };
 
 function makeInitial(params: URLSearchParams): Boot {
   const fen = S.validFen(params.get('fen'));
   const openingId = params.get('opening');
-  const stored = fen || openingId ? null : loadStored();
-  if (stored) return { state: stored, started: true };
+  // ?catalog=1 (&q=…) comes from the profile's 레퍼토리 구멍 links: open the catalogue at once.
+  const catalog = params.get('catalog') === '1';
+  const stored = fen || openingId || catalog ? null : loadStored();
+  if (stored) return { state: stored, started: true, tab: 'moves' };
   const kind: OpponentKind = params.get('opp') === 'stockfish' ? 'stockfish' : 'maia';
   const raw = Number(params.get('rating'));
   const rating = clampRating(kind, Number.isFinite(raw) && raw > 0 ? raw : OPPONENT_RANGE[kind].min + 400);
@@ -63,7 +71,8 @@ function makeInitial(params: URLSearchParams): Boot {
   const userColor = colorParamOf(params.get('color')) ?? sideToMove(startFen);
   return {
     state: S.initialState({ startFen, control: S.controlForUser(userColor), opponent: { kind, rating } }),
-    started: !!fen || !!openingId,
+    started: !!fen || !!openingId || catalog,
+    tab: catalog ? 'opening' : 'moves',
   };
 }
 
@@ -77,7 +86,7 @@ export default function PlayPage() {
   const [started, setStarted] = useState(boot.started);
 
   const [username, setUser] = useState<string | null>(() => getUsername());
-  const [tab, setTab] = useState<Tab>('moves');
+  const [tab, setTab] = useState<Tab>(boot.tab);
   const [orientation, setOrientation] = useState<Color>(() => S.userColorOf(boot.state.control) ?? 'white');
   const [thinking, setThinking] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
@@ -97,6 +106,8 @@ export default function PlayPage() {
   const [toast, setToast] = useState<string | null>(null);
   const [boardNonce, setBoardNonce] = useState(0);
   const [metaEl, setMetaEl] = useState<HTMLElement | null>(null);
+  /** A board the tutor showed. It only paints the board; the game never moves with it. */
+  const [preview, setPreview] = useState<Preview | null>(null);
   const { ref, size } = useBoardSize();
   /** Latest AI request id — a stale reply is dropped instead of landing on a changed position. */
   const reqRef = useRef(0);
@@ -114,11 +125,17 @@ export default function PlayPage() {
   const userRating = state.opponent.rating;
   const gameParam = params.get('game');
   const plyParam = params.get('ply');
+  const catalogQuery = params.get('q') ?? '';
+  const chatOn = state.coach.preset !== 'serious';
+  const tabs = useMemo(() => TABS.filter((t) => t.id !== 'chat' || chatOn), [chatOn]);
+  const boardFen = preview?.fen ?? cursorFen;
 
   useEffect(() => { setMetaEl(document.getElementById('topbar-meta')); }, []);
   useEffect(() => { if (userColor) setOrientation(userColor); }, [userColor]);
   useEffect(() => { if (!toast) return; const t = window.setTimeout(() => setToast(null), 4000); return () => window.clearTimeout(t); }, [toast]);
   useEffect(() => { setHint({ level: null, loading: false, error: null, data: null }); }, [live]);
+  useEffect(() => { if (!chatOn && tab === 'chat') setTab('moves'); }, [chatOn, tab]);
+  useEffect(() => { setPreview(null); }, [state.cursor, state.plies.length]);
 
   // Entry params (4.1). The initial render already consumed `fen`; an opening needs a fetch.
   const entryKey = `${params.get('fen') ?? ''}|${params.get('opening') ?? ''}|${params.get('color') ?? ''}|${params.get('drill') ?? ''}`;
@@ -223,6 +240,25 @@ export default function PlayPage() {
     return () => { cancelled = true; };
   }, [bookOn, cursorFen, state.control]);
 
+  /**
+   * The clock (M7d). It runs for whoever is to move — the user on their turn, the opponent while
+   * it "thinks" — and stops on the start card, once the game is over, and while a picker, a dialog
+   * or a book deviation is waiting for an answer. The reducer stays pure: this only reports elapsed ms.
+   */
+  const clockPaused = !started || over || !!promo || confirmCut !== null || fenDialog !== null || pgnDialog !== null || !!state.drillDeviation;
+  const clockRunning = !!state.timeControl && !clockPaused;
+  useEffect(() => {
+    if (!clockRunning) return;
+    let last = Date.now();
+    const id = window.setInterval(() => {
+      const now = Date.now();
+      const ms = now - last;
+      last = now;
+      dispatch({ type: 'tick', ms });
+    }, 250);
+    return () => window.clearInterval(id);
+  }, [clockRunning]);
+
   // Keep the unfinished game across reloads (4.5).
   useEffect(() => {
     if (state.status === 'saved' || state.plies.length === 0) return;
@@ -254,10 +290,10 @@ export default function PlayPage() {
   }, [state.cursor, state.plies.length, state.hintFen, state.hintsShown, cursorFen]);
 
   const movable = useMemo(() => {
-    if (over || state.drillDeviation || !started) return null;
+    if (over || state.drillDeviation || !started || preview) return null;
     if (aiColor && cursorTurn === aiColor) return null;
     return { color: cursorTurn, dests: legalDests(cursorFen) };
-  }, [over, state.drillDeviation, started, aiColor, cursorTurn, cursorFen]);
+  }, [over, state.drillDeviation, started, preview, aiColor, cursorTurn, cursorFen]);
 
   const onMove = useCallback((orig: string, dest: string) => {
     if (!movable) return;
@@ -284,6 +320,7 @@ export default function PlayPage() {
   }, [live, userRating, state.startFen, state.plies]);
 
   const shapes = useMemo<BoardShape[]>(() => {
+    if (preview) return preview.shapes;
     const out: BoardShape[] = [];
     const best = hint.level === 3 ? hint.data?.best?.uci : null;
     if (best && best.length >= 4 && atLive) out.push({ orig: best.slice(0, 2) as Key, dest: best.slice(2, 4) as Key, brush: 'blue' });
@@ -291,14 +328,17 @@ export default function PlayPage() {
       if (m.uci && m.uci.length >= 4) out.push({ orig: m.uci.slice(0, 2) as Key, dest: m.uci.slice(2, 4) as Key, brush: 'green' });
     }
     return out;
-  }, [hint.level, hint.data, atLive, bookOn, book]);
+  }, [preview, hint.level, hint.data, atLive, bookOn, book]);
 
   const lastMove = useMemo<[string, string] | null>(() => {
+    if (preview) return preview.lastMove;
     const p = state.cursor > 0 ? state.plies[state.cursor - 1] : null;
     return p && p.uci.length >= 4 ? [p.uci.slice(0, 2), p.uci.slice(2, 4)] : null;
-  }, [state.cursor, state.plies]);
+  }, [preview, state.cursor, state.plies]);
 
   const sans = useMemo(() => state.plies.map((p) => p.san), [state.plies]);
+  const sansToCursor = useMemo(() => state.plies.slice(0, state.cursor).map((p) => p.san), [state.plies, state.cursor]);
+  const onAskedTutor = useCallback(() => dispatch({ type: 'askedTutor' }), []);
   const pgn = useCallback(() => buildPgn({
     startFen: state.startFen,
     plies: state.plies,
@@ -310,6 +350,7 @@ export default function PlayPage() {
       Termination: state.termination,
       Opening: state.opening?.name ?? null,
       Mode: S.CONTROL_LABEL[state.control],
+      TimeControl: S.timeControlText(state.timeControl),
       Opponent: state.control === 'manual' ? null : opponentName(state.opponent),
       PracticeMode: S.practiceModeOf(state),
       Hints: state.stats.hints,
@@ -339,8 +380,8 @@ export default function PlayPage() {
       coach: { preset: state.coach.preset, hints: state.stats.hints, takebacks: state.stats.takebacks, alerts: state.stats.alerts },
       opening_id: state.opening?.id ?? null,
       practice_mode: S.practiceModeOf(state),
-      clocks: null,
-      time_control: null,
+      clocks: state.clocks,
+      time_control: S.timeControlText(state.timeControl),
       analyse: true,
     })
       .then((res) => {
@@ -401,6 +442,9 @@ export default function PlayPage() {
       : turn === userColor ? `당신 차례 · ${SIDE_LABEL[userColor]}` : '상대 차례');
 
   const reviewLink = gameParam ? `/review/${gameParam}${plyParam ? `/${plyParam}` : ''}` : null;
+  // Top chip is the far side of the board, bottom is the near side, both following the orientation.
+  const topColor: Color = orientation === 'white' ? 'black' : 'white';
+  const clockLabel = (c: Color) => (userColor === null ? SIDE_LABEL[c] : c === userColor ? '나' : opponentName(state.opponent));
 
   return (
     <div className="tr-page pl-page">
@@ -439,10 +483,12 @@ export default function PlayPage() {
             ))}
           </div>
 
+          {state.remaining && <ClockChip ms={state.remaining[topColor]} label={clockLabel(topColor)} running={clockRunning && turn === topColor} />}
+
           <div className="tr-board">
             <Board
               key={`${state.startFen}:${boardNonce}`}
-              fen={cursorFen}
+              fen={boardFen}
               orientation={orientation}
               size={size}
               movable={movable}
@@ -461,6 +507,8 @@ export default function PlayPage() {
               />
             )}
           </div>
+
+          {state.remaining && <ClockChip ms={state.remaining[orientation]} label={clockLabel(orientation)} running={clockRunning && turn === orientation} />}
 
           <div className="tr-controls">
             <button type="button" className="pl-nav" onClick={() => setCursor(0)} disabled={state.cursor === 0} title="처음 (Home)">⏮</button>
@@ -541,6 +589,13 @@ export default function PlayPage() {
               <button type="button" className="btn btn-ghost compact" onClick={() => dispatch({ type: 'drillContinue' })}>그대로 진행</button>
             </div>
           )}
+          {preview && (
+            <div className="tr-msg note">
+              <span><b>튜터가 보여준 국면입니다.</b> {preview.label}</span>
+              <div className="spacer" />
+              <button type="button" className="btn btn-ghost compact" onClick={() => setPreview(null)}>원래 국면으로</button>
+            </div>
+          )}
           {toast && <div className="tr-msg note"><span>{toast}</span></div>}
           {state.startFen !== S.START_FEN && (
             <div className="tr-msg note small">
@@ -553,7 +608,7 @@ export default function PlayPage() {
 
         <div className="card tr-panel">
           <div className="tr-tabs" role="tablist">
-            {TABS.map((t) => (
+            {tabs.map((t) => (
               <button key={t.id} type="button" role="tab" aria-selected={tab === t.id} className={`tr-tab${tab === t.id ? ' active' : ''}`} onClick={() => setTab(t.id)}>
                 {t.label}
                 {t.id === 'coach' && state.pendingAlert && <span className="badge badge-bad">1</span>}
@@ -561,6 +616,7 @@ export default function PlayPage() {
               </button>
             ))}
           </div>
+          {!chatOn && <span className="small faint pl-tabnote">{SERIOUS_NOTE}</span>}
 
           {state.pendingAlert && (
             <AlertBanner
@@ -583,6 +639,21 @@ export default function PlayPage() {
               onHint={requestHint}
             />
           )}
+          {chatOn && (
+            <LiveChatPanel
+              fen={cursorFen}
+              startFen={state.startFen}
+              movesSan={sansToCursor}
+              userColor={userColor}
+              opponent={state.control === 'manual' ? null : opponentName(state.opponent)}
+              openingName={state.opening?.name ?? null}
+              rating={state.control === 'manual' ? 1500 : state.opponent.rating}
+              preview={preview}
+              onPreview={setPreview}
+              onAsked={onAskedTutor}
+              hidden={tab !== 'chat'}
+            />
+          )}
           {tab === 'opening' && (
             <OpeningTab
               username={username}
@@ -596,6 +667,7 @@ export default function PlayPage() {
               onToggleBook={setBookOn}
               book={book}
               bookError={bookError}
+              query={catalogQuery}
             />
           )}
           {tab === 'settings' && (
@@ -607,6 +679,8 @@ export default function PlayPage() {
               coach={state.coach}
               onPreset={(p) => dispatch({ type: 'setPreset', preset: p })}
               onCoach={(c) => dispatch({ type: 'setCoach', coach: c })}
+              timeControl={state.timeControl}
+              onTimeControl={(tc) => dispatch({ type: 'setTimeControl', timeControl: tc })}
               username={username}
               onUsername={(n) => { setUsername(n); setUser(n); setNeedName(false); }}
               onNewGame={() => newGame(S.START_FEN)}

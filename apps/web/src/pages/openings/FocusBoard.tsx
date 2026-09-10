@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import type { Color, OpeningNode } from '../../api/types';
 import { MiniBoard } from '../../components/MiniBoard';
 import { pct, plainLabel, scoreTone } from './colors';
@@ -34,6 +35,8 @@ export function FocusBoard({ tree, node, preview, color }: Props) {
         {shown.is_deviation && <span className="badge badge-bad op-badge">책 이탈</span>}
         {merges >= 1 && <span className="badge badge-neutral op-badge">합류 {merges + 1}경로</span>}
         {shown.master_only && <span className="badge badge-neutral op-badge dashed">마스터 DB 전용</span>}
+        {/* 이 국면에서 두기 (M7d): the practice page opens on this position with the side we are reading it from. */}
+        <Link className="chip op-play" to={`/play?fen=${encodeURIComponent(shown.fen)}&color=${color}`}>이 국면에서 두기</Link>
       </div>
       {(shown.name || shown.eco) && (
         <div className="op-focus-line">

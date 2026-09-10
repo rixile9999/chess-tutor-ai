@@ -248,6 +248,9 @@ function HolesCard({ rows }: { rows: RepertoireHole[] }) {
                 <span className={`mono pf-hole-win${win < 45 ? ' pf-bad-text' : ''}`}>승률 {fmtPercent(h.win_rate)}</span>
                 <span className="pf-spacer" />
                 <span className="mono muted">평균 {fmtPawns(h.avg_loss_cp)}</span>
+                <Link to={`/play?catalog=1&q=${encodeURIComponent(h.label)}`} className="pf-hole-link" title="이 오프닝을 카탈로그에서 찾아 연습합니다">
+                  연습하기<IconPlay />
+                </Link>
                 <Link to="/openings" className="pf-hole-link">오프닝 지도에서 보기<IconArrow /></Link>
               </div>
             );

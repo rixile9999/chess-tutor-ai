@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { buildPgn, movetext } from '../src/pages/play/pgn';
 import { moveRows } from '../src/pages/play/MoveList';
+import { formatClock } from '../src/pages/play/Clock';
+import { matchesQuery } from '../src/pages/play/OpeningPicker';
 import * as S from '../src/pages/play/state';
 
 /** Apply a list of actions to a starting state, so a test reads like a game. */
@@ -247,5 +249,129 @@ describe('restore', () => {
     const s = S.initialState({ startFen: 'not a fen', plies: [], cursor: 7 });
     expect(s.startFen).toBe(S.START_FEN);
     expect(s.cursor).toBe(0);
+  });
+});
+
+describe('clocks', () => {
+  const TC: S.TimeControl = { initial: 300, increment: 5 };
+  /** A game whose clocks are already running, playing white against an AI black. */
+  const timed = (over: Partial<S.PlayState> = {}) => S.initialState({ control: 'ai-black', timeControl: TC, ...over });
+
+  it('starts both clocks at the initial time and records nothing yet', () => {
+    const s = timed();
+    expect(s.remaining).toEqual({ white: 300_000, black: 300_000 });
+    expect(s.clocks).toEqual([]);
+    expect(S.timeControlText(TC)).toBe('300+5');
+    expect(S.timeControlText(null)).toBeNull();
+  });
+
+  it('deducts from the side to move only', () => {
+    const s = run(timed(), { type: 'tick', ms: 4_000 });
+    expect(s.remaining).toEqual({ white: 296_000, black: 300_000 });
+    const after = run(s, move('e2e4'), { type: 'tick', ms: 2_000 });
+    expect(after.remaining?.black).toBe(298_000);
+  });
+
+  it('adds the increment to the mover and writes one clock per ply', () => {
+    const s = run(
+      timed(),
+      { type: 'tick', ms: 10_000 },
+      move('e2e4'),
+      { type: 'tick', ms: 4_000 },
+      { type: 'aiMove', uci: 'e7e5' },
+    );
+    // white: 300 - 10 + 5, black: 300 - 4 + 5
+    expect(s.clocks).toEqual([295, 301]);
+    expect(s.remaining).toEqual({ white: 295_000, black: 301_000 });
+  });
+
+  it('is inert without a time control, so the save sends no clocks', () => {
+    const s = run(manual(), move('e2e4'), { type: 'tick', ms: 5_000 });
+    expect(s.remaining).toBeNull();
+    expect(s.clocks).toBeNull();
+    expect(s.status).toBe('playing');
+  });
+
+  it('flags the user: the game is over and lost on time', () => {
+    const s = run(timed({ remaining: { white: 900, black: 300_000 } }), { type: 'tick', ms: 1_000 });
+    expect(s.remaining?.white).toBe(0);
+    expect(s.status).toBe('over');
+    expect(s.result).toBe('0-1');
+    expect(s.termination).toBe('시간 초과');
+  });
+
+  it('never flags the AI — its clock stops at zero and the game goes on (docs 10)', () => {
+    const s = run(timed({ remaining: { white: 300_000, black: 500 } }), move('e2e4'), { type: 'tick', ms: 2_000 });
+    expect(s.remaining?.black).toBe(0);
+    expect(s.status).toBe('playing');
+    // A further tick changes nothing, so the page does not re-render forever.
+    expect(S.playReducer(s, { type: 'tick', ms: 250 })).toBe(s);
+  });
+
+  it('flags whoever is to move in 수동 mode', () => {
+    const s = run(
+      S.initialState({ control: 'manual', timeControl: TC, remaining: { white: 300_000, black: 100 } }),
+      move('e2e4'),
+      { type: 'tick', ms: 1_000 },
+    );
+    expect(s.status).toBe('over');
+    expect(s.result).toBe('1-0');
+  });
+
+  it('물리기 puts both clocks back to what they were', () => {
+    const s = run(
+      timed(),
+      { type: 'tick', ms: 10_000 },
+      move('e2e4'),
+      { type: 'tick', ms: 20_000 },
+      { type: 'aiMove', uci: 'e7e5' },
+      { type: 'tick', ms: 30_000 },
+      move('g1f3'),
+    );
+    expect(s.clocks).toEqual([295, 285, 270]);
+    // 물리기 pops back to the user's own turn, so only Nf3 goes.
+    const back = S.playReducer(s, { type: 'takeback' });
+    expect(back.plies).toHaveLength(2);
+    expect(back.clocks).toEqual([295, 285]);
+    expect(back.remaining).toEqual({ white: 295_000, black: 285_000 });
+  });
+
+  it('keeps index = ply when the clock is turned on mid-game', () => {
+    const s = run(manual(), move('e2e4'), move('e7e5'));
+    const timedNow = S.playReducer(s, { type: 'setTimeControl', timeControl: TC });
+    expect(timedNow.clocks).toEqual([300, 300]);
+    const next = run(timedNow, { type: 'tick', ms: 7_000 }, move('g1f3'));
+    expect(next.clocks).toHaveLength(3);
+    expect(next.clocks?.[2]).toBe(298);
+    expect(S.playReducer(timedNow, { type: 'setTimeControl', timeControl: null }).clocks).toBeNull();
+  });
+
+  it('shows tenths under 20 seconds', () => {
+    expect(formatClock(305_000)).toBe('5:05');
+    expect(formatClock(60_000)).toBe('1:00');
+    expect(formatClock(9_400)).toBe('0:09.4');
+    expect(formatClock(-5)).toBe('0:00.0');
+  });
+});
+
+describe('튜터에게 질문', () => {
+  it('counts a live question as a hint', () => {
+    const s = run(manual(), { type: 'askedTutor' }, { type: 'askedTutor' });
+    expect(s.stats.hints).toBe(2);
+  });
+});
+
+describe('오프닝 카탈로그 검색', () => {
+  const card = {
+    id: 'french-advance', family: 'e4-other', family_label: '1.e4 기타', name: '프렌치 어드밴스', name_en: 'French Defense: Advance Variation',
+    eco: 'C02', line_san: [], tabiya_fen: '', structure: { key: 'french-chain', name: '프렌치 사슬' }, sides: ['white' as const], record: null,
+  };
+
+  it('matches the Korean name, the English name and the ECO code, ignoring case', () => {
+    expect(matchesQuery(card, '프렌치')).toBe(true);
+    expect(matchesQuery(card, 'advance')).toBe(true);
+    expect(matchesQuery(card, 'c02')).toBe(true);
+    expect(matchesQuery(card, '  ')).toBe(true);
+    expect(matchesQuery(card, '시실리안')).toBe(false);
   });
 });
