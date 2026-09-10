@@ -22,6 +22,7 @@ from chess_tutor.routers import (
     games,
     maia,
     openings,
+    play,
     positions,
     profile,
     review,
@@ -85,7 +86,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 app = FastAPI(title="chess-tutor", version=__version__, lifespan=lifespan)
 
-for r in (positions, games, analysis, review, chat, profile, openings, training, maia):
+for r in (positions, games, analysis, review, chat, profile, openings, training, maia, play):
     app.include_router(r.router)
 
 app.mount("/mcp", mcp_mount, name="mcp")

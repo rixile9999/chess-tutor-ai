@@ -103,3 +103,42 @@ export interface PuzzleOut {
   source_game_id: number | null; source_ply: number | null; due_at: string; interval_days: number; reps: number;
 }
 export interface SparringMoveResponse { san: string; uci: string; probs: Record<string, number>; source: 'maia' | 'engine' | 'random' }
+
+// ---------- play (M7 practice games) ----------
+export type OpponentKind = 'maia' | 'stockfish';
+export type PlaySource = 'maia' | 'engine' | 'random' | 'stockfish' | 'book';
+export type HintLevel = 1 | 2 | 3;
+export type PracticeMode = 'free' | 'drill' | 'tabiya';
+export type CoachPreset = 'serious' | 'learning' | 'free';
+export interface OpponentSpec { kind: OpponentKind; rating: number }
+export interface PlayMoveResponse { san: string; uci: string; source: PlaySource; probs: Record<string, number>; think_ms: number }
+export interface HintCandidate { san: string; uci: string; prob: number | null; reason: string; claims: Claim[] }
+export interface HintBest { san: string; uci: string; pv: string[]; score: Score; reason: string; motifs: MotifOut[]; claims: Claim[]; computer_move: boolean }
+export interface PlayHintResponse {
+  level: HintLevel; side: Color; structure: StructureInfo; plans: Plan[]; candidates: HintCandidate[]; best: HintBest | null;
+  text: string; source: 'maia' | 'engine' | 'random' | null; verified: boolean; verified_claims: number; total_claims: number;
+}
+export interface PlayCheckResponse {
+  san: string; uci: string; classification: Classification; win_loss: number; eval_before: Score; eval_after: Score;
+  best_san: string; best_uci: string; pv: string[]; reason: string; claims: Claim[]; verified: boolean; computer_move: boolean;
+  alternative_san: string | null; alternative_reason: string;
+}
+export interface CoachStats { preset: CoachPreset; hints: number; takebacks: number; alerts: number }
+export interface PracticeGameIn {
+  username: string; user_color: Color | null; start_fen: string; moves_san: string[]; result: '1-0' | '0-1' | '1/2-1/2' | '*';
+  termination: string | null; opponent: OpponentSpec | null; coach: CoachStats; opening_id: string | null; practice_mode: PracticeMode;
+  clocks: number[] | null; time_control: string | null; analyse: boolean;
+}
+export interface PracticeGameOut { game_id: number; analysis_status: AnalysisStatus; pgn: string }
+export interface OpeningRecord { games: number; score: number | null; practice_games: number; practice_score: number | null }
+export interface OpeningCard {
+  id: string; family: string; family_label: string; name: string; name_en: string; eco: string; line_san: string[]; tabiya_fen: string;
+  structure: StructureInfo; sides: Color[]; record: OpeningRecord | null;
+}
+export interface OpeningDetail extends OpeningCard { plans_white: Plan[]; plans_black: Plan[]; fens: string[] }
+export interface BookMove { san: string; uci: string; eco: string; name: string }
+export interface BookMoves { fen: string; opening: BookMove | null; moves: BookMove[] }
+export interface PlanReport {
+  game_id: number; side: Color; structure: StructureInfo | null; executed: Plan[]; pv_match: Plan[]; later: Plan[]; unavailable: Plan[];
+  breaks: string[]; opening_id: string | null; opening_name: string | null; practice_mode: PracticeMode | null; summary: string;
+}

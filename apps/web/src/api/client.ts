@@ -73,6 +73,20 @@ export const api = {
   maia: {
     move: (fen: string, rating: number) => post<T.SparringMoveResponse>('/maia/move', { fen, rating }),
   },
+
+  play: {
+    move: (fen: string, opponent: T.OpponentSpec, userRating?: number | null) =>
+      post<T.PlayMoveResponse>('/play/move', { fen, opponent, user_rating: userRating ?? null }),
+    hint: (body: { fen: string; level: T.HintLevel; rating: number; start_fen?: string; moves_san?: string[] }) =>
+      post<T.PlayHintResponse>('/play/hint', body),
+    check: (fen_before: string, san: string, rating: number) => post<T.PlayCheckResponse>('/play/check', { fen_before, san, rating }),
+    save: (body: T.PracticeGameIn) => post<T.PracticeGameOut>('/play/games', body),
+    openings: (username?: string | null) => get<T.OpeningCard[]>(`/play/openings${username ? `?username=${encodeURIComponent(username)}` : ''}`),
+    opening: (id: string, username?: string | null) =>
+      get<T.OpeningDetail>(`/play/openings/${encodeURIComponent(id)}${username ? `?username=${encodeURIComponent(username)}` : ''}`),
+    book: (fen: string) => get<T.BookMoves>(`/play/book?fen=${encodeURIComponent(fen)}`),
+    report: (gameId: number) => get<T.PlanReport>(`/play/report/${gameId}`),
+  },
 };
 
 export type { T };

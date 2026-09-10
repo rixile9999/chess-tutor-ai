@@ -509,3 +509,197 @@ class MaiaStatus(BaseModel):
     maia_loaded: bool = False
     maia_error: str | None = None
     stockfish_available: bool = False
+
+
+# ---------- play (M7 practice games) ----------
+
+OpponentKind = Literal["maia", "stockfish"]
+PlaySource = Literal["maia", "engine", "random", "stockfish", "book"]
+HintLevel = Literal[1, 2, 3]
+PracticeMode = Literal["free", "drill", "tabiya"]
+CoachPreset = Literal["serious", "learning", "free"]
+
+
+class OpponentSpec(BaseModel):
+    kind: OpponentKind = "maia"
+    rating: int = Field(default=1500, ge=800, le=3200)
+    """Maia: clamped to its 1100-2000 buckets. Stockfish: UCI_Elo, clamped to 1320-3190."""
+
+
+class PlayMoveRequest(BaseModel):
+    fen: str
+    opponent: OpponentSpec = Field(default_factory=OpponentSpec)
+    user_rating: int | None = None
+    """Rating of the human side; Maia conditions on both players when it is given."""
+    seed: int | None = None
+
+
+class PlayMoveResponse(BaseModel):
+    san: str
+    uci: str
+    source: PlaySource
+    probs: dict[str, float] = {}
+    """Maia/engine backends: SAN -> probability at the opponent's rating. Empty for stockfish."""
+    think_ms: int = 0
+
+
+class HintCandidate(BaseModel):
+    san: str
+    uci: str
+    prob: float | None = None
+    reason: str = ""
+    claims: list[Claim] = []
+
+
+class HintBest(BaseModel):
+    san: str
+    uci: str
+    pv: list[str] = []
+    score: Score
+    reason: str = ""
+    motifs: list[MotifOut] = []
+    claims: list[Claim] = []
+    computer_move: bool = False
+    """Best move a player of this rating would rarely find (Maia probability < 3%)."""
+
+
+class PlayHintRequest(BaseModel):
+    fen: str
+    level: HintLevel = 1
+    rating: int = 1500
+    depth: int | None = None
+    start_fen: str | None = None
+    moves_san: list[str] = []
+    """Game so far from start_fen, so plans can be marked executed/later."""
+
+
+class PlayHintResponse(BaseModel):
+    level: HintLevel
+    side: Color
+    structure: StructureInfo
+    plans: list[Plan] = []
+    candidates: list[HintCandidate] = []
+    best: HintBest | None = None
+    text: str = ""
+    """Korean summary for the level, built from the fields above and verified."""
+    source: Literal["maia", "engine", "random"] | None = None
+    verified: bool = True
+    verified_claims: int = 0
+    total_claims: int = 0
+
+
+class PlayCheckRequest(BaseModel):
+    fen_before: str
+    san: str
+    rating: int = 1500
+    depth: int | None = None
+
+
+class PlayCheckResponse(BaseModel):
+    san: str
+    uci: str
+    classification: Classification
+    win_loss: float
+    eval_before: Score
+    eval_after: Score
+    best_san: str
+    best_uci: str
+    pv: list[str] = []
+    reason: str = ""
+    claims: list[Claim] = []
+    verified: bool = True
+    computer_move: bool = False
+    alternative_san: str | None = None
+    """Natural move at this rating that keeps most of the eval, when the best is a computer move."""
+    alternative_reason: str = ""
+
+
+class CoachStats(BaseModel):
+    preset: CoachPreset = "learning"
+    hints: int = 0
+    takebacks: int = 0
+    alerts: int = 0
+
+
+class PracticeGameIn(BaseModel):
+    username: str
+    user_color: Color | None = None
+    """None: manual game, both sides by hand."""
+    start_fen: str = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+    moves_san: list[str] = []
+    result: Literal["1-0", "0-1", "1/2-1/2", "*"] = "*"
+    termination: str | None = None
+    """checkmate | stalemate | repetition | fifty | material | resign | draw | unfinished"""
+    opponent: OpponentSpec | None = None
+    coach: CoachStats = CoachStats()
+    opening_id: str | None = None
+    practice_mode: PracticeMode = "free"
+    clocks: list[float] | None = None
+    """Seconds left for the mover after each move, when the game had clocks."""
+    time_control: str | None = None
+    analyse: bool = True
+
+
+class PracticeGameOut(BaseModel):
+    game_id: int
+    analysis_status: AnalysisStatus = "none"
+    pgn: str
+
+
+class OpeningRecord(BaseModel):
+    games: int = 0
+    score: float | None = None
+    """Points per game (1 win, 0.5 draw) in imported games that reached the tabiya."""
+    practice_games: int = 0
+    practice_score: float | None = None
+
+
+class OpeningCard(BaseModel):
+    id: str
+    family: str
+    family_label: str
+    name: str
+    name_en: str
+    eco: str
+    line_san: list[str]
+    tabiya_fen: str
+    structure: StructureInfo
+    sides: list[Color] = ["white", "black"]
+    record: OpeningRecord | None = None
+
+
+class OpeningDetail(OpeningCard):
+    plans_white: list[Plan] = []
+    plans_black: list[Plan] = []
+    fens: list[str] = []
+    """FEN after each move of line_san (index 0 = start)."""
+
+
+class BookMove(BaseModel):
+    san: str
+    uci: str
+    eco: str
+    name: str
+
+
+class BookMoves(BaseModel):
+    fen: str
+    opening: BookMove | None = None
+    """Name of the current position when it is itself in the book (san/uci empty)."""
+    moves: list[BookMove] = []
+
+
+class PlanReport(BaseModel):
+    game_id: int
+    side: Color
+    structure: StructureInfo | None = None
+    executed: list[Plan] = []
+    pv_match: list[Plan] = []
+    later: list[Plan] = []
+    unavailable: list[Plan] = []
+    breaks: list[str] = []
+    """Pawn breaks of the side that were played, as 'e4 (12수)'."""
+    opening_id: str | None = None
+    opening_name: str | None = None
+    practice_mode: PracticeMode | None = None
+    summary: str = ""
