@@ -175,3 +175,23 @@ class ChatTurn(Base):
     role: Mapped[str] = mapped_column(String(16))  # user | assistant
     content: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class OpeningNote(Base):
+    """The deep explanation of one move of one position: what Claude Code wrote once, checked
+    against the board and stored (plan §9.2). `payload` is a schemas.OpeningNote."""
+
+    __tablename__ = "opening_notes"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    position_key: Mapped[str] = mapped_column(String(128), index=True)
+    """Position the move was played in (FEN without the move counters)."""
+    san: Mapped[str] = mapped_column(String(16))
+    lang: Mapped[str] = mapped_column(String(8), default="ko")
+    payload: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)  # OpeningNote
+    model: Mapped[str] = mapped_column(String(64), default="")
+    verified_claims: Mapped[int] = mapped_column(Integer, default=0)
+    total_claims: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+    __table_args__ = (UniqueConstraint("position_key", "san", "lang", name="uq_opening_note"),)

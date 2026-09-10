@@ -757,3 +757,133 @@ class PlanReport(BaseModel):
     opening_name: str | None = None
     practice_mode: PracticeMode | None = None
     summary: str = ""
+
+
+# ---------- opening map: move intent and deep notes (M8b) ----------
+
+FactKind = Literal[
+    "book",
+    "name",
+    "transposition",
+    "center",
+    "development",
+    "castling",
+    "fianchetto",
+    "tension",
+    "break",
+    "gambit",
+    "motif",
+    "plan",
+    "setup",
+    "prophylaxis",
+    "naturalness",
+    "engine",
+]
+EngineMode = Literal["off", "off_book", "always"]
+"""When /openings/annotate runs the engine: never, only off book, or on every move."""
+
+
+class MoveFact(BaseModel):
+    """One thing a move does, as a deterministic detector saw it (services.opening_intent).
+
+    `text` is a whole Korean sentence and `claims` are the board facts it states; a fact whose
+    claims do not all hold is reported with `verified=False` and left out of
+    MoveAnnotation.text."""
+
+    kind: FactKind
+    text: str
+    claims: list[Claim] = []
+    verified: bool = True
+
+
+class MoveAnnotation(BaseModel):
+    """Everything the opening map's journal says about one move."""
+
+    ply: int
+    label: str
+    """Move number and SAN, '3.Bb5' or '3…a6'."""
+    san: str
+    uci: str
+    fen_before: str
+    fen_after: str
+    in_book: bool = False
+    name_before: str | None = None
+    name_after: str | None = None
+    transposition: bool = False
+    """The position the move reaches is in the book, but the move order is not the book's."""
+    book_alternatives: list[NamedCandidate] = []
+    """Book moves instead of this one, at most three; empty when the move is itself in book."""
+    facts: list[MoveFact] = []
+    text: str = ""
+    """The verified sentences, in the order the journal reads them; the first one is the
+    one-line summary the journal shows (plan §9.3)."""
+    engine: PlayCheckResponse | None = None
+    naturalness: float | None = None
+    """Probability of this move at the requested rating (Maia), only when asked for."""
+    verified: bool = True
+    verified_claims: int = 0
+    total_claims: int = 0
+
+
+class AnnotateRequest(BaseModel):
+    start_fen: str | None = None
+    """Standard starting position when omitted."""
+    moves_san: list[str] = []
+    color: Color = "white"
+    rating: int = 1500
+    engine: EngineMode = "off_book"
+    naturalness: bool = False
+    depth: int | None = None
+
+
+class AnnotateResponse(BaseModel):
+    annotations: list[MoveAnnotation] = []
+
+
+class TrapLine(BaseModel):
+    """A trap or a typical mistake, as moves from the position after the annotated move."""
+
+    title: str
+    line_san: list[str] = []
+    """Replayed by the server; a line with an illegal move is dropped, never stored."""
+    text: str = ""
+
+
+class OpeningNote(BaseModel):
+    """The deep explanation of one move, written once per (position, move) and stored.
+
+    Prose comes from Claude Code (services.opening_notes); `[[…]]` marks a sentence the
+    verifier confirmed on the board, and a sentence whose claims failed keeps its text without
+    the marks. `mine` and `engine` are filled by the server, never by the model."""
+
+    position_key: str
+    """Position the move was played in, as openings.position_key."""
+    san: str
+    in_book: bool = False
+    summary: str = ""
+    why: list[str] = []
+    replies: list[tuple[str, str]] = []
+    """(SAN, explanation) pairs, serialised as ["a6", "…"]."""
+    alternatives: list[tuple[str, str]] = []
+    traps: list[TrapLine] = []
+    mine: str | None = None
+    engine: str | None = None
+    sources: list[str] = []
+    verified_claims: int = 0
+    total_claims: int = 0
+    model: str = ""
+    created_at: datetime
+
+
+class NoteMissing(BaseModel):
+    """GET /openings/note when nothing has been written for this move yet."""
+
+    status: Literal["missing"] = "missing"
+
+
+class NoteRequest(BaseModel):
+    fen: str
+    san: str
+    username: str | None = None
+    """Whose games fill the note's `mine` line; without it the line stays empty."""
+    regenerate: bool = False

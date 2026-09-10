@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -13,7 +14,7 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 
 from chess_tutor import __version__
 from chess_tutor.config import get_settings
-from chess_tutor.db import init_db
+from chess_tutor.db import init_db, session_factory
 from chess_tutor.engine import pool
 from chess_tutor.jobs import runner
 from chess_tutor.routers import (
@@ -29,7 +30,9 @@ from chess_tutor.routers import (
     review,
     training,
 )
-from chess_tutor.services import chat_tools
+from chess_tutor.services import chat_tools, opening_notes
+
+log = logging.getLogger(__name__)
 
 
 class _MCPMount:
@@ -71,9 +74,25 @@ def build_mcp_app() -> ASGIApp:
     )
 
 
+async def _seed_opening_notes() -> None:
+    """Store the hand-written opening notes that are not in the table yet (plan §9.2).
+
+    Idempotent and never fatal: the map still works without them, so a broken seed file costs a
+    warning, not the server."""
+    try:
+        async with session_factory()() as session:
+            added = await opening_notes.load_seed(session)
+    except Exception as exc:  # noqa: BLE001 - startup must survive a bad seed file
+        log.warning("opening notes: seed not loaded (%s)", exc)
+        return
+    if added:
+        log.info("opening notes: %d seeded notes stored", added)
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     await init_db()
+    await _seed_opening_notes()
     runner.start()
     mcp_mount.app = build_mcp_app()
     try:

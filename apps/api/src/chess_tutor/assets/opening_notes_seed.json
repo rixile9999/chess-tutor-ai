@@ -1,0 +1,633 @@
+{
+ "_source": "docs/opening-map-v2-mockup.html NOTES (8 Ruy Lopez notes, hand-written)",
+ "_note": "mine and engine are filled by the server, never seeded.",
+ "notes": [
+  {
+   "moves": "e4",
+   "summary": "[[e4 폰이 d5와 f5를 통제합니다.]] f1 비숍과 퀸의 대각선이 열려 빠른 전개와 캐슬링으로 이어집니다.",
+   "why": [
+    "백의 첫 수 중 가장 직접적입니다. 중앙 폰 하나를 4열에 세워 흑의 …d5를 어렵게 하고, 다음 수 d4로 폰 중앙(e4+d4)을 노립니다.",
+    "대신 [[e4 폰을 지키는 기물은 퀸뿐입니다.]] 흑은 …Nf6, …d5로 곧바로 도전할 수 있고, 그래서 1.e4 뒤의 오프닝은 대부분 \"백은 e4를 어떻게 지키고 흑은 어떻게 흔드는가\"의 이야기입니다."
+   ],
+   "alternatives": [
+    [
+     "d4",
+     "[[d4 폰은 퀸이 지킵니다.]] 도전받아도 되잡을 수 있어 구조가 오래 남고 게임이 느리게 흐릅니다."
+    ],
+    [
+     "c4",
+     "중앙 폰을 아끼고 d5를 옆에서 누릅니다. 피안케토와 묶는 유연한 구조."
+    ],
+    [
+     "Nf3",
+     "상대 준비를 피하기 좋지만 중앙 주도권은 늦게 옵니다."
+    ]
+   ],
+   "replies": [
+    [
+     "e5",
+     "대칭. e4·d4 전진을 막고 같은 권리를 요구합니다 → 루이 로페즈·이탈리안·스카치."
+    ],
+    [
+     "c5",
+     "비대칭. 백의 d4에 …cxd4로 응수해 중앙 폰을 c폰과 바꿉니다 → 시실리안."
+    ],
+    [
+     "e6",
+     "…d5 준비. c8 비숍이 답답한 대신 구조가 단단합니다 → 프렌치."
+    ],
+    [
+     "c6",
+     "…d5 준비하되 c8 비숍 길은 열어 둡니다 → 카로칸."
+    ]
+   ],
+   "traps": [
+    {
+     "title": "2.Qh5? — 초보 퀸 출동",
+     "line_san": [
+      "e5",
+      "Qh5",
+      "Nc6",
+      "Bc4",
+      "g6"
+     ],
+     "text": "[[Qh5는 e5 폰을 공격합니다.]] 하지만 흑이 …Nc6, …g6로 전개하며 퀸을 쫓으면 백만 템포를 잃습니다. 퀸을 일찍 꺼내면 안 되는 이유의 표본."
+    }
+   ],
+   "claims": [
+    {
+     "text": "e4 폰이 d5와 f5를 통제합니다.",
+     "kind": "attacks",
+     "subject": "e4",
+     "object": "d5",
+     "fen": "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1"
+    },
+    {
+     "text": "e4 폰이 d5와 f5를 통제합니다.",
+     "kind": "attacks",
+     "subject": "e4",
+     "object": "f5",
+     "fen": "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1"
+    },
+    {
+     "text": "e4 폰을 지키는 기물은 퀸뿐입니다.",
+     "kind": "defends",
+     "subject": "d1",
+     "object": "e4",
+     "fen": "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1"
+    },
+    {
+     "text": "d4 폰은 퀸이 지킵니다.",
+     "kind": "defends",
+     "subject": "d1",
+     "object": "d4",
+     "fen": "rnbqkbnr/pppppppp/8/8/3P4/8/PPP1PPPP/RNBQKBNR b KQkq - 0 1"
+    },
+    {
+     "text": "Qh5는 e5 폰을 공격합니다.",
+     "kind": "attacks",
+     "subject": "h5",
+     "object": "e5",
+     "fen": "rnbqkbnr/pppp1ppp/8/4p2Q/4P3/8/PPPP1PPP/RNB1KBNR b KQkq - 1 2"
+    },
+    {
+     "text": "Qh5는 e5 폰을 공격합니다.",
+     "kind": "piece_on",
+     "subject": "e5",
+     "object": "p",
+     "fen": "rnbqkbnr/pppp1ppp/8/4p2Q/4P3/8/PPPP1PPP/RNB1KBNR b KQkq - 1 2"
+    }
+   ]
+  },
+  {
+   "moves": "e4 e5",
+   "summary": "[[e5 폰이 d4와 f4를 통제합니다.]] 백과 같은 권리를 주장하는 가장 오래된 응수입니다.",
+   "why": [
+    "백의 d4를 폰으로 막아 두면 백은 d4를 두려면 c3나 Nf3로 준비해야 합니다. 대신 e5 폰이 f3 나이트의 첫 목표가 되어 흑은 곧바로 \"누가 e5를 지키는가\" 문제를 풀어야 합니다."
+   ],
+   "alternatives": [
+    [
+     "c5",
+     "비대칭 시실리안. 게임이 더 복잡해집니다."
+    ],
+    [
+     "e6",
+     "프렌치. 구조 싸움."
+    ]
+   ],
+   "replies": [
+    [
+     "Nf3",
+     "e5 공격. 가장 자연스러운 전개."
+    ],
+    [
+     "Bc4",
+     "f7 겨냥. 흑이 …Nf6로 e4를 맞공격하기 쉽습니다."
+    ],
+    [
+     "Nc3",
+     "비엔나. f4를 준비합니다."
+    ]
+   ],
+   "traps": [],
+   "claims": [
+    {
+     "text": "e5 폰이 d4와 f4를 통제합니다.",
+     "kind": "attacks",
+     "subject": "e5",
+     "object": "d4",
+     "fen": "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2"
+    },
+    {
+     "text": "e5 폰이 d4와 f4를 통제합니다.",
+     "kind": "attacks",
+     "subject": "e5",
+     "object": "f4",
+     "fen": "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2"
+    }
+   ]
+  },
+  {
+   "moves": "e4 e5 Nf3",
+   "summary": "[[f3 나이트가 e5 폰을 공격합니다.]] 첫 기물 전개이자 캐슬링 준비. 흑은 e5를 어떻게 지킬지 정해야 합니다.",
+   "why": [
+    "위협을 담은 전개입니다. 흑이 e5를 방치하면 Nxe5로 폰을 얻습니다. 흑의 선택은 나이트로 지키기(…Nc6, 가장 자연스러움), 폰으로 지키기(…d6, f8 비숍 길을 막음), 맞공격(…Nf6, 페트로프)입니다.",
+    "어느 쪽이든 흑의 다음 수를 하나 강제한 셈이라 백이 한 템포 앞서 갑니다. \"위협하면서 전개한다\"는 오프닝 원칙의 표본."
+   ],
+   "alternatives": [
+    [
+     "Bc4",
+     "위협 없는 전개. 흑이 …Nf6로 e4를 먼저 건드립니다."
+    ],
+    [
+     "Nc3",
+     "e4를 먼저 지킵니다. f4 계획이지만 …Nf6 …Bb4로 균형."
+    ]
+   ],
+   "replies": [
+    [
+     "Nc6",
+     "나이트 수비. 가장 흔합니다."
+    ],
+    [
+     "Nf6",
+     "맞공격(페트로프). 대칭 구조로 무승부 경향."
+    ],
+    [
+     "d6",
+     "폰 수비(필리도르). f8 비숍이 e7에 머뭅니다."
+    ]
+   ],
+   "traps": [
+    {
+     "title": "페트로프에서 곧바로 되잡으면",
+     "line_san": [
+      "Nf6",
+      "Nxe5",
+      "Nxe4",
+      "Qe2",
+      "Nf6",
+      "Nc6+"
+     ],
+     "text": "2…Nf6 3.Nxe5 Nxe4? 4.Qe2 — [[Qe2가 e4 나이트를 공격합니다.]] 여기서 4…Nf6?로 물러나면 5.Nc6+ 디스커버드 체크로 d8 퀸을 잃습니다. 흑은 3…d6로 백 나이트를 먼저 쫓아야 합니다."
+    }
+   ],
+   "claims": [
+    {
+     "text": "f3 나이트가 e5 폰을 공격합니다.",
+     "kind": "attacks",
+     "subject": "f3",
+     "object": "e5",
+     "fen": "rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2"
+    },
+    {
+     "text": "f3 나이트가 e5 폰을 공격합니다.",
+     "kind": "piece_on",
+     "subject": "e5",
+     "object": "p",
+     "fen": "rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2"
+    },
+    {
+     "text": "Qe2가 e4 나이트를 공격합니다.",
+     "kind": "attacks",
+     "subject": "e2",
+     "object": "e4",
+     "fen": "rnbqkb1r/pppp1ppp/8/4N3/4n3/8/PPPPQPPP/RNB1KB1R b KQkq - 1 4"
+    },
+    {
+     "text": "Qe2가 e4 나이트를 공격합니다.",
+     "kind": "piece_on",
+     "subject": "e4",
+     "object": "n",
+     "fen": "rnbqkb1r/pppp1ppp/8/4N3/4n3/8/PPPPQPPP/RNB1KB1R b KQkq - 1 4"
+    }
+   ]
+  },
+  {
+   "moves": "e4 e5 Nf3 Nc6",
+   "summary": "[[c6 나이트가 e5를 지킵니다.]] 가장 자연스러운 수비이자 전개. 이제 백이 비숍을 어디에 두느냐로 오프닝 이름이 갈립니다.",
+   "why": [
+    "나이트로 지키면 f8 비숍 길이 열린 채로 남고, d파일 폰도 자유롭습니다. 대신 c6 나이트 자체가 백의 다음 목표(Bb5)가 됩니다."
+   ],
+   "alternatives": [
+    [
+     "Nf6",
+     "페트로프. 수비 대신 맞공격."
+    ],
+    [
+     "d6",
+     "필리도르. 단단하지만 수동적."
+    ]
+   ],
+   "replies": [
+    [
+     "Bb5",
+     "루이 로페즈. e5의 수비수 c6를 건드립니다."
+    ],
+    [
+     "Bc4",
+     "이탈리안. f7을 겨눕니다."
+    ],
+    [
+     "d4",
+     "스카치. 중앙을 즉시 엽니다."
+    ],
+    [
+     "Nc3",
+     "쓰리 나이츠. 조용한 수."
+    ]
+   ],
+   "traps": [
+    {
+     "title": "투 나이츠 4.Ng5 — 프리드 리버 방향",
+     "line_san": [
+      "Bc4",
+      "Nf6",
+      "Ng5",
+      "d5",
+      "exd5",
+      "Nxd5",
+      "Nxf7"
+     ],
+     "text": "3.Bc4 Nf6 4.Ng5는 [[g5 나이트와 c4 비숍이 f7을 함께 공격합니다.]] 흑은 4…d5로 비숍을 막아야 하고, 5.exd5 Nxd5?는 6.Nxf7(프리드 리버)로 위험합니다. 이론의 수는 5…Na5."
+    }
+   ],
+   "claims": [
+    {
+     "text": "c6 나이트가 e5를 지킵니다.",
+     "kind": "defends",
+     "subject": "c6",
+     "object": "e5",
+     "fen": "r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3"
+    },
+    {
+     "text": "g5 나이트와 c4 비숍이 f7을 함께 공격합니다.",
+     "kind": "attacks",
+     "subject": "g5",
+     "object": "f7",
+     "fen": "r1bqkb1r/pppp1ppp/2n2n2/4p1N1/2B1P3/8/PPPP1PPP/RNBQK2R b KQkq - 5 4"
+    },
+    {
+     "text": "g5 나이트와 c4 비숍이 f7을 함께 공격합니다.",
+     "kind": "attacks",
+     "subject": "c4",
+     "object": "f7",
+     "fen": "r1bqkb1r/pppp1ppp/2n2n2/4p1N1/2B1P3/8/PPPP1PPP/RNBQK2R b KQkq - 5 4"
+    }
+   ]
+  },
+  {
+   "moves": "e4 e5 Nf3 Nc6 Bb5",
+   "summary": "[[b5 비숍이 c6 나이트를 공격합니다.]] c6는 e5의 유일한 수비수이므로 e5 폰을 간접적으로 압박하는 셈입니다. 두 번째 기물 전개, 캐슬링 준비 완료.",
+   "why": [
+    "지금 당장 Bxc6 dxc6 Nxe5로 폰을 따는 위협은 아닙니다. 흑이 …Qd4나 …Qg5로 e4 폰을 되찾기 때문입니다(아래 함정). 이 수의 뜻은 즉시 위협이 아니라 장기 압박입니다. 흑은 앞으로 e5를 지키느라 …d6, …Nf6 같은 수를 골라야 하고, 백은 그 사이 O-O, Re1, c3, d4로 중앙을 준비합니다.",
+    "비숍은 …a6에 Ba4로 물러나 압박을 유지하고, …b5에 Bb3로 가서 f7 대각선을 얻습니다. 물러설수록 강해지는 비숍이라 \"스페인식 고문\"이라는 별명이 붙었습니다.",
+    "이탈리안(Bc4)과의 차이: Bc4는 f7을 직접 겨누지만 흑이 …Nf6 …Bc5로 대등하게 전개합니다. Bb5는 흑에게 \"어떻게 e5를 지킬 것인가\"라는 문제를 계속 냅니다."
+   ],
+   "alternatives": [
+    [
+     "Bc4",
+     "f7 직접 겨냥. 흑이 대칭 전개로 균형을 잡기 쉽습니다."
+    ],
+    [
+     "d4",
+     "스카치. 중앙을 즉시 열어 기물이 빨리 교환됩니다. 압박이 오래가지 않습니다."
+    ],
+    [
+     "Nc3",
+     "쓰리 나이츠. 무난하지만 흑에게 문제를 내지 않습니다."
+    ]
+   ],
+   "replies": [
+    [
+     "a6",
+     "모피 방어. 비숍에게 물러설지 바꿀지 묻습니다. 메인 라인."
+    ],
+    [
+     "Nf6",
+     "베를린. 4.O-O Nxe4 5.Re1 Nd6로 엔드게임 지향."
+    ],
+    [
+     "d6",
+     "스타이니츠. 단단하지만 f8 비숍이 답답합니다."
+    ],
+    [
+     "Bc5",
+     "클래시컬. 4.c3로 d4를 준비하면 비숍이 목표가 됩니다."
+    ],
+    [
+     "Nd4",
+     "버드. 나이트 교환 제안, 드문 수."
+    ]
+   ],
+   "traps": [
+    {
+     "title": "왜 지금 폰을 딸 수 없는가",
+     "line_san": [
+      "a6",
+      "Bxc6",
+      "dxc6",
+      "Nxe5",
+      "Qd4"
+     ],
+     "text": "4.Bxc6 dxc6 5.Nxe5? Qd4! — [[d4 퀸이 e5 나이트와 e4 폰을 동시에 공격합니다.]] 백은 나이트를 살리면 e4를 잃습니다. 그래서 Bb5는 폰 위협이 아니라 압박입니다."
+    },
+    {
+     "title": "베를린 4.O-O Nxe4",
+     "line_san": [
+      "Nf6",
+      "O-O",
+      "Nxe4",
+      "Re1",
+      "Nd6",
+      "Nxe5"
+     ],
+     "text": "흑이 e4를 잡아도 5.Re1로 [[e1 룩이 e4 나이트를 공격합니다.]] 5…Nd6 6.Nxe5로 폰을 되찾고 6…Be7 7.Bf1이 베를린 엔드게임 방향입니다."
+    }
+   ],
+   "claims": [
+    {
+     "text": "b5 비숍이 c6 나이트를 공격합니다.",
+     "kind": "attacks",
+     "subject": "b5",
+     "object": "c6",
+     "fen": "r1bqkbnr/pppp1ppp/2n5/1B2p3/4P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 3 3"
+    },
+    {
+     "text": "b5 비숍이 c6 나이트를 공격합니다.",
+     "kind": "piece_on",
+     "subject": "c6",
+     "object": "n",
+     "fen": "r1bqkbnr/pppp1ppp/2n5/1B2p3/4P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 3 3"
+    },
+    {
+     "text": "d4 퀸이 e5 나이트와 e4 폰을 동시에 공격합니다.",
+     "kind": "attacks",
+     "subject": "d4",
+     "object": "e5",
+     "fen": "r1b1kbnr/1pp2ppp/p1p5/4N3/3qP3/8/PPPP1PPP/RNBQK2R w KQkq - 1 6"
+    },
+    {
+     "text": "d4 퀸이 e5 나이트와 e4 폰을 동시에 공격합니다.",
+     "kind": "attacks",
+     "subject": "d4",
+     "object": "e4",
+     "fen": "r1b1kbnr/1pp2ppp/p1p5/4N3/3qP3/8/PPPP1PPP/RNBQK2R w KQkq - 1 6"
+    },
+    {
+     "text": "e1 룩이 e4 나이트를 공격합니다.",
+     "kind": "attacks",
+     "subject": "e1",
+     "object": "e4",
+     "fen": "r1bqkb1r/pppp1ppp/2n5/1B2p3/4n3/5N2/PPPP1PPP/RNBQR1K1 b kq - 1 5"
+    },
+    {
+     "text": "e1 룩이 e4 나이트를 공격합니다.",
+     "kind": "piece_on",
+     "subject": "e4",
+     "object": "n",
+     "fen": "r1bqkb1r/pppp1ppp/2n5/1B2p3/4n3/5N2/PPPP1PPP/RNBQR1K1 b kq - 1 5"
+    }
+   ]
+  },
+  {
+   "moves": "e4 e5 Nf3 Nc6 Bb5 a6",
+   "summary": "비숍에게 결정을 요구합니다. 물러서면(Ba4) …b5로 템포를 벌고, 바꾸면(Bxc6) 비숍 쌍을 얻습니다.",
+   "why": [
+    "[[a6 폰이 b5 비숍을 공격합니다.]] 백은 지금 정해야 합니다. Ba4면 흑은 언제든 …b5로 비숍을 한 번 더 쫓아 퀸사이드 공간을 얻고, Bxc6면 흑은 더블 폰(c6·c7) 대신 비숍 쌍과 열린 d파일을 얻습니다.",
+    "모피 방어라 부르는 이유는 흑이 \"비숍 위치를 먼저 묻는다\"는 원칙 때문입니다. 나머지 흑 수(…Nf6, …d6)는 그 뒤에 두어도 늦지 않습니다."
+   ],
+   "alternatives": [
+    [
+     "Nf6",
+     "베를린. 비숍을 묻지 않고 e4를 맞공격. 엔드게임 성향."
+    ],
+    [
+     "d6",
+     "스타이니츠. 수동적."
+    ]
+   ],
+   "replies": [
+    [
+     "Ba4",
+     "메인. 압박 유지."
+    ],
+    [
+     "Bxc6",
+     "익스체인지. 구조 싸움, d4 교환 뒤 폰 다수 엔드게임 계획."
+    ]
+   ],
+   "traps": [
+    {
+     "title": "노아의 방주 — 비숍이 갇히는 함정",
+     "line_san": [
+      "Ba4",
+      "d6",
+      "d4",
+      "b5",
+      "Bb3",
+      "Nxd4",
+      "Nxd4",
+      "exd4",
+      "Qxd4",
+      "c5",
+      "Qd5",
+      "Be6",
+      "Qc6+",
+      "Bd7",
+      "Qd5",
+      "c4"
+     ],
+     "text": "4.Ba4 d6 5.d4? b5 6.Bb3 Nxd4 7.Nxd4 exd4 8.Qxd4? c5! 9.Qd5 Be6 10.Qc6+ Bd7 11.Qd5 c4 — [[c4 폰이 b3 비숍의 퇴로를 막습니다.]] 흑 폰 a6·b5·c4가 비숍을 가둡니다. 백은 5.d4 대신 5.c3나 5.Bxc6+로 가야 합니다."
+    }
+   ],
+   "claims": [
+    {
+     "text": "a6 폰이 b5 비숍을 공격합니다.",
+     "kind": "attacks",
+     "subject": "a6",
+     "object": "b5",
+     "fen": "r1bqkbnr/1ppp1ppp/p1n5/1B2p3/4P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 0 4"
+    },
+    {
+     "text": "a6 폰이 b5 비숍을 공격합니다.",
+     "kind": "piece_on",
+     "subject": "b5",
+     "object": "B",
+     "fen": "r1bqkbnr/1ppp1ppp/p1n5/1B2p3/4P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 0 4"
+    },
+    {
+     "text": "c4 폰이 b3 비숍의 퇴로를 막습니다.",
+     "kind": "attacks",
+     "subject": "c4",
+     "object": "b3",
+     "fen": "r2qkbnr/3b1ppp/p2p4/1p1Q4/2p1P3/1B6/PPP2PPP/RNB1K2R w KQkq - 0 12"
+    },
+    {
+     "text": "c4 폰이 b3 비숍의 퇴로를 막습니다.",
+     "kind": "piece_on",
+     "subject": "b3",
+     "object": "B",
+     "fen": "r2qkbnr/3b1ppp/p2p4/1p1Q4/2p1P3/1B6/PPP2PPP/RNB1K2R w KQkq - 0 12"
+    }
+   ]
+  },
+  {
+   "moves": "e4 e5 Nf3 Nc6 Bb5 a6 Bc4",
+   "summary": "책에 없는 후퇴입니다. 3.Bc4 이탈리안으로 갈 수 있었던 국면에 흑이 …a6를 공짜로 둔 셈이라, 나쁜 수라기보다 뜻이 없는 수입니다.",
+   "why": [
+    "[[c4 비숍은 f7을 겨눕니다.]] 그러나 같은 국면을 이탈리안(3.Bc4)으로 만들었다면 흑의 …a6는 없었습니다. …a6는 나중에 …b5로 이 비숍을 한 번 더 쫓는 데 쓰이므로 흑에게만 유리한 덤입니다.",
+    "책 수 Ba4는 같은 대각선(a4-e8)에 남아 c6 압박을 잇고, …b5 뒤에는 Bb3로 어차피 f7 대각선을 얻습니다. 즉 Ba4는 Bc4가 얻는 것을 나중에 다 얻으면서 압박까지 유지합니다."
+   ],
+   "alternatives": [
+    [
+     "Ba4",
+     "책의 메인. 압박 유지, …b5 뒤 Bb3."
+    ],
+    [
+     "Bxc6",
+     "책의 둘째 수. 구조 싸움으로 전환."
+    ]
+   ],
+   "replies": [
+    [
+     "Nf6",
+     "[[f6 나이트가 e4를 공격합니다.]] 백은 d3나 Nc3로 지켜야 하고, 흑은 …b5 …Bc5로 편하게 전개합니다."
+    ],
+    [
+     "Bc5",
+     "대칭 전개. 흑이 한 템포 앞선 이탈리안."
+    ]
+   ],
+   "traps": [],
+   "claims": [
+    {
+     "text": "c4 비숍은 f7을 겨눕니다.",
+     "kind": "attacks",
+     "subject": "c4",
+     "object": "f7",
+     "fen": "r1bqkbnr/1ppp1ppp/p1n5/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 1 4"
+    },
+    {
+     "text": "f6 나이트가 e4를 공격합니다.",
+     "kind": "attacks",
+     "subject": "f6",
+     "object": "e4",
+     "fen": "r1bqkb1r/1ppp1ppp/p1n2n2/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 2 5"
+    },
+    {
+     "text": "f6 나이트가 e4를 공격합니다.",
+     "kind": "piece_on",
+     "subject": "e4",
+     "object": "P",
+     "fen": "r1bqkb1r/1ppp1ppp/p1n2n2/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 2 5"
+    }
+   ]
+  },
+  {
+   "moves": "e4 e5 Nf3 Nc6 Bb5 a6 Ba4",
+   "summary": "압박을 유지하는 후퇴입니다. [[a4 비숍은 여전히 c6 나이트를 공격합니다.]] …b5에는 Bb3로 f7 대각선을 얻습니다.",
+   "why": [
+    "Bxc6로 구조를 바꾸는 대신 긴 게임을 고릅니다. 비숍은 a4에서 c6를 계속 노리고, 백은 O-O, Re1, c3, d4로 중앙을 준비합니다. 흑이 …b5로 쫓으면 Bb3, …Na5로 바꾸려 하면 c3 뒤 Bc2로 물러날 자리를 미리 만듭니다.",
+    "주의할 점은 딱 하나, d4를 너무 일찍 열지 않는 것입니다. 노아의 방주(아래)가 그 벌칙입니다."
+   ],
+   "alternatives": [
+    [
+     "Bxc6",
+     "익스체인지. 흑 더블 폰, 백은 d4 교환 뒤 킹사이드 폰 다수로 엔드게임을 노립니다."
+    ]
+   ],
+   "replies": [
+    [
+     "Nf6",
+     "메인. e4 공격, 5.O-O로 클로즈드 또는 오픈."
+    ],
+    [
+     "d6",
+     "모던 스타이니츠. …b5 …Na5 준비."
+    ],
+    [
+     "b5",
+     "즉시 쫓기. Bb3 뒤 …Na5나 …Bc5."
+    ],
+    [
+     "Nge7",
+     "코르드엘. 드문 수."
+    ]
+   ],
+   "traps": [
+    {
+     "title": "노아의 방주",
+     "line_san": [
+      "d6",
+      "d4",
+      "b5",
+      "Bb3",
+      "Nxd4",
+      "Nxd4",
+      "exd4",
+      "Qxd4",
+      "c5",
+      "Qd5",
+      "Be6",
+      "Qc6+",
+      "Bd7",
+      "Qd5",
+      "c4"
+     ],
+     "text": "4…d6 5.d4? b5 6.Bb3 Nxd4 7.Nxd4 exd4 8.Qxd4? c5! … 11…c4로 [[c4 폰이 b3 비숍의 퇴로를 막습니다.]] 5.c3가 안전한 준비 수."
+    }
+   ],
+   "claims": [
+    {
+     "text": "a4 비숍은 여전히 c6 나이트를 공격합니다.",
+     "kind": "attacks",
+     "subject": "a4",
+     "object": "c6",
+     "fen": "r1bqkbnr/1ppp1ppp/p1n5/4p3/B3P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 1 4"
+    },
+    {
+     "text": "a4 비숍은 여전히 c6 나이트를 공격합니다.",
+     "kind": "piece_on",
+     "subject": "c6",
+     "object": "n",
+     "fen": "r1bqkbnr/1ppp1ppp/p1n5/4p3/B3P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 1 4"
+    },
+    {
+     "text": "c4 폰이 b3 비숍의 퇴로를 막습니다.",
+     "kind": "attacks",
+     "subject": "c4",
+     "object": "b3",
+     "fen": "r2qkbnr/3b1ppp/p2p4/1p1Q4/2p1P3/1B6/PPP2PPP/RNB1K2R w KQkq - 0 12"
+    },
+    {
+     "text": "c4 폰이 b3 비숍의 퇴로를 막습니다.",
+     "kind": "piece_on",
+     "subject": "b3",
+     "object": "B",
+     "fen": "r2qkbnr/3b1ppp/p2p4/1p1Q4/2p1P3/1B6/PPP2PPP/RNB1K2R w KQkq - 0 12"
+    }
+   ]
+  }
+ ]
+}
