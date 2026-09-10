@@ -47,6 +47,11 @@ MASTER_MOVES_PER_NODE = 3
 BOOK_LOOKAHEAD = 50
 """Plies scanned for book positions when deciding where a game left the book."""
 
+PRACTICE_SOURCE = "practice"
+"""Source of games played on the practice board. The map, the heatmap and the break timing
+leave them out unless the caller asks for them (docs/PLAY.md 4.5): they can be played with
+hints and takebacks, so they are not evidence of what the user does on their own."""
+
 ROOT_LABEL = "시작 국면"
 TABIYA_SUFFIX = " 타비야"
 DEVIATION_SUFFIX = " 책 이탈"

@@ -673,8 +673,16 @@ async def find_users(session: AsyncSession, username: str) -> list[User]:
     return await users.find_users(session, username)
 
 
+PRACTICE_SOURCE = "practice"
+"""Games played on the practice board. Left out by default: they can be played with hints and
+takebacks, so counting them would flatter the report (docs/PLAY.md 4.5)."""
+
+
 async def games_in_window(
-    session: AsyncSession, user_ids: list[int], window_from: datetime
+    session: AsyncSession,
+    user_ids: list[int],
+    window_from: datetime,
+    include_practice: bool = False,
 ) -> list[Game]:
     stmt = (
         select(Game)
@@ -685,6 +693,8 @@ async def games_in_window(
         )
         .order_by(Game.played_at.desc().nulls_last(), Game.id.desc())
     )
+    if not include_practice:
+        stmt = stmt.where(Game.source != PRACTICE_SOURCE)
     return list((await session.execute(stmt)).scalars())
 
 
@@ -759,15 +769,17 @@ def report_from(
     )
 
 
-async def build_report(session: AsyncSession, username: str, days: int = 60) -> ProfileReport:
-    """Weakness report over the user's games of the last ``days`` days. Raises UserNotFound
-    when no account carries the name."""
+async def build_report(
+    session: AsyncSession, username: str, days: int = 60, include_practice: bool = False
+) -> ProfileReport:
+    """Weakness report over the user's games of the last ``days`` days. Practice games are left
+    out unless ``include_practice``. Raises UserNotFound when no account carries the name."""
     users = await find_users(session, username)
     if not users:
         raise UserNotFound(username)
     now = now_utc()
     ids = [u.id for u in users]
-    rows = await games_in_window(session, ids, now - timedelta(days=days))
+    rows = await games_in_window(session, ids, now - timedelta(days=days), include_practice)
     games = [load_game(row, username) for row in rows]
     due = await due_puzzle_count(session, ids, now)
     primary = users[0]

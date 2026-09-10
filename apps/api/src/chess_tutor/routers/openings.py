@@ -19,6 +19,7 @@ from chess_tutor.models import Game, User
 from chess_tutor.schemas import BreakTiming, Color, OpeningMap, PieceHeatmap
 from chess_tutor.services.openings_map import (
     COLOR_NAMES_KO,
+    PRACTICE_SOURCE,
     break_timing,
     build_map,
     piece_heatmap,
@@ -27,6 +28,7 @@ from chess_tutor.services.openings_map import (
 router = APIRouter(prefix="/openings", tags=["openings"])
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
+IncludePractice = Annotated[bool, Query(description="연습 게임(source=practice)도 포함할지")]
 
 
 @router.get("/_status")
@@ -35,7 +37,11 @@ def status() -> dict[str, str]:
 
 
 async def _user_games(
-    session: AsyncSession, username: str, color: Color, platform: str | None
+    session: AsyncSession,
+    username: str,
+    color: Color,
+    platform: str | None,
+    include_practice: bool = False,
 ) -> list[Game]:
     stmt = (
         select(Game)
@@ -45,6 +51,8 @@ async def _user_games(
     )
     if platform:
         stmt = stmt.where(User.platform == platform)
+    if not include_practice:
+        stmt = stmt.where(Game.source != PRACTICE_SOURCE)
     games = list((await session.execute(stmt)).scalars().all())
     if not games:
         raise HTTPException(
@@ -62,8 +70,9 @@ async def opening_map(
     depth: Annotated[int, Query(ge=1, le=40, description="플라이 단위 깊이")] = 12,
     min_games: Annotated[int, Query(ge=1)] = 2,
     platform: str | None = None,
+    include_practice: IncludePractice = False,
 ) -> OpeningMap:
-    games = await _user_games(session, username, color, platform)
+    games = await _user_games(session, username, color, platform, include_practice)
     return await asyncio.to_thread(build_map, games, color, depth, min_games)
 
 
@@ -75,8 +84,9 @@ async def heatmap(
     piece: Annotated[str, Query(min_length=3, max_length=3, description="예: bf8")],
     through_move: Annotated[int, Query(ge=1, le=60)] = 15,
     platform: str | None = None,
+    include_practice: IncludePractice = False,
 ) -> PieceHeatmap:
-    games = await _user_games(session, username, color, platform)
+    games = await _user_games(session, username, color, platform, include_practice)
     try:
         return await asyncio.to_thread(piece_heatmap, games, color, piece, through_move)
     except ValueError as exc:
@@ -90,6 +100,7 @@ async def breaks(
     color: Color,
     structure: str | None = None,
     platform: str | None = None,
+    include_practice: IncludePractice = False,
 ) -> list[BreakTiming]:
-    games = await _user_games(session, username, color, platform)
+    games = await _user_games(session, username, color, platform, include_practice)
     return await asyncio.to_thread(break_timing, games, color, structure)

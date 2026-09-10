@@ -24,23 +24,99 @@ def position_key(board: chess.Board) -> str:
     return " ".join(board.fen().split(" ")[:4])
 
 
+def san_tokens(pgn: str) -> list[str]:
+    """Move tokens of a TSV line, move numbers dropped."""
+    return [token for token in pgn.split() if not token[0].isdigit()]
+
+
+def moves_of(row: Opening) -> list[chess.Move]:
+    """The line of one TSV row as moves. Empty when the row does not replay (never happens
+    for the bundled files; :func:`rows` drops those)."""
+    board = chess.Board()
+    moves: list[chess.Move] = []
+    try:
+        for token in san_tokens(row.pgn):
+            move = board.parse_san(token)
+            moves.append(move)
+            board.push(move)
+    except ValueError:
+        return []
+    return moves
+
+
 @lru_cache
-def _book() -> dict[str, Opening]:
-    book: dict[str, Opening] = {}
+def rows() -> tuple[Opening, ...]:
+    """Every TSV line that replays, in file order (a..e). `ply` is the length of the line."""
+    out: list[Opening] = []
     assets = resources.files("chess_tutor").joinpath("assets")
     for letter in "abcde":
         text = assets.joinpath(f"openings_{letter}.tsv").read_text(encoding="utf-8")
         for row in csv.DictReader(text.splitlines(), delimiter="\t"):
             board = chess.Board()
             try:
-                for token in row["pgn"].split():
-                    if token[0].isdigit():
-                        continue
+                for token in san_tokens(row["pgn"]):
                     board.push_san(token)
             except ValueError:
                 continue
-            book[position_key(board)] = Opening(row["eco"], row["name"], row["pgn"], board.ply())
+            out.append(Opening(row["eco"], row["name"], row["pgn"], board.ply()))
+    return tuple(out)
+
+
+def find_rows(eco: str, name: str, ply: int | None = None) -> list[Opening]:
+    """TSV rows with this exact (eco, name), narrowed to one line length when `ply` is given.
+
+    The catalogue in services/openings_catalog.py addresses rows this way: several rows can
+    share a name (the same variation entered by different move orders), so the length of the
+    line is the disambiguator."""
+    return [
+        row
+        for row in rows()
+        if row.eco == eco and row.name == name and (ply is None or row.ply == ply)
+    ]
+
+
+@lru_cache
+def _book() -> dict[str, Opening]:
+    book: dict[str, Opening] = {}
+    for row in rows():
+        board = chess.Board()
+        for token in san_tokens(row.pgn):
+            board.push_san(token)
+        book[position_key(board)] = row
     return book
+
+
+@lru_cache
+def _tree() -> dict[str, dict[str, Opening]]:
+    """position key -> uci -> the opening that move leads to.
+
+    Built from every prefix of every TSV line, so a position reached by a different move order
+    finds the same continuations. The name attached to a move is the name of the position it
+    reaches when that position is itself in the book, and the name of the row that contributed
+    the move otherwise; when several rows offer the same move the shortest name wins, which is
+    the most general one ("Sicilian Defense" over "Sicilian Defense: Najdorf Variation")."""
+    book = _book()
+    tree: dict[str, dict[str, Opening]] = {}
+    for row in rows():
+        board = chess.Board()
+        for token in san_tokens(row.pgn):
+            move = board.parse_san(token)
+            key = position_key(board)
+            board.push(move)
+            named = book.get(position_key(board), row)
+            current = tree.setdefault(key, {})
+            known = current.get(move.uci())
+            if known is None or (len(named.name), named.name) < (len(known.name), known.name):
+                current[move.uci()] = named
+    return tree
+
+
+def next_moves(board: chess.Board) -> list[tuple[chess.Move, Opening]]:
+    """Book continuations from this position, sorted by the name they lead to."""
+    entries = _tree().get(position_key(board), {})
+    out = [(chess.Move.from_uci(uci), op) for uci, op in entries.items()]
+    out.sort(key=lambda pair: (pair[1].name, pair[0].uci()))
+    return [(move, op) for move, op in out if board.is_legal(move)]
 
 
 def lookup(board: chess.Board) -> Opening | None:

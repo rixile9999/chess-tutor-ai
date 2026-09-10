@@ -460,13 +460,17 @@ async def list_games(
     username: str | None = None,
     limit: int = 50,
     offset: int = 0,
+    source: str | None = None,
 ) -> list[Game]:
-    """Newest first (played_at, then id). username filters to that user's games."""
+    """Newest first (played_at, then id). username filters to that user's games, source to one
+    origin ('pgn', 'chesscom', 'lichess', 'practice')."""
     stmt = _base_query()
     if username and username.strip():
         stmt = stmt.join(User, Game.user_id == User.id).where(
             func.lower(User.username) == username.strip().lower()
         )
+    if source and source.strip():
+        stmt = stmt.where(Game.source == source.strip())
     stmt = (
         stmt.order_by(Game.played_at.desc().nulls_last(), Game.id.desc())
         .limit(limit)

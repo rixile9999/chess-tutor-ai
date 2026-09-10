@@ -65,8 +65,11 @@ async def list_games(
     user: str | None = None,
     limit: Annotated[int, Query(ge=1, le=500)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
+    source: Annotated[str | None, Query(description="pgn | chesscom | lichess | practice")] = None,
 ) -> list[GameSummary]:
-    rows = await games_svc.list_games(session, username=user, limit=limit, offset=offset)
+    rows = await games_svc.list_games(
+        session, username=user, limit=limit, offset=offset, source=source
+    )
     return [games_svc.to_summary(g) for g in rows]
 
 
