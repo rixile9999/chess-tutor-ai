@@ -3,9 +3,10 @@ import { createPortal } from 'react-dom';
 import { Link, useSearchParams } from 'react-router-dom';
 import type { Key } from 'chessground/types';
 import { api } from '../../api/client';
-import type { Color, TrapLine } from '../../api/types';
+import type { Color, OpeningNote, TrapLine } from '../../api/types';
 import type { BoardShape } from '../../components/Board';
 import { applyUci } from '../../lib/chess';
+import type { Preview } from '../../lib/shapes';
 import { getUsername, setUsername } from '../../lib/user';
 import { errorText, useBoardSize } from '../training/util';
 import { Strip } from './Strip';
@@ -13,6 +14,8 @@ import { Heatmap, defaultPiece, mirrorPiece, pieceOptions } from './Heatmap';
 import { BreakTimeline } from './BreakTimeline';
 import { Candidates, type MyMoves } from './Candidates';
 import { ExplainPanel } from './ExplainPanel';
+import { JournalExport } from './DeeperPanel';
+import { useDeeperPlay } from './useDeeper';
 import { Journal } from './Journal';
 import { LineBoard, type PositionLine } from './LineBoard';
 import { SetupPanel } from './SetupPanel';
@@ -63,8 +66,6 @@ export default function OpeningsPage() {
   const [line, dispatch] = useReducer(lineReducer, undefined, () => initialLine(START_FEN, storedDepth()));
   const [hover, setHover] = useState<string | null>(null);
   const [marked, setMarked] = useState<string | null>(null);
-  const [generating, setGenerating] = useState(false);
-  const [genError, setGenError] = useState<string | null>(null);
 
   const mapQ = useQuery(
     () => (username ? api.openings.map(username, color, FETCH_DEPTH, FETCH_MIN_GAMES) : null),
@@ -99,6 +100,9 @@ export default function OpeningsPage() {
     annotate([...sansTo(line, line.cursor), r.san]);
   }, [line, annotate]);
 
+  // The 더 깊이 panel sits inside ExplainPanel and cannot reach this action, so the page registers it (§10.4).
+  useDeeperPlay(play);
+
   const jumpTo = useCallback((sans: string[]) => {
     dispatch({ type: 'jumpTo', sans });
     annotate(pliesFrom(START_FEN, sans).map((p) => p.san));
@@ -128,15 +132,19 @@ export default function OpeningsPage() {
   const focusFenBefore = focusPly > 0 ? fenAt(line, focusPly - 1) : null;
   const noteQ = useNote(focusFenBefore, focused?.san ?? null);
 
-  const generate = useCallback((regenerate: boolean) => {
-    if (!focused || !focusFenBefore) return;
-    setGenerating(true);
-    setGenError(null);
-    api.openings.makeNote({ fen: focusFenBefore, san: focused.san, username, regenerate })
-      .then((note) => { rememberNote(focusFenBefore, focused.san, note); noteQ.reload(); })
-      .catch((e: unknown) => setGenError(errorText(e)))
-      .finally(() => setGenerating(false));
-  }, [focused, focusFenBefore, username, noteQ]);
+  // A note the panel just wrote (or changed with an addendum): cache it and refresh the query.
+  const onNote = useCallback((note: OpeningNote) => {
+    if (focusFenBefore && focused) rememberNote(focusFenBefore, focused.san, note);
+    noteQ.reload();
+  }, [focusFenBefore, focused, noteQ]);
+
+  // A board the tutor drew in the note chat borrows the main board, exactly as a trap line does.
+  const onTutorBoard = useCallback((p: Preview | null) => {
+    dispatch({
+      type: 'preview',
+      preview: p ? { key: p.id, fen: p.fen, title: p.label, lastMove: p.lastMove } : null,
+    });
+  }, []);
 
   const onTrap = useCallback((trap: TrapLine, index: number, step: number) => {
     const plies = pliesFrom(fenAt(line, focusPly), trap.line_san.slice(0, step));
@@ -370,18 +378,24 @@ export default function OpeningsPage() {
             label={focused?.label ?? null}
             annotation={focused?.annotation ?? null}
             name={guide?.name ?? null}
+            nameEn={guide?.name_en ?? null}
             eco={guide?.eco ?? null}
+            fenBefore={focusFenBefore}
+            san={focused?.san ?? null}
+            username={username}
             note={noteQ.data}
             loading={noteQ.loading}
             error={noteQ.error}
             onRetry={noteQ.reload}
             depth={line.depth}
             onDepth={(d) => dispatch({ type: 'setDepth', depth: d })}
-            generating={generating}
-            genError={genError}
-            onGenerate={generate}
+            onNote={onNote}
             onTrap={onTrap}
             previewKey={line.preview?.key ?? null}
+            fenAfter={focused?.fen ?? null}
+            movesSan={sansTo(line, focusPly)}
+            startFen={line.startFen}
+            onPreview={onTutorBoard}
           />
         </div>
 
@@ -409,6 +423,7 @@ export default function OpeningsPage() {
           <span className="small muted">
             둔 수의 시간순 색인. 항목을 누르면 보드가 그 국면으로 가고 옆 패널이 그 수의 해설로 바뀝니다. 되돌아가 다른 수를 두어도 이전 항목은 지워지지 않습니다
           </span>
+          <JournalExport plies={line.plies} cursor={line.cursor} name={guide?.name ?? null} eco={guide?.eco ?? null} noteSummary={(seq) => noteSummaries.get(seqKey(seq)) ?? null} />
         </div>
         <Journal
           journal={line.journal}

@@ -149,8 +149,10 @@ export interface NamedCandidate {
   /** "3.Bb5" / "3…a6" — the move number is part of the string. */
   label: string;
   fen_after: string;
-  /** Empty only when nothing names this move; a master-only move that lands in the book keeps its name. */
+  /** Korean (openings.name_ko). Empty only when nothing names this move; a master-only move that lands in the book keeps its name. */
   name: string; eco: string;
+  /** The book's English name, shown as the card's `title` so a transliteration can be checked. */
+  name_en: string | null;
   /** The arriving position itself is in the book (otherwise `name` is the line this move belongs to). */
   named_here: boolean;
   /** SAN left to the next named position while the line is forced; empty when `named_here`. */
@@ -168,14 +170,20 @@ export interface SetupStatus {
 }
 export interface PositionGuide {
   fen: string; side: Color;
-  name: string | null; eco: string | null; in_book: boolean;
+  name: string | null;
+  /** The book's own English name, shown on hover next to the Korean one (M8d-5). */
+  name_en: string | null;
+  eco: string | null; in_book: boolean;
   structure: StructureInfo; candidates: NamedCandidate[]; setups: SetupStatus[];
 }
 export interface MoveFact { kind: string; text: string; claims: Claim[]; verified: boolean }
 export interface MoveAnnotation {
   ply: number; label: string; san: string; uci: string;
   fen_before: string; fen_after: string;
-  in_book: boolean; name_before: string | null; name_after: string | null; transposition: boolean;
+  in_book: boolean; name_before: string | null; name_after: string | null;
+  /** English name of the position the move arrives at: the journal badge's tooltip. */
+  name_after_en: string | null;
+  transposition: boolean;
   /** Only when the move left the book, at most 3. */
   book_alternatives: NamedCandidate[];
   facts: MoveFact[];
@@ -198,6 +206,18 @@ export interface TrapLine {
   line_san: string[];
   text: string;
 }
+/** A board the tutor drew, as it is kept on a note (M8d-3). */
+export interface ChatBoardOut {
+  type: 'board'; n: number; start_fen: string; fen: string; moves: string[];
+  last_move: [string, string] | null; arrows: Arrow[]; highlights: string[]; caption: string;
+}
+/** One question the student asked about this move and the answer they kept (§10.3). */
+export interface Addendum {
+  question: string; answer: string; boards: ChatBoardOut[];
+  /** Squares the answer named that nothing had grounded — shown as the chat shows them. */
+  unverified: string[];
+  created_at: string;
+}
 export interface OpeningNote {
   position_key: string; san: string; in_book: boolean;
   /** 2~3 sentences; [[...]] marks a sentence the verifier confirmed on the board. */
@@ -209,7 +229,42 @@ export interface OpeningNote {
   sources: string[];
   verified_claims: number; total_claims: number;
   model: string; created_at: string;
+  addenda: Addendum[];
+  /** Question chips the server made from this note; recomputed on every read. */
+  questions: string[];
+}
+export interface AddendumRequest {
+  fen: string; san: string; question: string; answer: string;
+  boards: ChatBoardOut[]; unverified: string[];
+}
+/** The note the student is reading, attached to a live chat question (§10.3). */
+export interface OpeningContext {
+  fen_before: string; san: string; note_summary: string; section?: string | null; quote?: string | null;
 }
 export interface NoteMissing { status: 'missing' }
 export type NoteLookup = OpeningNote | NoteMissing;
 export interface NoteRequest { fen: string; san: string; username?: string | null; regenerate?: boolean }
+
+// ---------- 더 깊이 (M8d-4: 엔진 라인 · 마스터 통계) ----------
+export interface DeeperLine {
+  san: string; uci: string;
+  /** From White's point of view, like every other score in the API. */
+  score: Score;
+  /** The whole line in SAN, the first move included (server cap: 10 plies). */
+  pv_san: string[];
+}
+export interface DeeperLines { fen: string; depth: number; lines: DeeperLine[] }
+export interface MasterMove {
+  san: string; uci: string;
+  /** Raw number of master games with this move; `white`/`draws`/`black` are percents adding up to 100. */
+  games: number;
+  white: number; draws: number; black: number;
+  avg_rating: number | null;
+}
+export interface MasterStats {
+  fen: string;
+  /** False when the numbers could not be fetched (no token, explorer down); `reason` says why. */
+  available: boolean;
+  reason: string | null;
+  moves: MasterMove[];
+}

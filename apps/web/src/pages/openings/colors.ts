@@ -67,7 +67,12 @@ export function shortName(name: string | null | undefined): string {
 
 // ---------- 수 해설 배지 (M8) ----------
 export type BadgeTone = 'good' | 'bad' | 'warn' | 'neutral';
-export interface MoveBadge { tone: BadgeTone; text: string }
+export interface MoveBadge {
+  tone: BadgeTone;
+  text: string;
+  /** `title` attribute when there is more to say than fits — the English opening name (M8d-5). */
+  title?: string;
+}
 
 /** `badge` classes for a tone; 경고색은 이 페이지에서만 쓰므로 openings.css의 클래스를 씁니다. */
 export const badgeClass = (tone: BadgeTone): string =>
@@ -84,12 +89,16 @@ const FACT_SKIP = new Set(['book', 'name', 'transposition', 'naturalness', 'engi
 
 /** Badges for a move, most telling first (⚑이름 / ⚠책 밖 / 전위 / 사실 종류 / 마이아). Engine gets its own. */
 export function moveBadges(a: {
-  in_book: boolean; name_before: string | null; name_after: string | null; transposition: boolean;
+  in_book: boolean; name_before: string | null; name_after: string | null;
+  name_after_en?: string | null; transposition: boolean;
   facts: { kind: string }[]; naturalness: number | null;
 }): MoveBadge[] {
   const out: MoveBadge[] = [];
   const name = (a.name_after ?? '').trim();
-  if (name && name !== (a.name_before ?? '').trim()) out.push({ tone: 'good', text: `⚑ ${name}` });
+  const nameEn = (a.name_after_en ?? '').trim();
+  if (name && name !== (a.name_before ?? '').trim()) {
+    out.push({ tone: 'good', text: `⚑ ${name}`, title: nameEn || name });
+  }
   if (!a.in_book) out.push({ tone: 'warn', text: '⚠ 책 밖' });
   if (a.transposition) out.push({ tone: 'neutral', text: '전위' });
   const seen = new Set<string>();

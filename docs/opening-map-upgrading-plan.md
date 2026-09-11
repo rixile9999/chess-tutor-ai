@@ -369,3 +369,82 @@ class OpeningNote(BaseModel):
 | **M8d** | 노트 스트리밍, `[질문]`을 `/play/chat`에 노트 문맥과 함께 연결, `sentences.py` 공유, 라우터 합치기, 문서 |
 
 작업 규칙: 브랜치 `m8-opening-map`(워크트리 `chess-tutor-ai-m8`). 단계마다 커밋. `openings.py`·`openings_map.py`·`openings_catalog.py`·`routers/openings.py`·`play_coach.py`는 다른 작업이 병렬로 고치고 있으므로 **읽기만** 하고 새 파일에 쓴다. 웹 `pages/openings/index.tsx`·`Explorer.tsx`·`FocusBoard.tsx`·`openings.css`는 이 작업이 소유한다.
+
+## 10. M8d 계획 (2026-09-12)
+
+M8a~c가 `main`에 들어간 상태(PR #1)에서 남은 것과, 그 뒤 실측에서 드러난 것을 묶는다. 시안: `docs/opening-map-m8d-mockup.html`.
+
+### 10.1 범위
+
+| # | 항목 | 왜 | 화면 |
+|---|---|---|---|
+| 1 | **노트 스트리밍** — 섹션 단위 | 지금은 `POST /openings/note`가 10초 넘게 빈 화면. 요약 → 왜 → 응수 → 대안 → 함정 순서로 도착하는 대로 보여 준다 | 있음 |
+| 2 | **튜터에게 질문** — 해설 문맥 + 제안 질문 + 답을 해설에 덧붙이기 | "더 깊이" 버튼이 비어 있다. 질문은 해설의 문장을 인용해서 시작해야 하고, 좋은 답은 해설에 남아야 한다 | 있음 |
+| 3 | **더 깊이** — 엔진 라인 3개, 마스터 통계 | 같은 버튼 자리. 카드의 마스터 승률 한 숫자로는 부족하다 | 있음 |
+| 4 | **오프닝 이름 한글화** | 해설·후보·일지에 `'King's Pawn Game'(B00)` 영어 이름이 그대로 나온다 | 있음 |
+| 5 | 내부 정리 | `routers/opening_guide.py` → `routers/openings.py` 합치기, `_Sentence/_assemble` → `services/sentences.py`, `docs/IMPLEMENTATION.md` §7·§8 갱신 | 없음 |
+| 6 | 일지 내보내기 | 수순 + 한 줄 해설을 주석 달린 PGN으로 복사. 작다 | 버튼 하나 |
+
+### 10.2 노트 스트리밍
+
+**서버.** `POST /openings/note/stream` — 채팅과 같은 이벤트 스트림(`services/chat.py`의 `StreamParser`가 만드는 것과 같은 줄 단위 JSON). 이벤트:
+
+```
+{type:"stage", name:"book"|"engine"|"plans"|"maia", detail:"후보 2가지"|"3라인 · 깊이 12 · 1.1s"|…}   # facts_block을 만드는 동안, 서버가 낸다
+{type:"tool", name:"analyse"|"compare"|…, input:{…}}                                             # 모델의 도구 호출(채팅과 동일)
+{type:"section", name:"summary"|"why"|"replies"|"alternatives"|"traps"|"mine"|"engine", payload:…, verified_claims, total_claims}
+{type:"note", note: OpeningNote}                                                                 # 저장된 최종본
+{type:"error"|"warning", message}
+```
+
+- 프롬프트를 **NDJSON**으로 바꾼다: "섹션마다 한 줄 JSON을 순서대로 출력한다(`{"section":"summary",…}` …)". `claude -p --output-format stream-json --include-partial-messages`로 텍스트 델타를 받아 줄 단위로 자르고, 줄 하나가 JSON으로 읽히면 그 섹션을 **바로 검증**(`[[…]]` 강등, 함정 합법성)해 `section` 이벤트로 낸다. `mine`·`engine`은 서버가 채우므로 모델 출력과 무관하게 `stage` 직후에 먼저 보낸다.
+- 완성된 노트만 저장한다. 중단(클라이언트 abort → 프로세스 종료)되면 저장하지 않고, 화면은 받은 섹션을 "미완성"으로 남긴다.
+- 20초 안에 첫 유효 섹션이 없으면 프로세스를 끊고 기존 비스트리밍 경로로 한 번 재시도한다(모델이 산문으로 답하는 경우의 안전망).
+- 동시성은 채팅의 `_slots()` 세마포어를 같이 쓴다. 기존 `POST /openings/note`는 그대로 두고(테스트·시드·비스트리밍 클라이언트용), 내부 생성 함수만 공유한다.
+
+**웹.** `ExplainPanel`: [깊은 해설 만들기]를 누르면 패널 상단에 **단계 체크리스트**(책 후보 → 엔진 → 구조·계획 → 마이아 → 작성 중(도구 호출 이름이 흐르는 한 줄)), 섹션은 도착 순서대로 펼쳐지며 각 섹션 제목 옆에 "검증 n/n" 칩. [중단] 버튼. 끝나면 "저장됨 · 12초 · 검증 9/9".
+
+**테스트.** 가짜 claude 스크립트가 NDJSON을 줄 단위로 천천히 내게 하고 (1) 섹션 이벤트 순서 (2) 섹션별 검증·강등 (3) 중단 시 미저장 (4) 20초 무응답 → 폴백 (5) 완료 시 저장본 = `GET /openings/note` 결과.
+
+### 10.3 튜터에게 질문 (해설 문맥)
+
+**서버.** `POST /play/chat`의 라이브 요청에 선택 필드 `opening: {fen_before, san, note_summary, section?, quote?}`를 더한다. `chat_prompt.build_live_prompt`가 "지금 보는 해설" 블록을 붙인다: 수, 이름, 요약, (있으면) 학생이 인용한 문장. 세션 키는 `fen_before+san`(수에 대한 대화). 도구·검증·보드 이벤트는 그대로.
+
+**제안 질문**은 LLM 없이 노트에서 만든다(`opening_notes.suggested_questions(note)`): 함정 제목 → "왜 {제목}인가요?", 대안 → "{san} 대신 {alt}는 왜 안 되나요?", 응수 → "상대가 {reply}로 응수하면 내 계획은?", 책 밖이면 "이 수가 나쁘지 않다면 왜 책에 없나요?". 최대 4개.
+
+**해설에 반영.** `POST /openings/note/addendum {fen, san, question, answer, boards: BoardEvent[], unverified: string[]}` → `OpeningNote.addenda: list[Addendum]`(질문, 답, 보드, 미확인 칸 목록, 시각). 패널에 "내 질문" 섹션이 생기고 보드는 미리보기 버튼이 된다. 답 문장의 검증은 채팅의 접지 규칙(`text_end.unverified`)을 그대로 저장한다 — 재검증하지 않는다.
+
+**웹.** `ExplainPanel`의 "튜터에게 질문" 섹션 = 인라인 채팅(`useConversations` scope `'opening'`, `ChatLog` 재사용). 위에 문맥 칩(수 · 이름 · "해설 요약 포함"), 제안 질문 칩 4개, 노트 문장을 드래그해 [이 문장에 대해 질문] 하면 `quote`로 들어간다. 튜터가 보여 준 보드는 카드로 뜨고 [보드에 보기]가 메인 보드 미리보기(`state.preview`)를 켠다. 답이 끝나면 [해설에 반영] 버튼.
+
+**테스트.** 프롬프트에 해설 블록이 들어가는지, 제안 질문 생성 규칙, addendum 저장·조회, 세션 키 분리(같은 FEN 다른 수).
+
+### 10.4 더 깊이
+
+- `GET /openings/lines?fen=&depth=12&multipv=3` → `[{san, uci, score, pv_san[]}]` (`analysis.analyse_position` + `EngineCache`). 웹: 줄마다 평가 막대 + PV 칩(클릭 = 미리보기, 함정과 같은 방식) + [이 수 두기].
+- `GET /openings/masters?fen=` → `{available, moves:[{san, uci, games, white, draws, black, avg_rating}]}` (`openings_map.fetch_master_moves` 정규화; 토큰 없으면 `available:false`). 웹: 표 + W/D/L 누적 막대 + [두기]. 카드의 마스터 승률과 같은 캐시.
+- 둘 다 "더 깊이" 섹션을 열 때만 부른다(패널 기본 상태에서는 호출 없음).
+
+### 10.5 오프닝 이름 한글화
+
+- `assets/opening_names_ko.json` `{en: ko}` 3,810개. 만드는 방법은 `scripts/translate_openings.py`: (1) 규칙 사전 60단어(Opening→오프닝, Defense→디펜스, Variation→변화, Gambit→갬빗, Accepted→억셉티드, Declined→디클라인드, Attack→어택, System→시스템, Line→라인, Main→메인, Classical→클래시컬 …)와 고유명사 표 200개(Ruy Lopez→루이 로페즈, Najdorf→나이도르프, Morphy→모피 …)를 먼저 적용, (2) 남은 토큰만 headless claude에 100개씩 묶어 음차 요청, (3) 결과를 파일로 커밋. 내 기보에 자주 나오는 상위 200개는 사람이 한 번 훑는다(`README`에 검수 절차).
+- 런타임 `openings.name_ko(name) -> str`(없으면 영어). 적용: 후보 카드, 일지, `MoveFact` 문장(`'루이 로페즈: 모피 방어'(C70) 국면이 됩니다` → `루이 로페즈: 모피 방어(C70)가 됩니다`), 해설 패널 헤더, 카탈로그 `name`(기존 `name_ko`는 유지, `name_en` 그대로).
+- 테스트: TSV 모든 이름에 항목 존재·비어 있지 않음, 표본 20개 고정.
+
+### 10.6 순서와 크기
+
+| 단계 | 내용 | 크기 |
+|---|---|---|
+| M8d-1 | 이름 한글화(스크립트·자산·적용·테스트) | 서버 200줄 + 자산, 웹 30줄 |
+| M8d-2 | 노트 스트리밍 | 서버 300줄, 웹 200줄 |
+| M8d-3 | 튜터에게 질문 + 제안 질문 + 반영 | 서버 250줄, 웹 250줄 |
+| M8d-4 | 더 깊이(엔진 라인·마스터) + 일지 PGN 복사 | 서버 120줄, 웹 200줄 |
+| M8d-5 | 내부 정리 + 문서 | 이동 위주 |
+
+M8d-1과 M8d-2·3·4는 파일이 겹치지 않아 병렬 가능(웹은 `ExplainPanel.tsx`를 세 단계가 다 만지므로 2→3→4는 순서대로). 작업은 `main`에서 딴 워크트리 브랜치 `m8d`에서 하고 단계마다 커밋한다.
+
+### 10.7 리스크
+
+- 모델이 NDJSON 대신 산문을 낼 수 있다 → 20초 폴백(10.2). 시드·테스트는 비스트리밍 경로로 남긴다.
+- "해설에 반영"은 답을 재검증하지 않는다. 채팅의 접지 표시(미확인 칸)를 그대로 저장하고 화면에 같은 표시를 한다.
+- 이름 번역은 음차라 어색한 것이 섞인다. 상위 200개 검수로 대부분을 잡고, 나머지는 영어 병기(`title` 속성)로 확인 가능하게 둔다.
+- 엔진 라인·마스터는 패널을 열 때만 부르므로 비용은 사용자가 결정한다.

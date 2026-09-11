@@ -19,7 +19,7 @@ from chess_tutor import models
 from chess_tutor.config import get_settings
 from chess_tutor.db import get_session
 from chess_tutor.routers.review import NOT_FOUND, PLY_NOT_FOUND, _analysis
-from chess_tutor.schemas import Color
+from chess_tutor.schemas import Color, OpeningContext
 from chess_tutor.services import chat as chat_svc
 from chess_tutor.services import chat_prompt
 from chess_tutor.services import review as review_svc
@@ -51,6 +51,18 @@ class LiveChatRequest(ChatRequest):
     user_color: Color | None = Field(default=None, description="학생의 색. 수동 게임이면 비움")
     opponent: str | None = Field(default=None, description='상대 표시 이름, 예: "Maia 1500"')
     opening_name: str | None = None
+    opening: OpeningContext | None = Field(
+        default=None, description="오프닝 지도에서 읽고 있는 해설. 있으면 대화가 그 수에 붙는다"
+    )
+
+
+def _session_key(req: LiveChatRequest) -> str:
+    """What one live conversation is about. A question from the opening map is about a *move*,
+    so the key is the position it was played in plus the move: the same position with another
+    move is another conversation (plan §10.3). Otherwise it is the position on the board."""
+    if req.opening is not None:
+        return f"{req.opening.fen_before}|{req.opening.san}"
+    return req.fen
 
 
 class ChatStatus(BaseModel):
@@ -108,8 +120,9 @@ async def chat(
 
 @router.post("/play/chat")
 async def live_chat(req: LiveChatRequest, rating: Rating = None) -> StreamingResponse:
-    """Ask the tutor about the position of a practice game in progress. The session follows
-    the position: a question from a different FEN starts a new conversation."""
+    """Ask the tutor about the position of a practice game in progress, or about the move an
+    opening note explains. The session follows what the question is about (`_session_key`): a
+    question from a different position — or about a different move — starts a new conversation."""
     try:
         board = chess.Board(req.fen)
         chess.Board(req.start_fen)
@@ -118,12 +131,20 @@ async def live_chat(req: LiveChatRequest, rating: Rating = None) -> StreamingRes
     if not board.is_valid():
         raise HTTPException(status_code=422, detail="규칙에 맞지 않는 국면입니다.")
     r = rating or get_settings().default_rating
+    key = _session_key(req)
     chat_session = chat_svc.get_session(req.session_id)
-    if chat_session is None or chat_session.game_id is not None or chat_session.fen != req.fen:
+    if chat_session is None or chat_session.game_id is not None or chat_session.fen != key:
         prompt = chat_prompt.build_live_prompt(
-            req.fen, req.start_fen, req.moves_san, req.user_color, r, req.opponent, req.opening_name
+            req.fen,
+            req.start_fen,
+            req.moves_san,
+            req.user_color,
+            r,
+            req.opponent,
+            req.opening_name,
+            req.opening,
         )
-        chat_session = chat_svc.create_session(None, len(req.moves_san), prompt, fen=req.fen)
+        chat_session = chat_svc.create_session(None, len(req.moves_san), prompt, fen=key)
     if chat_session.lock.locked():
         raise HTTPException(status_code=409, detail="이 대화는 아직 이전 답을 쓰는 중입니다.")
     move_fen = req.move.fen if req.move else None

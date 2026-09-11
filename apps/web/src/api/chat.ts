@@ -1,5 +1,5 @@
 import { ApiError } from './client';
-import type { Arrow } from './types';
+import type { Arrow, OpeningContext } from './types';
 
 /** One board state the tutor showed (the show_board tool). */
 export type BoardEvent = {
@@ -43,6 +43,8 @@ type StreamParams = {
 export type LiveStreamParams = {
   fen: string; startFen: string; movesSan: string[]; userColor: 'white' | 'black' | null; opponent: string | null;
   openingName?: string | null; message: string; sessionId: string | null; move: ChatMove | null; rating?: number;
+  /** The opening note the question came from; the server then keys the session by the move (§10.3). */
+  opening?: OpeningContext | null;
 };
 
 /** POST a question and hand every server-sent event to `onEvent` as it arrives. Resolves when
@@ -66,13 +68,16 @@ export async function streamLiveChat(p: LiveStreamParams, onEvent: (e: ChatEvent
     {
       message: p.message, session_id: p.sessionId, move: p.move, fen: p.fen, start_fen: p.startFen, moves_san: p.movesSan,
       user_color: p.userColor, opponent: p.opponent, opening_name: p.openingName ?? null,
+      opening: p.opening ?? null,
     },
     onEvent,
     signal,
   );
 }
 
-async function streamFrom(url: string, body: unknown, onEvent: (e: ChatEvent) => void, signal?: AbortSignal): Promise<void> {
+/** POST `body` and hand every server-sent event to `onEvent`. Generic over the event type so the
+ * opening-note stream (api/noteStream) reads the same frames with its own events. */
+export async function streamFrom<E>(url: string, body: unknown, onEvent: (e: E) => void, signal?: AbortSignal): Promise<void> {
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'content-type': 'application/json', accept: 'text/event-stream' },
@@ -91,7 +96,7 @@ async function streamFrom(url: string, body: unknown, onEvent: (e: ChatEvent) =>
   const flush = (chunk: string) => {
     const payload = chunk.split('\n').filter((l) => l.startsWith('data:')).map((l) => l.slice(5).replace(/^ /, '')).join('\n');
     if (!payload) return;
-    try { onEvent(JSON.parse(payload) as ChatEvent); } catch { /* skip a malformed event */ }
+    try { onEvent(JSON.parse(payload) as E); } catch { /* skip a malformed event */ }
   };
   for (;;) {
     const { value, done } = await reader.read();

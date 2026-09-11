@@ -202,3 +202,69 @@
   .op-journal-entry, .op-journal-note { grid-template-columns: 62px minmax(0, 1fr); }
   .op-journal-detail { grid-column: 2; }
 }
+
+/* streamed note: the stage checklist and the sections as they arrive (§10.2) */
+.op-note-stages { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; border-radius: 8px; background: rgba(43, 38, 34, 0.045); font-size: 12px; }
+.op-note-stage { display: grid; grid-template-columns: 18px 92px minmax(0, 1fr); gap: 8px; align-items: baseline; color: var(--ink-3); }
+.op-note-stage .ic { font-weight: 700; }
+.op-note-stage .what { font-weight: 600; }
+.op-note-stage .detail { min-width: 0; overflow-wrap: anywhere; }
+.op-note-stage.done { color: var(--ink-2); }
+.op-note-stage.done .ic { color: var(--good); }
+.op-note-stage.run { color: var(--ink); }
+.op-note-stage.run .ic { color: var(--warn); display: inline-block; animation: op-note-spin 1s linear infinite; }
+@keyframes op-note-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .op-note-stage.run .ic { animation: none; } }
+.op-note-tools { display: flex; flex-wrap: wrap; gap: 4px; font-family: var(--font-mono); font-size: 11px; color: var(--ink-2); }
+.op-note-tools span { padding: 0 5px; border: 1px solid var(--line); border-radius: 4px; background: var(--surface); }
+.op-note-arrive { animation: op-note-in 0.35s ease-out; }
+@keyframes op-note-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .op-note-arrive { animation: none; } }
+.op-note-done { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 8px 10px; border-radius: 8px; background: rgba(36, 120, 166, 0.1); font-size: 12px; color: var(--ink-2); }
+.op-note-done.warn { background: rgba(168, 115, 28, 0.12); }
+@media (max-width: 900px) {
+  .op-note-stage { grid-template-columns: 18px minmax(0, 1fr); }
+  .op-note-stage .detail { grid-column: 2; }
+}
+
+/* 튜터에게 질문: the note's own chat and the answers kept on it (§10.3) */
+.op-page .badge.op-badge-note { background: rgba(106, 63, 181, 0.12); color: #6a3fb5; }
+.op-note-chat { max-width: none; gap: 10px; }
+.op-note-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.op-note-ask { text-align: left; height: auto; min-height: 24px; padding: 3px 10px; white-space: normal; }
+.op-note-quotebar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.op-note-quotebar .small { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.op-note-quoted { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 6px 8px; border-left: 3px solid #6a3fb5; background: var(--paper); border-radius: 0 6px 6px 0; }
+.op-note-keep { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.op-note-addendum { display: flex; flex-direction: column; gap: 4px; padding-left: 10px; border-left: 3px solid #6a3fb5; }
+.op-note-addendum .q { font-weight: 600; }
+.op-note-unverified { font-size: 12px; color: var(--bad); }
+.op-note-chat .ch-chat-log { max-height: 420px; }
+/* 더 깊이 (M8d-4): engine lines, master statistics, PGN export */
+.op-deep { display: flex; flex-direction: column; }
+.op-deep-sec:first-child { border-top: none; }
+.op-deep-sec summary .op-badge { font-weight: 400; }
+.op-deep-lines { display: flex; flex-direction: column; gap: 6px; }
+.op-deep-line { display: grid; grid-template-columns: 58px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 6px 8px; border-radius: 8px; background: rgba(43, 38, 34, 0.04); }
+.op-deep-ev { display: flex; flex-direction: column; gap: 3px; font-size: 12.5px; font-weight: 600; }
+.op-deep-ev i { display: block; height: 5px; border-radius: 3px; background: var(--ink); overflow: hidden; }
+.op-deep-ev i b { display: block; height: 100%; background: var(--surface); border-right: 1px solid var(--line-strong); }
+.op-deep-masters { border-collapse: collapse; width: 100%; font-size: 13px; }
+.op-deep-masters th { text-align: left; font-weight: 500; color: var(--ink-3); font-size: 11px; letter-spacing: 0.04em; padding: 4px 6px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.op-deep-masters td { padding: 6px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.op-deep-masters tr:last-child td { border-bottom: none; }
+.op-deep-wdl-cell { display: flex; align-items: center; gap: 8px; }
+.op-deep-wdl { display: flex; height: 10px; width: 150px; border-radius: 5px; overflow: hidden; background: var(--line); }
+.op-deep-wdl i { display: block; height: 100%; }
+.op-deep-wdl .w { background: var(--surface); }
+.op-deep-wdl .dr { background: var(--line-strong); }
+.op-deep-wdl .b { background: var(--ink-2); }
+.op-deep-veil { position: fixed; inset: 0; background: rgba(43, 38, 34, 0.42); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 40; }
+.op-deep-dialog { width: min(620px, 100%); padding: 18px 20px; display: flex; flex-direction: column; gap: 10px; text-align: left; }
+.op-deep-pgn { width: 100%; box-sizing: border-box; border: 1px solid var(--line-strong); border-radius: 8px; padding: 8px 10px; font-family: var(--font-mono); font-size: 12px; line-height: 1.6; background: var(--surface); color: var(--ink); resize: vertical; }
+.op-deep-pgn:focus { outline: 2px solid var(--ink); outline-offset: -1px; }
+@media (max-width: 900px) {
+  .op-deep-line { grid-template-columns: 58px minmax(0, 1fr); }
+  .op-deep-line > .btn { grid-column: 2; justify-self: start; }
+  .op-deep-wdl { width: 90px; }
+}

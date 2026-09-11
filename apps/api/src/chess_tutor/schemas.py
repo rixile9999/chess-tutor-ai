@@ -483,6 +483,9 @@ class NamedCandidate(BaseModel):
     """Master result from the requested colour's point of view, (wins + 0.5 draws) / games."""
     master_only: bool = False
     """The book does not know this move; the master explorer does."""
+    name_en: str | None = None
+    """The book's own English name; `name` is its Korean label (openings.name_ko, plan §10.5).
+    The card shows it on hover, so a machine transliteration can always be checked."""
 
 
 class SetupStatus(BaseModel):
@@ -507,6 +510,9 @@ class PositionGuide(BaseModel):
     fen: str
     side: Color
     name: str | None = None
+    name_en: str | None = None
+    """The book's own English name; `name` is its Korean label (openings.name_ko, plan §10.5).
+    The panel's header badge shows it on hover, so a transliteration can always be checked."""
     eco: str | None = None
     in_book: bool = False
     structure: StructureInfo
@@ -810,6 +816,8 @@ class MoveAnnotation(BaseModel):
     in_book: bool = False
     name_before: str | None = None
     name_after: str | None = None
+    name_after_en: str | None = None
+    """English name of the position the move arrives at, for the journal badge's tooltip."""
     transposition: bool = False
     """The position the move reaches is in the book, but the move order is not the book's."""
     book_alternatives: list[NamedCandidate] = []
@@ -839,6 +847,34 @@ class AnnotateRequest(BaseModel):
 
 class AnnotateResponse(BaseModel):
     annotations: list[MoveAnnotation] = []
+
+
+class ChatBoard(BaseModel):
+    """A board the tutor drew with `show_board`, as the chat stream sends it (M8d-3)."""
+
+    type: Literal["board"] = "board"
+    n: int = 0
+    start_fen: str = ""
+    fen: str = ""
+    moves: list[str] = []
+    last_move: tuple[str, str] | None = None
+    arrows: list[Arrow] = []
+    highlights: list[str] = []
+    caption: str = ""
+
+
+class Addendum(BaseModel):
+    """One question the student asked about this move and the answer they kept.
+
+    The answer is stored exactly as the chat showed it, `unverified` included: the chat's own
+    grounding is what the panel repeats, and nothing is verified a second time (plan §10.3)."""
+
+    question: str
+    answer: str
+    boards: list[ChatBoard] = []
+    unverified: list[str] = []
+    """Squares the answer named that no fact or tool result had grounded."""
+    created_at: datetime
 
 
 class TrapLine(BaseModel):
@@ -874,6 +910,11 @@ class OpeningNote(BaseModel):
     total_claims: int = 0
     model: str = ""
     created_at: datetime
+    addenda: list[Addendum] = []
+    """Answers the student kept from the tutor chat, oldest first (M8d-3)."""
+    questions: list[str] = []
+    """Question chips the panel offers, made from this note by the server on every read
+    (`opening_notes.suggested_questions`); never written by the model."""
 
 
 class NoteMissing(BaseModel):
@@ -888,3 +929,77 @@ class NoteRequest(BaseModel):
     username: str | None = None
     """Whose games fill the note's `mine` line; without it the line stays empty."""
     regenerate: bool = False
+
+
+# ---------- the tutor's answers kept on a note (M8d-3) ----------
+
+
+class AddendumRequest(BaseModel):
+    fen: str
+    """Position the move was played in — the note's own key."""
+    san: str
+    question: str = Field(min_length=1, max_length=4000)
+    answer: str = Field(min_length=1, max_length=20000)
+    boards: list[ChatBoard] = []
+    unverified: list[str] = []
+
+
+class OpeningContext(BaseModel):
+    """The note the student is reading while asking, attached to a live chat question.
+
+    The conversation is keyed by (fen_before, san): the question is about that move, so the
+    same position with a different move is a different conversation (plan §10.3)."""
+
+    fen_before: str
+    san: str
+    note_summary: str = ""
+    section: str | None = None
+    """Which section of the note the question came from, when it came from one."""
+    quote: str | None = None
+    """A sentence of the note the student quoted."""
+
+
+# ---------- 더 깊이 (M8d-4): engine lines and master statistics ----------
+
+
+class DeeperLine(BaseModel):
+    """One engine continuation from a position, as the panel draws it: the move, its score and
+    the principal variation the score comes from."""
+
+    san: str
+    uci: str
+    score: Score
+    """From White's point of view, like every other score in the API."""
+    pv_san: list[str] = []
+    """The whole line in SAN, first move included, cut at services.opening_deeper.PV_CAP."""
+
+
+class DeeperLines(BaseModel):
+    fen: str
+    """The normalised FEN that was searched."""
+    depth: int
+    lines: list[DeeperLine] = []
+    """Best first (engine rank), at most `multipv` of them."""
+
+
+class MasterMove(BaseModel):
+    """One move in the Lichess master explorer, with the results as whole percents."""
+
+    san: str
+    uci: str
+    games: int
+    white: int
+    draws: int
+    black: int
+    """Percentages, 0-100, adding up to 100; `games` keeps the raw count."""
+    avg_rating: int | None = None
+
+
+class MasterStats(BaseModel):
+    """GET /openings/masters. `available` is false whenever the numbers could not be fetched
+    (no token, explorer down); `reason` then says why, in Korean, and `moves` is empty."""
+
+    fen: str
+    available: bool = False
+    reason: str | None = None
+    moves: list[MasterMove] = []

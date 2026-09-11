@@ -71,6 +71,14 @@ export const api = {
     note: (fen: string, san: string) =>
       get<T.NoteLookup>(`/openings/note?fen=${encodeURIComponent(fen)}&san=${encodeURIComponent(san)}`),
     makeNote: (body: T.NoteRequest) => post<T.OpeningNote>('/openings/note', body),
+    /** Keep one tutor answer on the note ("해설에 반영"); the note comes back with it (§10.3). */
+    addendum: (body: T.AddendumRequest) => post<T.OpeningNote>('/openings/note/addendum', body),
+
+    /** 더 깊이: the engine runs on request only, so this is never called before the section is opened. */
+    lines: (fen: string, depth = 12, multipv = 3) =>
+      get<T.DeeperLines>(`/openings/lines?fen=${encodeURIComponent(fen)}&depth=${depth}&multipv=${multipv}`),
+    /** Master statistics for one position; `available: false` (never an error) without a Lichess token. */
+    masters: (fen: string) => get<T.MasterStats>(`/openings/masters?fen=${encodeURIComponent(fen)}`),
   },
 
   training: {

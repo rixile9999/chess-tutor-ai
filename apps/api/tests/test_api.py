@@ -27,6 +27,28 @@ def test_router_stubs_mounted(client: TestClient) -> None:
         assert client.get(f"/{name}/_status").status_code == 200
 
 
+def test_every_openings_path_comes_from_the_one_router(client: TestClient) -> None:
+    """M8d-5 folded routers/opening_guide.py and routers/opening_deeper.py into
+    routers/openings.py; every path must still be there, and all from that module."""
+    from chess_tutor.routers import openings
+
+    wanted = {
+        "/openings/_status",
+        "/openings/map",
+        "/openings/heatmap",
+        "/openings/breaks",
+        "/openings/position",
+        "/openings/annotate",
+        "/openings/note",
+        "/openings/note/stream",
+        "/openings/note/addendum",
+        "/openings/lines",
+        "/openings/masters",
+    }
+    assert wanted <= set(client.get("/openapi.json").json()["paths"])
+    assert wanted <= {getattr(r, "path", "") for r in openings.router.routes}
+
+
 def test_oversized_ids_are_rejected_not_500(client: TestClient) -> None:
     huge = "9" * 25
     assert client.get(f"/games/{huge}").status_code == 422

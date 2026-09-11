@@ -1,12 +1,19 @@
 """Opening names from the lichess/chess-openings TSV (CC0). Lookup by position key so
-transpositions resolve to the same name."""
+transpositions resolve to the same name.
+
+The English name is the identity of a line — the TSV column, the catalogue's `tsv_name`, the
+key of :func:`find_rows` — and :func:`name_ko` is the Korean label shown next to it
+(``assets/opening_names_ko.json``, built by ``scripts/translate_openings.py``, plan §10.5).
+Nothing looks an opening up by its Korean name."""
 
 from __future__ import annotations
 
 import csv
+import json
 from dataclasses import dataclass
 from functools import lru_cache
 from importlib import resources
+from typing import Any
 
 import chess
 
@@ -60,6 +67,26 @@ def rows() -> tuple[Opening, ...]:
                 continue
             out.append(Opening(row["eco"], row["name"], row["pgn"], board.ply()))
     return tuple(out)
+
+
+@lru_cache
+def names_ko() -> dict[str, str]:
+    """English name -> Korean name, from the bundled asset. Empty when the file is missing."""
+    asset = resources.files("chess_tutor").joinpath("assets/opening_names_ko.json")
+    if not asset.is_file():
+        return {}
+    loaded: Any = json.loads(asset.read_text(encoding="utf-8"))
+    if not isinstance(loaded, dict):
+        return {}
+    return {str(key): str(value) for key, value in loaded.items() if str(value).strip()}
+
+
+def name_ko(name: str) -> str:
+    """The Korean name of an opening, the English one when it has no entry (plan §10.5).
+
+    Every name in the bundled TSVs has one (`test_openings.py` pins that); the fallback is for a
+    name that comes from somewhere else — a master-explorer line, a newer book."""
+    return names_ko().get(name, name)
 
 
 def find_rows(eco: str, name: str, ply: int | None = None) -> list[Opening]:
@@ -117,8 +144,9 @@ def warm() -> None:
     Parsing the 3,810 lines and every prefix of them takes about 2.5 s, which is what the first
     ``GET /play/book`` used to pay. The API startup runs this on a thread; the caches are
     ``lru_cache``, so a request arriving meanwhile just builds it itself and both get the same
-    table."""
+    table. The Korean names are read here too — one 350 kB JSON file, a few milliseconds."""
     _tree()
+    names_ko()
 
 
 def next_moves(board: chess.Board) -> list[tuple[chess.Move, Opening]]:

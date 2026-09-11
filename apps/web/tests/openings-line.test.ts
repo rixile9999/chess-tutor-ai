@@ -14,7 +14,7 @@ const moves = (s: LineState) => s.journal.filter((e) => e.kind === 'move');
 function annotation(ply: number, san: string, inBook = true): MoveAnnotation {
   return {
     ply, label: `${ply}.${san}`, san, uci: '', fen_before: '', fen_after: '',
-    in_book: inBook, name_before: null, name_after: null, transposition: false,
+    in_book: inBook, name_before: null, name_after: null, name_after_en: null, transposition: false,
     book_alternatives: [], facts: [], text: `${san} 해설`, engine: null, naturalness: null,
     verified: true, verified_claims: 0, total_claims: 0,
   };
