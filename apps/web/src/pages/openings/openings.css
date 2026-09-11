@@ -202,3 +202,27 @@
   .op-journal-entry, .op-journal-note { grid-template-columns: 62px minmax(0, 1fr); }
   .op-journal-detail { grid-column: 2; }
 }
+
+/* streamed note: the stage checklist and the sections as they arrive (§10.2) */
+.op-note-stages { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; border-radius: 8px; background: rgba(43, 38, 34, 0.045); font-size: 12px; }
+.op-note-stage { display: grid; grid-template-columns: 18px 92px minmax(0, 1fr); gap: 8px; align-items: baseline; color: var(--ink-3); }
+.op-note-stage .ic { font-weight: 700; }
+.op-note-stage .what { font-weight: 600; }
+.op-note-stage .detail { min-width: 0; overflow-wrap: anywhere; }
+.op-note-stage.done { color: var(--ink-2); }
+.op-note-stage.done .ic { color: var(--good); }
+.op-note-stage.run { color: var(--ink); }
+.op-note-stage.run .ic { color: var(--warn); display: inline-block; animation: op-note-spin 1s linear infinite; }
+@keyframes op-note-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .op-note-stage.run .ic { animation: none; } }
+.op-note-tools { display: flex; flex-wrap: wrap; gap: 4px; font-family: var(--font-mono); font-size: 11px; color: var(--ink-2); }
+.op-note-tools span { padding: 0 5px; border: 1px solid var(--line); border-radius: 4px; background: var(--surface); }
+.op-note-arrive { animation: op-note-in 0.35s ease-out; }
+@keyframes op-note-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .op-note-arrive { animation: none; } }
+.op-note-done { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 8px 10px; border-radius: 8px; background: rgba(36, 120, 166, 0.1); font-size: 12px; color: var(--ink-2); }
+.op-note-done.warn { background: rgba(168, 115, 28, 0.12); }
+@media (max-width: 900px) {
+  .op-note-stage { grid-template-columns: 18px minmax(0, 1fr); }
+  .op-note-stage .detail { grid-column: 2; }
+}

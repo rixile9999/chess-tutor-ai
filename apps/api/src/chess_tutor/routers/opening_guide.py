@@ -1,9 +1,10 @@
-"""Opening map: the position guide (M8a) and the move commentary (M8b).
+"""Opening map: the position guide (M8a) and the move commentary (M8b, M8d).
 
   GET  /openings/position   book candidates, pawn structure, setup progress   (opening_guide)
   POST /openings/annotate   what every move of a line does, as verified facts  (opening_intent)
   GET  /openings/note       the deep note for one move, or {"status": "missing"} (opening_notes)
   POST /openings/note       write that note with Claude Code and store it       (opening_notes)
+  POST /openings/note/stream  the same, reported stage by stage and section by section (M8d-2)
 
 The first two are stateless; the notes are stored per (position key, move, language) and are
 the only endpoints here that read the database. Shares the /openings prefix with
@@ -13,12 +14,15 @@ routers/openings.py; the two are merged in M8d.
 from __future__ import annotations
 
 import asyncio
-from typing import Annotated
+import json
+from collections.abc import AsyncIterator
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from chess_tutor.db import get_session
+from chess_tutor.db import get_session, session_factory
 from chess_tutor.schemas import (
     AnnotateRequest,
     AnnotateResponse,
@@ -98,3 +102,38 @@ async def write_note(req: NoteRequest, session: Session) -> OpeningNote:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except opening_notes.NoteUnavailable as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+async def _sse(events: AsyncIterator[dict[str, Any]]) -> AsyncIterator[str]:
+    """One event per frame, exactly as the chat sends them (routers/chat)."""
+    async for event in events:
+        yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+
+
+@router.post("/note/stream")
+async def stream_note(req: NoteRequest, session: Session) -> StreamingResponse:
+    """Write the note and report it while it is being written (plan §10.2).
+
+    Events: `stage` per step of the facts block, `section` per part of the note (the server's
+    `mine` and `engine` first, then the model's as each NDJSON line arrives, each already
+    verified), `tool` for every tool the model calls, a final `note` with the stored note, and
+    `warning`/`error`. Closing the connection kills the Claude Code process and stores nothing.
+
+    The FEN and the move are checked here, while the request's own session is still open, so a
+    bad one is still a 422; the stream itself runs on a session of its own because the
+    request-scoped one is closed as soon as this function returns."""
+    try:
+        await opening_notes.load(session, req.fen, req.san)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    async def events() -> AsyncIterator[dict[str, Any]]:
+        async with session_factory()() as own:
+            async for event in opening_notes.stream(own, req):
+                yield event
+
+    return StreamingResponse(
+        _sse(events()),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )

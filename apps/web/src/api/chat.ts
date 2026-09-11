@@ -72,7 +72,9 @@ export async function streamLiveChat(p: LiveStreamParams, onEvent: (e: ChatEvent
   );
 }
 
-async function streamFrom(url: string, body: unknown, onEvent: (e: ChatEvent) => void, signal?: AbortSignal): Promise<void> {
+/** POST `body` and hand every server-sent event to `onEvent`. Generic over the event type so the
+ * opening-note stream (api/noteStream) reads the same frames with its own events. */
+export async function streamFrom<E>(url: string, body: unknown, onEvent: (e: E) => void, signal?: AbortSignal): Promise<void> {
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'content-type': 'application/json', accept: 'text/event-stream' },
@@ -91,7 +93,7 @@ async function streamFrom(url: string, body: unknown, onEvent: (e: ChatEvent) =>
   const flush = (chunk: string) => {
     const payload = chunk.split('\n').filter((l) => l.startsWith('data:')).map((l) => l.slice(5).replace(/^ /, '')).join('\n');
     if (!payload) return;
-    try { onEvent(JSON.parse(payload) as ChatEvent); } catch { /* skip a malformed event */ }
+    try { onEvent(JSON.parse(payload) as E); } catch { /* skip a malformed event */ }
   };
   for (;;) {
     const { value, done } = await reader.read();

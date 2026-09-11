@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { Link, useSearchParams } from 'react-router-dom';
 import type { Key } from 'chessground/types';
 import { api } from '../../api/client';
-import type { Color, TrapLine } from '../../api/types';
+import type { Color, OpeningNote, TrapLine } from '../../api/types';
 import type { BoardShape } from '../../components/Board';
 import { applyUci } from '../../lib/chess';
 import { getUsername, setUsername } from '../../lib/user';
@@ -63,8 +63,6 @@ export default function OpeningsPage() {
   const [line, dispatch] = useReducer(lineReducer, undefined, () => initialLine(START_FEN, storedDepth()));
   const [hover, setHover] = useState<string | null>(null);
   const [marked, setMarked] = useState<string | null>(null);
-  const [generating, setGenerating] = useState(false);
-  const [genError, setGenError] = useState<string | null>(null);
 
   const mapQ = useQuery(
     () => (username ? api.openings.map(username, color, FETCH_DEPTH, FETCH_MIN_GAMES) : null),
@@ -128,15 +126,11 @@ export default function OpeningsPage() {
   const focusFenBefore = focusPly > 0 ? fenAt(line, focusPly - 1) : null;
   const noteQ = useNote(focusFenBefore, focused?.san ?? null);
 
-  const generate = useCallback((regenerate: boolean) => {
-    if (!focused || !focusFenBefore) return;
-    setGenerating(true);
-    setGenError(null);
-    api.openings.makeNote({ fen: focusFenBefore, san: focused.san, username, regenerate })
-      .then((note) => { rememberNote(focusFenBefore, focused.san, note); noteQ.reload(); })
-      .catch((e: unknown) => setGenError(errorText(e)))
-      .finally(() => setGenerating(false));
-  }, [focused, focusFenBefore, username, noteQ]);
+  // A note the panel just wrote (or changed with an addendum): cache it and refresh the query.
+  const onNote = useCallback((note: OpeningNote) => {
+    if (focusFenBefore && focused) rememberNote(focusFenBefore, focused.san, note);
+    noteQ.reload();
+  }, [focusFenBefore, focused, noteQ]);
 
   const onTrap = useCallback((trap: TrapLine, index: number, step: number) => {
     const plies = pliesFrom(fenAt(line, focusPly), trap.line_san.slice(0, step));
@@ -371,15 +365,16 @@ export default function OpeningsPage() {
             annotation={focused?.annotation ?? null}
             name={guide?.name ?? null}
             eco={guide?.eco ?? null}
+            fenBefore={focusFenBefore}
+            san={focused?.san ?? null}
+            username={username}
             note={noteQ.data}
             loading={noteQ.loading}
             error={noteQ.error}
             onRetry={noteQ.reload}
             depth={line.depth}
             onDepth={(d) => dispatch({ type: 'setDepth', depth: d })}
-            generating={generating}
-            genError={genError}
-            onGenerate={generate}
+            onNote={onNote}
             onTrap={onTrap}
             previewKey={line.preview?.key ?? null}
           />
