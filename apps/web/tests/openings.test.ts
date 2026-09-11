@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { defaultPiece, mirrorPiece, pieceOptions } from '../src/pages/openings/Heatmap';
+import { moveBadges } from '../src/pages/openings/colors';
 import { api } from '../src/api/client';
 
 /** GET /openings/heatmap takes `<colour w|b><start square>` (services/openings_map.py parse_piece). */
@@ -78,5 +79,27 @@ describe('openings map request', () => {
       await api.openings.map('duke', 'white');
     } finally { restore(); }
     for (const url of urls) expect(url).toContain('min_games=1');
+  });
+});
+
+describe('the name badge carries the English name as its tooltip (M8d-5)', () => {
+  const move = {
+    in_book: true, name_before: null, transposition: false, facts: [], naturalness: null,
+  };
+
+  it('shows the Korean name and hides the English one behind `title`', () => {
+    const [badge] = moveBadges({ ...move, name_after: '루이 로페즈', name_after_en: 'Ruy Lopez' });
+    expect(badge.text).toBe('⚑ 루이 로페즈');
+    expect(badge.title).toBe('Ruy Lopez');
+  });
+
+  it('falls back to the Korean name when the book has no English one', () => {
+    const [badge] = moveBadges({ ...move, name_after: '루이 로페즈', name_after_en: null });
+    expect(badge.title).toBe('루이 로페즈');
+  });
+
+  it('says nothing when the move does not change the name', () => {
+    const badges = moveBadges({ ...move, name_before: '루이 로페즈', name_after: '루이 로페즈', name_after_en: 'Ruy Lopez' });
+    expect(badges.filter((b) => b.text.startsWith('⚑'))).toEqual([]);
   });
 });

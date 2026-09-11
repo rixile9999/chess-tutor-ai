@@ -72,7 +72,7 @@ export function Journal({ journal, plies, focusPly, onGoto, onRetry, noteSummary
             <span className="op-journal-body">
               {(badges.length > 0 || engine) && (
                 <span className="op-journal-tags">
-                  {badges.map((b, j) => <span key={j} className={`${badgeClass(b.tone)} op-badge sm`}>{b.text}</span>)}
+                  {badges.map((b, j) => <span key={j} className={`${badgeClass(b.tone)} op-badge sm`} title={b.title}>{b.text}</span>)}
                   {engine && <span className={`${badgeClass(engine.tone)} op-badge sm`}>{engine.text}</span>}
                 </span>
               )}

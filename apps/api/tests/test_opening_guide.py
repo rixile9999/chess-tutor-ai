@@ -99,6 +99,7 @@ def test_guide_carries_the_name_the_structure_and_every_setup() -> None:
     guide = opening_guide.guide(fen(RUY_LOPEZ), color="white")
     assert guide.side == "black" and guide.in_book
     assert guide.name == "루이 로페즈" and guide.eco == "C60"
+    assert guide.name_en == "Ruy Lopez"  # the tooltip's English name (M8d-5)
     assert guide.structure.key and guide.structure.name
     assert len(guide.setups) == 14
     assert guide.setups[0].side == "black"  # the side to move comes first

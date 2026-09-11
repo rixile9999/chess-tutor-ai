@@ -189,7 +189,8 @@ def guide(fen: str, color: Color = "white", masters: bool = False) -> PositionGu
     """Candidates, book name, pawn structure and setup progress for one position.
 
     `color` is the user's side and only decides whose point of view the master score is from.
-    `name` is Korean; the English name of a line stays on each candidate as `name_en`.
+    `name` is Korean; the book's own English name stays next to it as `name_en`, here and
+    on every candidate.
     Raises ValueError for a FEN that is not a legal position."""
     board = _board(fen)
     here = lookup(board)
@@ -197,6 +198,7 @@ def guide(fen: str, color: Color = "white", masters: bool = False) -> PositionGu
         fen=board.fen(),
         side=_side(board),
         name=name_ko(here.name) if here is not None else None,
+        name_en=here.name if here is not None else None,
         eco=here.eco if here is not None else None,
         in_book=here is not None,
         structure=classify(board),

@@ -378,6 +378,7 @@ export default function OpeningsPage() {
             label={focused?.label ?? null}
             annotation={focused?.annotation ?? null}
             name={guide?.name ?? null}
+            nameEn={guide?.name_en ?? null}
             eco={guide?.eco ?? null}
             fenBefore={focusFenBefore}
             san={focused?.san ?? null}

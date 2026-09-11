@@ -170,14 +170,20 @@ export interface SetupStatus {
 }
 export interface PositionGuide {
   fen: string; side: Color;
-  name: string | null; eco: string | null; in_book: boolean;
+  name: string | null;
+  /** The book's own English name, shown on hover next to the Korean one (M8d-5). */
+  name_en: string | null;
+  eco: string | null; in_book: boolean;
   structure: StructureInfo; candidates: NamedCandidate[]; setups: SetupStatus[];
 }
 export interface MoveFact { kind: string; text: string; claims: Claim[]; verified: boolean }
 export interface MoveAnnotation {
   ply: number; label: string; san: string; uci: string;
   fen_before: string; fen_after: string;
-  in_book: boolean; name_before: string | null; name_after: string | null; transposition: boolean;
+  in_book: boolean; name_before: string | null; name_after: string | null;
+  /** English name of the position the move arrives at: the journal badge's tooltip. */
+  name_after_en: string | null;
+  transposition: boolean;
   /** Only when the move left the book, at most 3. */
   book_alternatives: NamedCandidate[];
   facts: MoveFact[];

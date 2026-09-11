@@ -510,6 +510,9 @@ class PositionGuide(BaseModel):
     fen: str
     side: Color
     name: str | None = None
+    name_en: str | None = None
+    """The book's own English name; `name` is its Korean label (openings.name_ko, plan §10.5).
+    The panel's header badge shows it on hover, so a transliteration can always be checked."""
     eco: str | None = None
     in_book: bool = False
     structure: StructureInfo
@@ -813,6 +816,8 @@ class MoveAnnotation(BaseModel):
     in_book: bool = False
     name_before: str | None = None
     name_after: str | None = None
+    name_after_en: str | None = None
+    """English name of the position the move arrives at, for the journal badge's tooltip."""
     transposition: bool = False
     """The position the move reaches is in the book, but the move order is not the book's."""
     book_alternatives: list[NamedCandidate] = []

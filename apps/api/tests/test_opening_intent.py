@@ -149,6 +149,7 @@ def test_a_defending_knight_is_said_to_defend() -> None:
 def test_the_ruy_lopez_bishop_attacks_the_knight_and_names_the_opening() -> None:
     annotation = last("e4 e5 Nf3 Nc6 Bb5")
     assert annotation.name_after == "루이 로페즈"
+    assert annotation.name_after_en == "Ruy Lopez"  # the journal badge's tooltip (M8d-5)
     assert fact_of(annotation, "name").text == "루이 로페즈(C60)가 됩니다."
     motif = fact_of(annotation, "motif")
     assert motif.text == "c6 나이트를 공격합니다."

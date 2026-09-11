@@ -5,8 +5,8 @@
              no move is named; text lists the structure and the side's plans
     level 2: level 1 + maia.move_probs top 2-3 as candidates with reasoning.explain_alternative
     level 3: level 2 + analysis.get_lines best line, motifs.detect, computer_move flag
-    Every sentence's claims go through verify.verify_all; text keeps only verified sentences
-    (verified/verified_claims/total_claims report the tally).
+    Every sentence's claims go through services.sentences.assemble; text keeps only the
+    verified ones (verified/verified_claims/total_claims report the tally).
   check(req) -> PlayCheckResponse
     shallow (depth default 12) win-probability loss of `san` from fen_before, classified with
     analysis.classify_loss; best move from the cached lines; reason via explain_alternative;
@@ -43,6 +43,7 @@ from chess_tutor.schemas import (
 from chess_tutor.services import analysis, maia
 from chess_tutor.services import plans as kb
 from chess_tutor.services.reasoning import explain_alternative
+from chess_tutor.services.sentences import Sentence, assemble
 from chess_tutor.verify import Claim, verify_all
 
 MULTIPV = 3
@@ -60,14 +61,6 @@ ILLEGAL_POSITION = "체스 규칙에 맞지 않는 국면입니다."
 """Stockfish dies on a position the rules forbid (a side to move with the opponent already in
 check, two kings of one colour), which would take a pooled engine down with it, so such a FEN
 is refused before the engine sees it - the same guard routers/analysis.py puts on /position."""
-
-
-class _Sentence:
-    """A piece of the Korean answer together with the board facts it states."""
-
-    def __init__(self, text: str, claims: list[Claim] | None = None) -> None:
-        self.text = text
-        self.claims = list(claims or [])
 
 
 def _side(board: chess.Board) -> Color:
@@ -119,39 +112,23 @@ def _played_moves(
     return start, moves
 
 
-def _assemble(sentences: list[_Sentence]) -> tuple[str, bool, int, int]:
-    """(text, verified, verified_claims, total_claims). A sentence whose claims do not all hold
-    is dropped: principle 1 says the user only reads statements the verifier confirmed."""
-    kept: list[str] = []
-    verified_claims = 0
-    total_claims = 0
-    for sentence in sentences:
-        verdicts = verify_all(sentence.claims)
-        holds = [v for v in verdicts if v.holds]
-        total_claims += len(verdicts)
-        verified_claims += len(holds)
-        if len(holds) == len(verdicts):
-            kept.append(sentence.text)
-    return " ".join(kept), verified_claims == total_claims, verified_claims, total_claims
-
-
 # ---------- hint ----------
 
 
-def _plan_sentences(board: chess.Board, side: Color, plans: list[Plan]) -> list[_Sentence]:
+def _plan_sentences(board: chess.Board, side: Color, plans: list[Plan]) -> list[Sentence]:
     """Level 1: the structure and what this side usually does in it. Names no concrete move
     for this position - only plan titles, which are the knowledge base's own wording."""
     todo = [p.title for p in plans if p.status in ("pv_match", "later")][:3]
     done = [p.title for p in plans if p.status == "executed"][:2]
-    out: list[_Sentence] = []
+    out: list[Sentence] = []
     who = COLOR_KO[side]
     if todo:
-        out.append(_Sentence(f"{who}의 전형적 계획은 {', '.join(todo)}입니다."))
+        out.append(Sentence(f"{who}의 전형적 계획은 {', '.join(todo)}입니다."))
     if done:
-        out.append(_Sentence(f"이미 실행한 계획: {', '.join(done)}."))
+        out.append(Sentence(f"이미 실행한 계획: {', '.join(done)}."))
     if not todo and not done:
         out.append(
-            _Sentence("이 구조에는 등록된 계획이 없습니다. 전개와 킹 안전을 먼저 살펴보세요.")
+            Sentence("이 구조에는 등록된 계획이 없습니다. 전개와 킹 안전을 먼저 살펴보세요.")
         )
     return out
 
@@ -229,7 +206,7 @@ def hint(req: PlayHintRequest) -> PlayHintResponse:
         start_board=start_board,
     )
 
-    sentences = [_Sentence(f"지금 구조는 {info.name}입니다."), *_plan_sentences(board, side, plans)]
+    sentences = [Sentence(f"지금 구조는 {info.name}입니다."), *_plan_sentences(board, side, plans)]
 
     probs: dict[str, float] = {}
     source: maia.Source | None = None
@@ -240,25 +217,25 @@ def hint(req: PlayHintRequest) -> PlayHintResponse:
         if candidates:
             listed = ", ".join(f"{c.san}({_percent(c.prob or 0.0)})" for c in candidates)
             sentences.append(
-                _Sentence(
+                Sentence(
                     f"이 레이팅대({req.rating})에서는 {listed}를 둡니다.",
                     [Claim(kind="legal_move", fen=board.fen(), object=c.san) for c in candidates],
                 )
             )
-            sentences.extend(_Sentence(f"{c.san}: {c.reason}", c.claims) for c in candidates)
+            sentences.extend(Sentence(f"{c.san}: {c.reason}", c.claims) for c in candidates)
 
     best = _best(board, lines, probs) if req.level >= 3 else None
     if best is not None:
         sentences.append(
-            _Sentence(
+            Sentence(
                 f"엔진의 최선수는 {best.san}입니다. {best.reason}",
                 [Claim(kind="legal_move", fen=board.fen(), object=best.san), *best.claims],
             )
         )
         if best.computer_move:
-            sentences.append(_Sentence("이 레이팅대에서 사람이 거의 두지 않는, 엔진다운 수입니다."))
+            sentences.append(Sentence("이 레이팅대에서 사람이 거의 두지 않는, 엔진다운 수입니다."))
 
-    text, verified, verified_claims, total_claims = _assemble(sentences)
+    answer = assemble(sentences)
     return PlayHintResponse(
         level=req.level,
         side=side,
@@ -266,11 +243,11 @@ def hint(req: PlayHintRequest) -> PlayHintResponse:
         plans=plans,
         candidates=candidates,
         best=best,
-        text=text,
+        text=answer.text,
         source=source,
-        verified=verified,
-        verified_claims=verified_claims,
-        total_claims=total_claims,
+        verified=answer.verified,
+        verified_claims=answer.verified_claims,
+        total_claims=answer.total_claims,
     )
 
 

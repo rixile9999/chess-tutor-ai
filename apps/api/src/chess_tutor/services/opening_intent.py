@@ -50,8 +50,9 @@ from chess_tutor.services import maia, opening_guide, play_coach, setups
 from chess_tutor.services import plans as kb
 from chess_tutor.services.openings_map import move_label
 from chess_tutor.services.reasoning import _eul, _ga, _is_break, _ro, _wa
+from chess_tutor.services.sentences import Assembly, Sentence, assemble
 from chess_tutor.structure import classify
-from chess_tutor.verify import Claim, verify_all
+from chess_tutor.verify import Claim
 
 ANNOTATE_ENGINE_CAP = 6
 """Engine calls one request may make (plan §5.3). A strip jump can send twenty moves at once;
@@ -120,18 +121,7 @@ _SQUARE_MENTION = re.compile(r"[a-h][1-8]")
 """Same rule as services.verbalize: a square named in a sentence needs a claim that covers it."""
 
 
-class _Sentence:
-    """A piece of the Korean answer together with the board facts it states.
-
-    The same helper `play_coach` uses; the two are merged into `services/sentences.py` in M8d
-    (plan §5.3), which is why this copy stays small and identical."""
-
-    def __init__(self, text: str, claims: list[Claim] | None = None) -> None:
-        self.text = text
-        self.claims = list(claims or [])
-
-
-_Fact = tuple[FactKind, _Sentence]
+_Fact = tuple[FactKind, Sentence]
 
 
 @dataclass(frozen=True)
@@ -250,7 +240,7 @@ def _book_facts(mv: _Move, in_book: bool, alternatives: list[NamedCandidate]) ->
         out.append(
             (
                 "name",
-                _Sentence(
+                Sentence(
                     f"{korean}({arrived.eco}){_subject_particle(korean)} 됩니다.",
                     _ground(korean, mv.after),
                 ),
@@ -267,9 +257,9 @@ def _book_facts(mv: _Move, in_book: bool, alternatives: list[NamedCandidate]) ->
             for c in alternatives[:BOOK_ALTERNATIVES]
         ]
         claims += _ground(" ".join(c.name for c in alternatives[:BOOK_ALTERNATIVES]), mv.before)
-        out.append(("book", _Sentence(f"책 밖의 수입니다. 책 수는 {listed}입니다.", claims)))
+        out.append(("book", Sentence(f"책 밖의 수입니다. 책 수는 {listed}입니다.", claims)))
     else:
-        out.append(("book", _Sentence("책에서 이미 벗어난 국면입니다.")))
+        out.append(("book", Sentence("책에서 이미 벗어난 국면입니다.")))
     return out
 
 
@@ -347,7 +337,7 @@ def _centre_and_development(mv: _Move, tension: bool = False) -> list[_Fact]:
         subject = _named(mv.after, mv.to_square)
         text = f"{_ga(subject)} {head}합니다."
         kind = "center"
-    return [(kind, _Sentence(text, claims))]
+    return [(kind, Sentence(text, claims))]
 
 
 def _queen_sortie(mv: _Move) -> list[_Fact]:
@@ -359,7 +349,7 @@ def _queen_sortie(mv: _Move) -> list[_Fact]:
     return [
         (
             "development",
-            _Sentence(
+            Sentence(
                 f"퀸을 {_ro(chess.square_name(mv.to_square))} 일찍 꺼냅니다. "
                 "상대가 전개하며 템포로 쫓기 쉽습니다.",
                 [_piece_claim(mv.after, mv.to_square)],
@@ -380,7 +370,7 @@ def _castling(mv: _Move) -> list[_Fact]:
         return [
             (
                 "castling",
-                _Sentence(
+                Sentence(
                     f"{side} 캐슬링으로 킹을 {chess.square_name(king)}로 옮기고 "
                     f"룩을 {chess.square_name(rook)}에 연결합니다.",
                     [_piece_claim(mv.after, king), _piece_claim(mv.after, rook)],
@@ -411,7 +401,7 @@ def _castling(mv: _Move) -> list[_Fact]:
     return [
         (
             "castling",
-            _Sentence(
+            Sentence(
                 f"{_ga(what)} 움직여 {'·'.join(lost)} 캐슬링 권리를 잃습니다.",
                 [_piece_claim(mv.after, mv.to_square)],
             ),
@@ -425,7 +415,7 @@ def _fianchetto(mv: _Move) -> list[_Fact]:
         return [
             (
                 "fianchetto",
-                _Sentence(
+                Sentence(
                     f"비숍을 {chess.square_name(mv.to_square)}의 긴 대각선에 놓습니다.",
                     [_piece_claim(mv.after, mv.to_square)],
                 ),
@@ -439,7 +429,7 @@ def _fianchetto(mv: _Move) -> list[_Fact]:
     return [
         (
             "fianchetto",
-            _Sentence(
+            Sentence(
                 f"{chess.square_name(mv.to_square)}로 {chess.square_name(home)} "
                 "비숍의 피안케토를 준비합니다.",
                 [_piece_claim(mv.after, mv.to_square), _piece_claim(mv.after, home)],
@@ -457,7 +447,7 @@ def _tension(mv: _Move) -> list[_Fact]:
         return [
             (
                 "tension",
-                _Sentence(
+                Sentence(
                     f"{chess.square_name(mv.to_square)}에서 폰을 잡아 폰 긴장을 정리합니다.",
                     [_piece_claim(mv.after, mv.to_square)],
                 ),
@@ -471,7 +461,7 @@ def _tension(mv: _Move) -> list[_Fact]:
         return [
             (
                 "tension",
-                _Sentence(
+                Sentence(
                     f"{_ro(chess.square_name(mv.to_square))} "
                     f"{_named(mv.after, target)}에 긴장을 만듭니다.",
                     [
@@ -486,7 +476,7 @@ def _tension(mv: _Move) -> list[_Fact]:
     return [
         (
             "break",
-            _Sentence(
+            Sentence(
                 f"{chess.square_name(mv.to_square)} 폰이 {_named(mv.after, front)}과 맞닿습니다.",
                 [_piece_claim(mv.after, mv.to_square), _piece_claim(mv.after, front)],
             ),
@@ -504,7 +494,7 @@ def _gambit(mv: _Move) -> list[_Fact]:
     return [
         (
             "gambit",
-            _Sentence(
+            Sentence(
                 f"{chess.square_name(mv.to_square)} 폰을 내어 주는 수입니다. "
                 f"{_ga(_named(mv.after, attackers[0]))} 잡을 수 있습니다.",
                 [
@@ -541,7 +531,7 @@ def _motifs(mv: _Move) -> list[_Fact]:
         claims = _motif_claims(mv, motif)
         if claims is None:
             continue
-        out.append(("motif", _Sentence(f"{describe(motif)}.", claims)))
+        out.append(("motif", Sentence(f"{describe(motif)}.", claims)))
         break
     if out:
         return out
@@ -557,7 +547,7 @@ def _motifs(mv: _Move) -> list[_Fact]:
     claims = [_piece_claim(mv.after, mv.to_square)]
     for square in targets[:2]:
         claims += [_attack_claim(mv.after, mv.to_square, square), _piece_claim(mv.after, square)]
-    return [("motif", _Sentence(f"{_eul(named)} 공격합니다.", claims))]
+    return [("motif", Sentence(f"{_eul(named)} 공격합니다.", claims))]
 
 
 def _pins(board: chess.Board, attacker: chess.Square, victim_color: chess.Color) -> bool:
@@ -615,7 +605,7 @@ def _prophylaxis(mv: _Move) -> list[_Fact]:
         if covered:
             guard = sorted(mv.after.attackers(mv.color, square))[0]
             claims.append(_attack_claim(mv.after, guard, square))
-        return [("prophylaxis", _Sentence(f"상대의 {probe.san(threat)}를 미리 막습니다.", claims))]
+        return [("prophylaxis", Sentence(f"상대의 {probe.san(threat)}를 미리 막습니다.", claims))]
     return []
 
 
@@ -631,7 +621,7 @@ def _plan(mv: _Move) -> list[_Fact]:
             return [
                 (
                     "plan",
-                    _Sentence(f"{info.name} 구조에서 '{spec.title}' 계획의 수입니다."),
+                    Sentence(f"{info.name} 구조에서 '{spec.title}' 계획의 수입니다."),
                 )
             ]
     return []
@@ -654,7 +644,7 @@ def _setup(mv: _Move) -> list[_Fact]:
             out.append(
                 (
                     "setup",
-                    _Sentence(
+                    Sentence(
                         f"{_setup_name(change.name)} {change.done}/{change.total}.",
                         [_piece_claim(mv.after, mv.to_square)],
                     ),
@@ -665,7 +655,7 @@ def _setup(mv: _Move) -> list[_Fact]:
             out.append(
                 (
                     "setup",
-                    _Sentence(
+                    Sentence(
                         f"이 수로 {_setup_name(change.name)}는 물 건너갑니다."
                         + (f" {why}." if why else ""),
                         _ground(why, mv.after),
@@ -684,7 +674,7 @@ def _naturalness(mv: _Move, rating: int) -> tuple[float | None, list[_Fact]]:
     return prob, [
         (
             "naturalness",
-            _Sentence(f"이 레이팅대({rating})에서 {_percent(prob)}가 두는 수입니다."),
+            Sentence(f"이 레이팅대({rating})에서 {_percent(prob)}가 두는 수입니다."),
         )
     ]
 
@@ -703,32 +693,29 @@ def _engine(mv: _Move, rating: int, depth: int | None) -> tuple[PlayCheckRespons
         f"최선은 {result.best_san}."
     )
     claims = [Claim(kind="legal_move", fen=mv.before.fen(), object=result.best_san)]
-    return result, [("engine", _Sentence(text, claims))]
+    return result, [("engine", Sentence(text, claims))]
 
 
 # ---------- one move ----------
 
 
-def _assemble(facts: list[_Fact]) -> tuple[list[MoveFact], str, bool, int, int]:
-    """(facts, text, verified, verified_claims, total_claims).
+def _assemble(facts: list[_Fact]) -> tuple[list[MoveFact], Assembly]:
+    """Every detector's sentence as a fact, and the summary text over the ones that verified.
 
-    Every detector's sentence is reported as a fact; only the ones whose claims all hold reach
-    the text, at most MAX_SENTENCES of them, in the order of PRIORITY (principle 1)."""
+    Only sentences whose claims all hold reach the text, at most MAX_SENTENCES of them, in the
+    order of PRIORITY (principle 1); the rest are still reported, marked unverified."""
     ordered = sorted(facts, key=lambda item: PRIORITY[item[0]])
-    out: list[MoveFact] = []
-    kept: list[str] = []
-    verified_claims = 0
-    total_claims = 0
-    for kind, sentence in ordered:
-        verdicts = verify_all(sentence.claims)
-        holds = sum(1 for verdict in verdicts if verdict.holds)
-        total_claims += len(verdicts)
-        verified_claims += holds
-        ok = holds == len(verdicts)
-        out.append(MoveFact(kind=kind, text=sentence.text, claims=sentence.claims, verified=ok))
-        if ok and len(kept) < MAX_SENTENCES:
-            kept.append(sentence.text)
-    return out, " ".join(kept), verified_claims == total_claims, verified_claims, total_claims
+    answer = assemble((sentence for _, sentence in ordered), limit=MAX_SENTENCES)
+    out = [
+        MoveFact(
+            kind=kind,
+            text=checked.sentence.text,
+            claims=checked.sentence.claims,
+            verified=checked.verified,
+        )
+        for (kind, _), checked in zip(ordered, answer.checked, strict=True)
+    ]
+    return out, answer
 
 
 def facts(
@@ -799,7 +786,7 @@ def _annotate_move(
         *_setup(mv),
     ]
     if transposition:
-        collected.append(("transposition", _Sentence("다른 수순으로 같은 국면에 합류합니다.")))
+        collected.append(("transposition", Sentence("다른 수순으로 같은 국면에 합류합니다.")))
 
     probability: float | None = None
     if naturalness:
@@ -813,7 +800,7 @@ def _annotate_move(
             verdict, engine_facts = _engine(mv, rating, depth)
             collected += engine_facts
 
-    move_facts, text, verified, verified_claims, total_claims = _assemble(collected)
+    move_facts, answer = _assemble(collected)
     return MoveAnnotation(
         ply=mv.ply,
         label=move_label(mv.ply, san),
@@ -824,15 +811,16 @@ def _annotate_move(
         in_book=in_book,
         name_before=name_ko(here.name) if here is not None else None,
         name_after=name_ko(arrived.name) if arrived is not None else None,
+        name_after_en=arrived.name if arrived is not None else None,
         transposition=transposition,
         book_alternatives=alternatives,
         facts=move_facts,
-        text=text,
+        text=answer.text,
         engine=verdict,
         naturalness=round(probability, maia.PRECISION) if probability is not None else None,
-        verified=verified,
-        verified_claims=verified_claims,
-        total_claims=total_claims,
+        verified=answer.verified,
+        verified_claims=answer.verified_claims,
+        total_claims=answer.total_claims,
     )
 
 

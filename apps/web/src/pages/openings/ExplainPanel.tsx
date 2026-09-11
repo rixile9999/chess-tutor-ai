@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from 'react';
+import { useCallback, useEffect, type ReactNode } from 'react';
 import type { MoveAnnotation, OpeningNote, TrapLine } from '../../api/types';
 import type { Preview } from '../../lib/shapes';
 import { NoteChat } from './NoteChat';
@@ -25,6 +25,8 @@ type Props = {
   annotation: MoveAnnotation | null;
   /** Name of the position the focused move arrives at. */
   name: string | null;
+  /** Its English name: the badge's tooltip, so a transliteration can be checked (M8d-5). */
+  nameEn: string | null;
   eco: string | null;
   /** The position the focused move was played in, and the move: the note's own key. */
   fenBefore: string | null;
@@ -55,10 +57,13 @@ type Props = {
  * being written — the stages, the tool calls and every section the moment it is verified (§10.2).
  */
 export function ExplainPanel({
-  ply, label, annotation, name, eco, fenBefore, san, username, note, loading, error, onRetry,
+  ply, label, annotation, name, nameEn, eco, fenBefore, san, username, note, loading, error, onRetry,
   depth, onDepth, onNote, onTrap, previewKey, fenAfter, movesSan, startFen, onPreview,
 }: Props) {
-  const { run, start, stop, reset } = useNoteStream(onNote);
+  const { run, start, stop, reset, adopt } = useNoteStream(onNote);
+  // The panel shows the run's own note while a run is on screen, so a note the chat changed has to
+  // reach that copy too (M8d-5 smoke: 해설에 반영 stored the addendum but the section stayed hidden).
+  const noteChanged = useCallback((n: OpeningNote) => { adopt(n); onNote(n); }, [adopt, onNote]);
   const key = fenBefore && san ? `${fenBefore}|${san}` : '';
   // Walking to another move abandons the run: the connection closes, the server stores nothing.
   useEffect(() => { reset(); }, [key, reset]);
@@ -79,7 +84,7 @@ export function ExplainPanel({
       <span className="op-explain-label">{label ? <span className="mv">{label}</span> : '시작 국면'}</span>
       {name ? (
         <>
-          <span className="badge badge-good op-badge">{name}</span>
+          <span className="badge badge-good op-badge" title={nameEn ?? name}>{name}</span>
           {eco && <span className="mono faint small">{eco}</span>}
         </>
       ) : offBook ? (
@@ -234,7 +239,7 @@ export function ExplainPanel({
           note={shown}
           previewKey={previewKey}
           onPreview={onPreview}
-          onNote={onNote}
+          onNote={noteChanged}
         />
       )}
 
@@ -369,7 +374,7 @@ function Badges({ badges, engine }: { badges: ReturnType<typeof moveBadges>; eng
   if (!badges.length && !engine) return null;
   return (
     <div className="op-explain-badges">
-      {badges.map((b, i) => <span key={i} className={`${badgeClass(b.tone)} op-badge sm`}>{b.text}</span>)}
+      {badges.map((b, i) => <span key={i} className={`${badgeClass(b.tone)} op-badge sm`} title={b.title}>{b.text}</span>)}
       {engine && <span className={`${badgeClass(engine.tone)} op-badge sm`}>{engine.text}</span>}
     </div>
   );

@@ -61,6 +61,12 @@ export function useNoteStream(onNote: (note: OpeningNote) => void) {
 
   const stop = useCallback(() => { abortRef.current?.abort(); }, []);
   const reset = useCallback(() => { abortRef.current?.abort(); abortRef.current = null; setRun(null); }, []);
+  // A finished run keeps showing its own copy of the note, so a note that changed elsewhere - an
+  // answer kept with 해설에 반영 - has to replace it, or the new section would only appear after
+  // walking away from the move and back.
+  const adopt = useCallback((note: OpeningNote) => {
+    setRun((r) => (r && r.note ? { ...r, note } : r));
+  }, []);
 
   const start = useCallback((body: NoteRequest) => {
     abortRef.current?.abort();
@@ -101,7 +107,7 @@ export function useNoteStream(onNote: (note: OpeningNote) => void) {
       });
   }, [onNote]);
 
-  return { run, start, stop, reset };
+  return { run, start, stop, reset, adopt };
 }
 
 /** "엔진 분석 · depth 12" — the same label and summary the chat puts on a tool call. */
