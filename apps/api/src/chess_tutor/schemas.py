@@ -483,6 +483,9 @@ class NamedCandidate(BaseModel):
     """Master result from the requested colour's point of view, (wins + 0.5 draws) / games."""
     master_only: bool = False
     """The book does not know this move; the master explorer does."""
+    name_en: str | None = None
+    """The book's own English name; `name` is its Korean label (openings.name_ko, plan §10.5).
+    The card shows it on hover, so a machine transliteration can always be checked."""
 
 
 class SetupStatus(BaseModel):

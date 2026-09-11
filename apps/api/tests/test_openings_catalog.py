@@ -203,7 +203,7 @@ def test_book_names_the_carlsbad_tabiya(client: TestClient) -> None:
     r = svc.find(CARLSBAD)
     assert r is not None
     body = client.get("/play/book", params={"fen": r.board.fen()}).json()
-    assert body["opening"]["name"] == "Queen's Gambit Declined: Exchange Variation"
+    assert body["opening"]["name"] == "퀸즈 갬빗 디클라인드: 익스체인지 변화"
     assert body["opening"]["eco"] == "D35"
     assert body["opening"]["san"] == "" and body["opening"]["uci"] == ""
 

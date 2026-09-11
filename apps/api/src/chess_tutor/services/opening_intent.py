@@ -33,7 +33,7 @@ from dataclasses import dataclass
 import chess
 
 from chess_tutor.motifs import Motif, describe, detect
-from chess_tutor.openings import find_rows, lookup, moves_of, next_moves
+from chess_tutor.openings import find_rows, lookup, moves_of, name_ko, next_moves
 from chess_tutor.schemas import (
     AnnotateRequest,
     Classification,
@@ -205,6 +205,12 @@ def _attack_claim(board: chess.Board, frm: chess.Square, to: chess.Square) -> Cl
     )
 
 
+def _subject_particle(word: str) -> str:
+    """'이' or '가' for a word the sentence puts something in brackets after: the particle
+    agrees with the name, not with the ECO code in between ('루이 로페즈(C60)가')."""
+    return _ga(word)[len(word) :]
+
+
 def _ground(text: str, board: chess.Board) -> list[Claim]:
     """A claim for every square a knowledge-base sentence names, so it can be verified at all."""
     squares = sorted({name for name in _SQUARE_MENTION.findall(text)})
@@ -232,18 +238,21 @@ def _at_home(board: chess.Board, square: chess.Square) -> bool:
 def _book_facts(mv: _Move, in_book: bool, alternatives: list[NamedCandidate]) -> list[_Fact]:
     """The book's own word: the name the move reaches, or that the move leaves the book.
 
-    Opening names are quoted because sixty-four of them contain a square ('Benko Gambit: Nd2
-    Variation'): a name is a label, not a claim about this board."""
+    Names are Korean (`openings.name_ko`, plan §10.5) and carry the ECO code instead of quote
+    marks: '루이 로페즈(C60)가 됩니다'. Sixty-four names still hold a move ('Benko Gambit: Nd2
+    Variation'), so whatever square the Korean label names is grounded like any other square —
+    a name is a label, not a claim about this board, and the claim just says what stands there."""
     out: list[_Fact] = []
     here = lookup(mv.before)
     arrived = lookup(mv.after)
     if arrived is not None and (here is None or arrived.name != here.name):
+        korean = name_ko(arrived.name)
         out.append(
             (
                 "name",
                 _Sentence(
-                    f"'{arrived.name}'({arrived.eco}) 국면이 됩니다.",
-                    _ground(arrived.name, mv.after),
+                    f"{korean}({arrived.eco}){_subject_particle(korean)} 됩니다.",
+                    _ground(korean, mv.after),
                 ),
             )
         )
@@ -251,7 +260,7 @@ def _book_facts(mv: _Move, in_book: bool, alternatives: list[NamedCandidate]) ->
         return out
     if alternatives:
         listed = ", ".join(
-            f"{c.san}('{c.name}')" if c.name else c.san for c in alternatives[:BOOK_ALTERNATIVES]
+            f"{c.san}({c.name})" if c.name else c.san for c in alternatives[:BOOK_ALTERNATIVES]
         )
         claims = [
             Claim(kind="legal_move", fen=mv.before.fen(), object=c.san)
@@ -813,8 +822,8 @@ def _annotate_move(
         fen_before=board.fen(),
         fen_after=after.fen(),
         in_book=in_book,
-        name_before=here.name if here is not None else None,
-        name_after=arrived.name if arrived is not None else None,
+        name_before=name_ko(here.name) if here is not None else None,
+        name_after=name_ko(arrived.name) if arrived is not None else None,
         transposition=transposition,
         book_alternatives=alternatives,
         facts=move_facts,
