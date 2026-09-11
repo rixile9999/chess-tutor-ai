@@ -1,0 +1,451 @@
+<title>오프닝 지도 M8d 시안</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Gowun+Batang:wght@400;700&display=swap">
+<style>
+:root {
+  --paper: #f4efe6; --surface: #fcf9f3; --surface-2: #f1ebdf;
+  --ink: #2b2622; --ink-2: #6b6259; --ink-3: #9b9187;
+  --line: #e4dbcb; --line-strong: #cdc1ab;
+  --good: #2478a6; --good-bg: rgba(36,120,166,.10);
+  --bad: #c25a3c; --bad-bg: rgba(194,90,60,.12);
+  --warn: #a8731c; --warn-bg: rgba(168,115,28,.12);
+  --board-light: #ecdfc5; --board-dark: #a98b68; --last: rgba(168,115,28,.30);
+  --note: #6a3fb5; --note-bg: rgba(106,63,181,.12);
+  --font-ui: 'IBM Plex Sans KR','Apple SD Gothic Neo','Noto Sans KR',system-ui,sans-serif;
+  --font-display: 'Gowun Batang','Apple Myungjo','Noto Serif KR',Georgia,serif;
+  --font-mono: 'IBM Plex Mono','SF Mono',Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #1e1b18; --surface: #27231f; --surface-2: #2f2a25; --ink: #ece5d8; --ink-2: #b3a898; --ink-3: #7d746a;
+    --line: #3a342e; --line-strong: #4d453c; --good: #5aa0cc; --good-bg: rgba(90,160,204,.16); --bad: #d97a5c; --bad-bg: rgba(217,122,92,.16);
+    --warn: #d1a04a; --warn-bg: rgba(209,160,74,.16); --board-light: #b9a583; --board-dark: #7a5f45; --last: rgba(209,160,74,.32);
+    --note: #b596ea; --note-bg: rgba(181,150,234,.16);
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #1e1b18; --surface: #27231f; --surface-2: #2f2a25; --ink: #ece5d8; --ink-2: #b3a898; --ink-3: #7d746a;
+  --line: #3a342e; --line-strong: #4d453c; --good: #5aa0cc; --good-bg: rgba(90,160,204,.16); --bad: #d97a5c; --bad-bg: rgba(217,122,92,.16);
+  --warn: #d1a04a; --warn-bg: rgba(209,160,74,.16); --board-light: #b9a583; --board-dark: #7a5f45; --last: rgba(209,160,74,.32);
+  --note: #b596ea; --note-bg: rgba(181,150,234,.16);
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--font-ui); font-size: 14px; line-height: 1.5; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+button:focus-visible { outline: 2px solid var(--good); outline-offset: 2px; }
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.mv { font-family: var(--font-mono); font-weight: 500; }
+.small { font-size: 12px; } .muted { color: var(--ink-2); } .faint { color: var(--ink-3); }
+.page { max-width: 1180px; margin: 0 auto; padding-block: 18px 48px; padding-inline: 20px; display: flex; flex-direction: column; gap: 14px; }
+.intro { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; padding: 10px 14px; border: 1px dashed var(--note); border-radius: 8px; background: var(--note-bg); }
+.intro b { color: var(--note); }
+.tabs { display: flex; flex-wrap: wrap; gap: 6px; }
+.tab { padding: 6px 12px; border: 1px solid var(--line-strong); border-radius: 999px; background: var(--surface); font-size: 13px; color: var(--ink-2); display: inline-flex; align-items: center; gap: 6px; }
+.tab.on { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.tab .n { font-family: var(--font-mono); font-size: 11px; opacity: .8; }
+.head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; }
+.title { font-family: var(--font-display); font-size: 24px; font-weight: 700; }
+.card { position: relative; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+.card-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 10px; }
+.h3 { font-weight: 600; font-size: 15px; }
+.grow { flex: 1; }
+.explore { display: grid; grid-template-columns: minmax(280px, 400px) minmax(360px, 1fr); gap: 18px 24px; align-items: start; }
+.board-col { display: flex; flex-direction: column; gap: 10px; }
+.board-wrap { position: relative; width: 100%; max-width: 400px; aspect-ratio: 1; }
+.board { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); grid-template-rows: repeat(8, minmax(0, 1fr)); width: 100%; height: 100%; border-radius: 4px; overflow: hidden; user-select: none; }
+.sq { position: relative; min-width: 0; overflow: hidden; display: flex; align-items: center; justify-content: center; font-size: clamp(20px, 4.6vw, 34px); line-height: 1; }
+.sq.l { background: var(--board-light); } .sq.d { background: var(--board-dark); }
+.sq.last { background-image: linear-gradient(var(--last), var(--last)); }
+.sq .p { font-family: 'Noto Sans Symbols 2', 'Segoe UI Symbol', 'Apple Symbols', sans-serif; }
+.sq .p.w { color: #fffdf7; text-shadow: 0 0 2px #3a2f24, 0 0 1px #3a2f24, 0 1px 1px #3a2f24; } .sq .p.b { color: #2a221c; }
+.preview-chip { position: absolute; top: 8px; left: 8px; z-index: 2; background: var(--ink); color: var(--paper); font-size: 11px; padding: 2px 8px; border-radius: 999px; }
+.board-line { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; min-height: 26px; }
+.btn { height: 30px; padding: 0 10px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--surface); font-size: 12px; color: var(--ink); display: inline-flex; align-items: center; gap: 6px; }
+.btn:hover { background: var(--surface-2); }
+.btn.primary { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.btn.sm { height: 24px; font-size: 11px; padding: 0 8px; }
+.btn:disabled { opacity: .5; cursor: default; }
+.badge { display: inline-flex; align-items: center; height: 20px; padding: 0 7px; border-radius: 4px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+.badge.good { background: var(--good-bg); color: var(--good); } .badge.bad { background: var(--bad-bg); color: var(--bad); }
+.badge.warn { background: var(--warn-bg); color: var(--warn); } .badge.neutral { background: var(--surface-2); color: var(--ink-2); border: 1px solid var(--line); }
+.badge.dashed { border: 1px dashed var(--line-strong); background: none; color: var(--ink-2); }
+.badge.note { background: var(--note-bg); color: var(--note); }
+.req { position: absolute; top: -9px; right: 10px; z-index: 3; background: var(--note); color: #fff; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; }
+
+/* explain panel */
+.explain { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.explain-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.explain-head .lab { font-size: 22px; font-family: var(--font-display); font-weight: 700; }
+.explain-head .lab .mv { font-size: 20px; }
+.summary { font-size: 15px; line-height: 1.65; max-width: 62ch; position: relative; }
+.v { border-bottom: 1px dotted var(--good); }
+.v::after { content: "✓"; font-size: 10px; color: var(--good); margin-left: 2px; vertical-align: super; }
+.sec { border-top: 1px solid var(--line); }
+.sec summary { list-style: none; display: flex; align-items: center; gap: 8px; padding: 9px 0; cursor: pointer; font-weight: 600; }
+.sec summary::-webkit-details-marker { display: none; }
+.sec summary::before { content: "▸"; color: var(--ink-3); font-size: 11px; transition: transform .12s; }
+.sec[open] summary::before { transform: rotate(90deg); }
+.sec summary .n { font-weight: 400; color: var(--ink-3); font-size: 12px; }
+.sec .body { display: flex; flex-direction: column; gap: 8px; padding-bottom: 12px; max-width: 66ch; line-height: 1.65; }
+.sec p { margin: 0; }
+.alt { display: grid; grid-template-columns: 64px 1fr; gap: 8px; align-items: baseline; }
+.steps { display: flex; flex-wrap: wrap; gap: 4px; }
+.steps button { padding: 1px 7px; border: 1px solid var(--line); border-radius: 4px; background: var(--surface); font-family: var(--font-mono); font-size: 12px; }
+.steps button.on { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.sources { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding-top: 8px; border-top: 1px solid var(--line); font-size: 12px; color: var(--ink-2); }
+.arrive { animation: arrive .35s ease-out; }
+@keyframes arrive { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .arrive { animation: none; } }
+
+/* streaming stages */
+.stages { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; border-radius: 8px; background: var(--surface-2); font-size: 12px; }
+.stage { display: grid; grid-template-columns: 18px 130px 1fr; gap: 8px; align-items: baseline; color: var(--ink-3); }
+.stage.done { color: var(--ink-2); } .stage.done .ic { color: var(--good); }
+.stage.run { color: var(--ink); } .stage.run .ic { color: var(--warn); animation: spin 1s linear infinite; display: inline-block; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.stage .ic { font-weight: 700; }
+.stage .what { font-weight: 600; }
+.tools { font-family: var(--font-mono); font-size: 11px; color: var(--ink-2); }
+.tools span { padding: 0 5px; border: 1px solid var(--line); border-radius: 4px; background: var(--surface); margin-right: 4px; display: inline-block; margin-top: 2px; }
+.donebar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 8px 10px; border-radius: 8px; background: var(--good-bg); font-size: 12px; color: var(--ink-2); }
+.cursor::after { content: "▍"; color: var(--ink-3); animation: blink 1s steps(2) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+
+/* chat */
+.chat { display: flex; flex-direction: column; gap: 10px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 9px; border: 1px solid var(--line-strong); border-radius: 999px; background: var(--surface); font-size: 12px; color: var(--ink-2); }
+.chip.q { color: var(--ink); cursor: pointer; }
+.chip.q:hover { border-color: var(--ink); }
+.chip.q::before { content: "?"; font-weight: 700; color: var(--note); }
+.turn { display: flex; flex-direction: column; gap: 6px; }
+.bubble { padding: 8px 12px; border-radius: 10px; max-width: 62ch; line-height: 1.6; }
+.bubble.user { align-self: flex-end; background: var(--ink); color: var(--paper); }
+.bubble.tutor { background: var(--surface-2); }
+.bubble.tutor .quote { display: block; border-left: 3px solid var(--note); padding-left: 8px; color: var(--ink-2); font-size: 12px; margin-bottom: 6px; }
+.boardcard { display: grid; grid-template-columns: 64px 1fr auto; gap: 10px; align-items: center; padding: 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); max-width: 62ch; }
+.mini { display: grid; grid-template-columns: repeat(8, 1fr); grid-template-rows: repeat(8, 1fr); border-radius: 3px; overflow: hidden; width: 64px; height: 64px; }
+.mini span { display: flex; align-items: center; justify-content: center; font-size: 8px; line-height: 1; font-family: 'Noto Sans Symbols 2', 'Segoe UI Symbol', 'Apple Symbols', sans-serif; }
+.mini span.l { background: var(--board-light); } .mini span.d { background: var(--board-dark); }
+.mini span.w { color: #fffdf7; text-shadow: 0 0 1px #3a2f24, 0 0 1px #3a2f24; } .mini span.b { color: #2a221c; }
+.ground { font-size: 12px; color: var(--ink-2); display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.ask { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+.ask textarea { font: inherit; padding: 8px 10px; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--surface); color: var(--ink); resize: vertical; min-height: 40px; }
+.quotebtn { position: absolute; right: 0; top: -2px; }
+.addendum { border-left: 3px solid var(--note); padding-left: 10px; display: flex; flex-direction: column; gap: 4px; }
+.addendum .q { font-weight: 600; }
+
+/* deeper */
+.lines { display: flex; flex-direction: column; gap: 6px; }
+.line { display: grid; grid-template-columns: 64px 1fr auto; gap: 10px; align-items: center; padding: 6px 8px; border-radius: 8px; background: var(--surface-2); }
+.ev { font-family: var(--font-mono); font-weight: 600; display: flex; flex-direction: column; gap: 3px; }
+.ev i { display: block; height: 5px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.ev i b { display: block; height: 100%; background: var(--good); }
+table.masters { border-collapse: collapse; width: 100%; font-size: 13px; }
+table.masters th { text-align: left; font-weight: 500; color: var(--ink-3); font-size: 11px; letter-spacing: .04em; padding: 4px 6px; border-bottom: 1px solid var(--line); }
+table.masters td { padding: 6px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.wdl { display: flex; height: 10px; border-radius: 5px; overflow: hidden; width: 160px; background: var(--line); }
+.wdl i { display: block; height: 100%; } .wdl .w { background: #e9e2d3; } .wdl .dr { background: var(--line-strong); } .wdl .b { background: #5a4d42; }
+pre.pgn { margin: 0; padding: 10px; border-radius: 8px; background: var(--surface-2); font-family: var(--font-mono); font-size: 12px; white-space: pre-wrap; color: var(--ink-2); }
+
+/* names */
+.cmp { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.cmp .col { display: flex; flex-direction: column; gap: 8px; }
+.cmp .col > .cap { font-size: 12px; color: var(--ink-3); letter-spacing: .04em; text-transform: uppercase; }
+.cand { display: grid; grid-template-columns: 56px 1fr; gap: 8px; padding: 7px; border: 1px solid var(--line); border-radius: 8px; align-items: start; }
+.cand .mini { width: 56px; height: 56px; }
+.cand .name { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.jl { display: grid; grid-template-columns: 62px 1fr; gap: 8px; padding: 6px 8px; border-radius: 6px; background: var(--surface-2); font-size: 13px; }
+table.names { border-collapse: collapse; width: 100%; font-size: 13px; }
+table.names td { padding: 5px 6px; border-bottom: 1px solid var(--line); }
+table.names td:first-child { color: var(--ink-2); }
+@media (max-width: 900px) { .explore, .cmp { grid-template-columns: 1fr; } }
+</style>
+
+<div class="page">
+  <div class="intro">
+    <span><b>M8d 시안</b> · 해설 패널의 다음 단계 네 가지. 오른쪽 위 탭으로 상태를 바꿔 보세요. 숫자와 답변은 <b>예시</b>이고, 도구 호출·검증 표시 방식은 실제 채팅 화면과 같습니다.</span>
+  </div>
+  <div class="head">
+    <div class="title">오프닝 지도 · 해설 패널</div>
+    <span class="muted">4.Ba4 · 루이 로페즈: 모피 방어 · 흑 차례</span>
+    <div class="grow"></div>
+    <div class="tabs" id="tabs">
+      <button type="button" class="tab on" data-tab="stream"><span class="n">1</span>노트 스트리밍</button>
+      <button type="button" class="tab" data-tab="chat"><span class="n">2</span>튜터에게 질문</button>
+      <button type="button" class="tab" data-tab="deep"><span class="n">3</span>더 깊이</button>
+      <button type="button" class="tab" data-tab="names"><span class="n">4</span>한글 이름</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="explore">
+      <div class="board-col">
+        <div class="board-wrap"><div class="board" id="board"></div></div>
+        <div class="board-line" id="posLine"></div>
+        <div class="small faint">보드는 문맥용입니다. 함정·PV·튜터 보드의 수를 누르면 여기에 미리보기가 뜨고, 보드를 클릭하면 돌아옵니다.</div>
+      </div>
+      <div class="explain" id="panel"></div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+<script>
+(function () {
+  'use strict';
+  const BASE_FEN = 'r1bqkbnr/1ppp1ppp/p1n5/4p3/B3P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 1 4';
+  const GLYPH = { k: '♚', q: '♛', r: '♜', b: '♝', n: '♞', p: '♟' };
+  const FILES = 'abcdefgh';
+  const state = { tab: 'stream', preview: null, addenda: [] };
+  const mark = (s) => s.replace(/\[\[(.+?)\]\]/g, '<span class="v">$1</span>');
+  const label = (ply, san) => (ply % 2 === 1 ? `${(ply + 1) / 2}.${san}` : `${ply / 2}…${san}`);
+  const BASE_PLY = 8; // 4.Ba4 was ply 8; lines from here start at ply 9
+
+  // ---------- board ----------
+  function renderBoard() {
+    const el = document.getElementById('board');
+    const fen = state.preview ? state.preview.fen : BASE_FEN;
+    const c = new Chess(fen);
+    const last = state.preview ? state.preview.last : 'b5a4';
+    el.innerHTML = '';
+    const old = document.querySelector('.preview-chip'); if (old) old.remove();
+    if (state.preview) el.parentElement.insertAdjacentHTML('afterbegin', `<span class="preview-chip">미리보기 · ${state.preview.title}</span>`);
+    for (let r = 8; r >= 1; r--) for (const f of FILES) {
+      const sq = f + r; const p = c.get(sq); const light = (FILES.indexOf(f) + r) % 2 === 1;
+      const d = document.createElement('div');
+      d.className = `sq ${light ? 'l' : 'd'}${last && (last.slice(0, 2) === sq || last.slice(2, 4) === sq) ? ' last' : ''}`;
+      if (p) d.innerHTML = `<span class="p ${p.color}">${GLYPH[p.type]}</span>`;
+      el.appendChild(d);
+    }
+    const pl = document.getElementById('posLine');
+    pl.innerHTML = state.preview
+      ? `<span class="badge neutral">미리보기</span><span class="mv">${state.preview.title}</span><button type="button" class="btn sm" id="pvBack">현재 국면으로</button>`
+      : `<span class="mv">1.e4 e5 2.Nf3 Nc6 3.Bb5 a6 4.Ba4</span><span class="badge good">루이 로페즈: 모피 방어</span><span class="mono faint small">C70</span>`;
+    const b = document.getElementById('pvBack'); if (b) b.onclick = () => { state.preview = null; renderBoard(); refreshSteps(); };
+  }
+  document.getElementById('board').addEventListener('click', () => { if (state.preview) { state.preview = null; renderBoard(); refreshSteps(); } });
+  const PRE_FEN = 'r1bqkbnr/1ppp1ppp/p1n5/1B2p3/4P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 0 4';
+  function previewLine(sans, n, title, key, base, ply0) {
+    const c = new Chess(base || BASE_FEN); let last = null;
+    for (let i = 0; i < n; i++) { const mv = c.move(sans[i]); if (!mv) break; last = mv.from + mv.to; }
+    const p0 = ply0 ?? BASE_PLY;
+    state.preview = { fen: c.fen(), last, title: `${title} · ${sans.slice(0, n).map((s, i) => label(p0 + i + 1, s)).join(' ')}`, key };
+    renderBoard(); refreshSteps();
+  }
+  function stepButtons(sans, title, keyPrefix) {
+    return `<div class="steps">${sans.map((s, i) => `<button type="button" data-line="${keyPrefix}" data-step="${i + 1}">${label(BASE_PLY + i + 1, s)}</button>`).join('')}</div>`;
+  }
+  const LINES = {};
+  function wireSteps(root) {
+    root.querySelectorAll('[data-line]').forEach((b) => b.addEventListener('click', () => {
+      const L = LINES[b.dataset.line]; previewLine(L.sans, +b.dataset.step, L.title, `${b.dataset.line}:${b.dataset.step}`, L.base, L.ply0);
+    }));
+  }
+  function refreshSteps() {
+    document.querySelectorAll('[data-line]').forEach((b) => b.classList.toggle('on', !!state.preview && state.preview.key === `${b.dataset.line}:${b.dataset.step}`));
+  }
+  function miniBoard(sans, base) {
+    const c = new Chess(base || BASE_FEN); for (const s of sans) c.move(s);
+    let html = '<div class="mini">';
+    for (let r = 8; r >= 1; r--) for (const f of FILES) { const p = c.get(f + r); const light = (FILES.indexOf(f) + r) % 2 === 1; html += `<span class="${light ? 'l' : 'd'}${p ? ' ' + p.color : ''}">${p ? GLYPH[p.type] : ''}</span>`; }
+    return html + '</div>';
+  }
+
+  // ---------- shared note content (4.Ba4) ----------
+  const NOTE = {
+    summary: '압박을 유지하는 후퇴입니다. [[a4 비숍은 여전히 c6 나이트를 공격합니다.]] …b5에는 Bb3로 f7 대각선을 얻습니다.',
+    why: ['Bxc6로 구조를 바꾸는 대신 긴 게임을 고릅니다. 비숍은 a4에서 c6를 계속 노리고, 백은 O-O, Re1, c3, d4로 중앙을 준비합니다. 흑이 …b5로 쫓으면 Bb3, …Na5로 바꾸려 하면 c3 뒤 Bc2로 물러날 자리를 미리 만듭니다.', '주의할 점은 딱 하나, d4를 너무 일찍 열지 않는 것입니다. 노아의 방주(아래)가 그 벌칙입니다.'],
+    replies: [['Nf6', '메인(61%). e4 공격, 5.O-O로 클로즈드 또는 오픈.'], ['d6', '모던 스타이니츠. …b5 …Na5 준비.'], ['b5', '즉시 쫓기. Bb3 뒤 …Na5나 …Bc5.'], ['Nge7', '코지오. 드문 수.']],
+    alternatives: [['Bxc6', '익스체인지. 흑 더블 폰, 백은 d4 교환 뒤 킹사이드 폰 다수로 엔드게임을 노립니다.']],
+    trap: { title: '노아의 방주', sans: ['d6', 'd4', 'b5', 'Bb3', 'Nxd4', 'Nxd4', 'exd4', 'Qxd4', 'c5', 'Qd5', 'Be6', 'Qc6+', 'Bd7', 'Qd5', 'c4'], text: '4…d6 5.d4? b5 6.Bb3 Nxd4 7.Nxd4 exd4 8.Qxd4? c5! … 11…c4로 [[c4 폰이 b3 비숍의 퇴로를 막습니다.]] 5.c3가 안전한 준비 수.' },
+    mine: '26판 · 승률 56%. …b5 …Na5로 비숍을 바꾸는 라인에서 2승 4패(예시).',
+  };
+  LINES.trap = { sans: NOTE.trap.sans, title: NOTE.trap.title };
+
+  const panel = document.getElementById('panel');
+  const header = (extra) => `<div class="explain-head"><span class="lab"><span class="mv">4.Ba4</span></span><span class="badge good">루이 로페즈: 모피 방어</span><span class="mono faint small">C70</span>${extra || ''}</div>`;
+  const sec = (title, count, body, open = true) => `<details class="sec"${open ? ' open' : ''}><summary>${title}${count ? `<span class="n">${count}</span>` : ''}</summary><div class="body">${body}</div></details>`;
+  const bodyWhy = () => NOTE.why.map((p) => `<p>${mark(p)}</p>`).join('');
+  const bodyPairs = (pairs) => pairs.map(([s, t]) => `<div class="alt"><span class="mv">${s}</span><span>${mark(t)}</span></div>`).join('');
+  const bodyTrap = () => `<div><b>${NOTE.trap.title}</b>${stepButtons(NOTE.trap.sans, NOTE.trap.title, 'trap')}<span class="small">${mark(NOTE.trap.text)} <span class="faint">수를 누르면 보드에 미리보기</span></span></div>`;
+
+  // ---------- tab 1: streaming ----------
+  let timers = [];
+  const clearTimers = () => { timers.forEach(clearTimeout); timers = []; };
+  const later = (ms, fn) => timers.push(setTimeout(fn, ms));
+  function renderStream() {
+    clearTimers();
+    panel.innerHTML = `<span class="req">1 · 노트 스트리밍</span>` + header(`<span class="grow"></span><button type="button" class="btn primary" id="gen">깊은 해설 만들기</button>`) +
+      `<div class="summary muted">이 국면의 깊은 해설이 아직 없습니다. 만들면 준비 단계와 섹션이 도착하는 순서대로 보입니다.</div>` +
+      `<div id="stream"></div>`;
+    document.getElementById('gen').onclick = runStream;
+  }
+  function runStream() {
+    clearTimers();
+    const btn = document.getElementById('gen'); btn.textContent = '중단'; btn.classList.remove('primary'); btn.onclick = () => { clearTimers(); document.getElementById('stream').insertAdjacentHTML('beforeend', `<div class="donebar" style="background:var(--warn-bg)">중단됨 · 받은 섹션은 저장하지 않습니다 · <button type="button" class="btn sm" id="again">다시 만들기</button></div>`); document.getElementById('again').onclick = runStream; btn.textContent = '깊은 해설 만들기'; btn.classList.add('primary'); btn.onclick = runStream; };
+    const s = document.getElementById('stream');
+    const stages = [
+      ['book', '책 후보', '2가지 · Ba4, Bxc6 · 전위 포함'],
+      ['engine', '엔진 3라인', '깊이 12 · 1.1s · +0.31 / +0.28 / +0.22'],
+      ['plans', '구조·계획', '오프닝 단계 — 구조 미분류, 셋업 KB에서 이탈리안 배치 3/6'],
+      ['maia', '마이아 1500', '상위 3수 Nf6 61% · d6 9% · b5 7%'],
+      ['write', '작성 중', ''],
+    ];
+    s.innerHTML = `<div class="stages" id="stages">${stages.map((st, i) => `<div class="stage" id="st-${st[0]}"><span class="ic">${i === 0 ? '⟳' : '·'}</span><span class="what">${st[1]}</span><span class="detail">${i === 0 ? '…' : ''}</span></div>`).join('')}</div><div id="secs"></div>`;
+    let t = 0;
+    stages.slice(0, 4).forEach((st, i) => {
+      t += 500 + i * 250;
+      later(t, () => { const el = document.getElementById(`st-${st[0]}`); el.className = 'stage done'; el.querySelector('.ic').textContent = '✓'; el.querySelector('.detail').textContent = st[2]; const nx = stages[i + 1]; const ne = document.getElementById(`st-${nx[0]}`); ne.className = 'stage run'; ne.querySelector('.ic').textContent = '⟳'; });
+    });
+    const tools = ['analyse(fen)', 'compare(Ba4, Bxc6)', 'analyse(4…d6 5.d4 b5 …)', 'motifs(11…c4)'];
+    tools.forEach((tool, i) => later(t + 400 + i * 700, () => { const d = document.querySelector('#st-write .detail'); d.innerHTML = `<span class="tools">${tools.slice(0, i + 1).map((x) => `<span>${x}</span>`).join('')}</span>`; }));
+    const secs = document.getElementById('secs');
+    const arrivals = [
+      [t + 900, `<div class="summary arrive">${mark(NOTE.summary)}</div><div class="small faint arrive">요약 · 검증 1/1</div>`],
+      [t + 1700, sec('왜 이 수인가 <span class="badge neutral">검증 0/0</span>', '', bodyWhy())],
+      [t + 2400, sec('상대의 응수와 계획 <span class="badge neutral">검증 0/0</span>', '4가지', bodyPairs(NOTE.replies))],
+      [t + 3000, sec('대안과 비교 <span class="badge neutral">검증 0/0</span>', '1가지', bodyPairs(NOTE.alternatives))],
+      [t + 3900, sec('전형적인 실수와 함정 <span class="badge good">검증 1/1 · 수순 15수 합법</span>', '1개', bodyTrap())],
+      [t + 4100, sec('내 기보에서 <span class="badge neutral">서버</span>', '', `<p>${NOTE.mine}</p>`)],
+    ];
+    arrivals.forEach(([at, html]) => later(at, () => { secs.insertAdjacentHTML('beforeend', html); const last = secs.lastElementChild; last.classList.add('arrive'); wireSteps(last); }));
+    later(t + 4600, () => {
+      const w = document.getElementById('st-write'); w.className = 'stage done'; w.querySelector('.ic').textContent = '✓'; w.querySelector('.what').textContent = '작성 완료';
+      secs.insertAdjacentHTML('beforeend', `<div class="donebar arrive">저장됨 · 12.4초 · 검증 2/2 · 도구 호출 4회 · 모델 claude-opus-5 <span class="grow"></span><button type="button" class="btn sm">다시 만들기</button></div><div class="sources"><span>근거:</span><span class="badge neutral">책 · lichess TSV</span><span class="badge neutral">엔진 깊이 12</span><span class="badge neutral">마이아 1500</span><span class="badge neutral">LLM 해설</span><span class="grow"></span><span><span class="v">문장</span> = 보드에서 확인된 사실</span></div>`);
+      btn.textContent = '깊은 해설 만들기'; btn.classList.add('primary'); btn.disabled = true;
+    });
+  }
+
+  // ---------- tab 2: chat with note context ----------
+  const QA = {
+    '왜 노아의 방주에서 비숍이 갇히나요?': {
+      quote: '해설: "…11…c4로 c4 폰이 b3 비숍의 퇴로를 막습니다."',
+      tools: ['analyse · 8.Qxd4 뒤 국면', 'show_board · 11…c4'],
+      board: { sans: ['d6', 'd4', 'b5', 'Bb3', 'Nxd4', 'Nxd4', 'exd4', 'Qxd4', 'c5', 'Qd5', 'Be6', 'Qc6+', 'Bd7', 'Qd5', 'c4'], caption: '보드 1 · 11…c4 뒤. b3 비숍의 칸이 a2(a6 폰이 …b5로 막음), c2(c4 폰), a4/c4(흑 폰)' },
+      text: '비숍이 "갇힌다"는 것은 갈 칸이 하나도 안전하지 않다는 뜻입니다. [[11…c4 뒤 b3 비숍은 a2·c2·a4·c4로만 갈 수 있는데]], a4와 c4는 흑 폰이 지키고, c2는 c4 폰이 막으며, a2는 …b5 폰이 a4를 잡을 수 있어 결국 …Be6로 교환당합니다. 그래서 5.d4 대신 5.c3로 c2 퇴로를 먼저 만드는 것입니다. 되돌리려면 8.Qxd4 대신 8.Qxd4를 두지 않고 8.Bd5!? 정도가 검토되지만 그래도 흑이 편합니다.',
+      ground: '확인된 칸 5 · 미확인 0 · 보드 1개',
+    },
+    'Ba4 대신 Bxc6는 왜 안 되나요?': {
+      quote: '해설: "Bxc6로 구조를 바꾸는 대신 긴 게임을 고릅니다."',
+      tools: ['compare · Ba4 vs Bxc6', 'analyse · Bxc6 dxc6'],
+      board: { sans: ['Bxc6', 'dxc6'], base: 'pre', caption: '보드 1 · 4.Bxc6 dxc6. 흑 더블 폰 c6·c7, 비숍 쌍, d파일 열림' },
+      text: '안 되는 수가 아니라 다른 게임입니다. 엔진은 두 수를 거의 같게 봅니다(+0.28 대 +0.25). [[4.Bxc6 dxc6 뒤 흑은 c6·c7 더블 폰을 갖고]] 백은 d4 교환 뒤 킹사이드 4 대 3 폰 다수로 엔드게임을 노립니다. 대신 흑은 비숍 쌍과 열린 d파일을 얻어 중반이 편합니다. 당신 기보에서는 익스체인지 4판 2승 2패, 모피 26판 56%라 지금까지는 Ba4 쪽이 익숙합니다.',
+      ground: '확인된 칸 2 · 미확인 0 · 보드 1개',
+    },
+    '상대가 …Nf6로 응수하면 내 계획은?': {
+      quote: '해설: "Nf6 — 메인(61%). e4 공격, 5.O-O로 클로즈드 또는 오픈."',
+      tools: ['analyse · 4…Nf6', 'show_board · 5.O-O Be7 6.Re1 b5 7.Bb3 d6 8.c3 O-O 9.h3'],
+      board: { sans: ['Nf6', 'O-O', 'Be7', 'Re1', 'b5', 'Bb3', 'd6', 'c3', 'O-O', 'h3'], caption: '보드 1 · 클로즈드 메인 9.h3. 다음 계획 d4, Nbd2-f1-g3' },
+      text: '[[4…Nf6는 e4를 공격하지만]] 지키지 않고 5.O-O로 캐슬링합니다. 5…Nxe4면 6.d4로 되찾고(오픈), 5…Be7이면 6.Re1로 지킨 뒤 c3, d4, Nbd2-f1-g3 재배치가 표준 계획입니다. 흑의 …b5 …d6 …O-O 뒤 9.h3(보드 1)까지가 외길에 가깝고, 그 뒤부터 갈립니다. 이 수순은 당신 기보에서 9판 61%로 가장 좋은 라인입니다.',
+      ground: '확인된 칸 1 · 미확인 0 · 보드 1개',
+    },
+    '…b5 …Na5로 비숍을 바꾸려 하면 어떻게 하나요?': {
+      quote: '해설(내 기보): "…b5 …Na5로 비숍을 바꾸는 라인에서 2승 4패"',
+      tools: ['analyse · 4…b5 5.Bb3 Na5', 'show_board · 6.O-O d6 7.d4 Nxb3 8.axb3'],
+      board: { sans: ['b5', 'Bb3', 'Na5', 'O-O', 'd6', 'd4', 'Nxb3', 'axb3'], caption: '보드 1 · 8.axb3 뒤. a파일 반개방, 흑 a6·b5 폰이 목표' },
+      text: '교환을 막을 수는 없고, 막을 필요도 없습니다. [[5…Na5 뒤 6.O-O로 먼저 캐슬링하고]] …Nxb3에는 axb3로 되잡아 a파일을 엽니다. 흑은 나이트를 a5로 보내느라 두 템포를 썼고, 백은 d4로 중앙을 엽니다. 당신이 진 판들은 비숍을 Bc2로 살리려고 c3를 서두른 경우였습니다 — 그 수가 d4를 늦춥니다.',
+      ground: '확인된 칸 2 · 미확인 0 · 보드 1개',
+    },
+  };
+  function renderChat() {
+    clearTimers();
+    panel.innerHTML = `<span class="req">2 · 튜터에게 질문</span>` + header() +
+      `<div class="summary">${mark(NOTE.summary)}<button type="button" class="btn sm quotebtn" id="quoteBtn">❝ 이 문장에 대해 질문</button></div>` +
+      sec('왜 이 수인가', '', bodyWhy(), false) + sec('전형적인 실수와 함정', '1개', bodyTrap(), false) +
+      `<div id="addenda"></div>` +
+      `<details class="sec" open><summary>튜터에게 질문 <span class="n">해설 문맥 포함</span></summary><div class="body chat" style="max-width:none">` +
+      `<div class="chips"><span class="chip">수 4.Ba4</span><span class="chip">루이 로페즈: 모피 방어</span><span class="chip">해설 요약 + 왜 이 수인가 포함</span><span class="chip">내 기보 26판</span></div>` +
+      `<div class="small faint">제안 질문 — 해설의 함정·대안·응수에서 만든 것</div>` +
+      `<div class="chips" id="sugg">${Object.keys(QA).map((q) => `<button type="button" class="chip q">${q}</button>`).join('')}</div>` +
+      `<div id="log"></div>` +
+      `<form class="ask" id="ask"><textarea id="q" placeholder="질문을 적거나 위 제안을 누르세요"></textarea><button type="submit" class="btn primary">묻기</button></form>` +
+      `</div></details>`;
+    wireSteps(panel);
+    document.getElementById('quoteBtn').onclick = () => { document.getElementById('q').value = '"a4 비숍은 여전히 c6 나이트를 공격합니다" — 그런데 흑이 …Nd4로 나이트를 옮기면 이 압박이 사라지지 않나요?'; document.getElementById('q').focus(); };
+    document.querySelectorAll('#sugg .chip').forEach((b) => b.addEventListener('click', () => askQ(b.textContent)));
+    document.getElementById('ask').onsubmit = (e) => { e.preventDefault(); const v = document.getElementById('q').value.trim(); if (v) askQ(v); };
+    renderAddenda();
+  }
+  function renderAddenda() {
+    const el = document.getElementById('addenda'); if (!el) return;
+    el.innerHTML = state.addenda.length ? sec(`내 질문 <span class="badge note">해설에 반영됨</span>`, `${state.addenda.length}개`, state.addenda.map((a) => `<div class="addendum"><span class="q">${a.q}</span><span>${a.text}</span><span class="small faint">${a.ground} · 2026-09-12 · 보드 <button type="button" class="btn sm" data-line="${a.key}" data-step="${a.n}">보기</button></span></div>`).join('')) : '';
+    wireSteps(el);
+  }
+  function askQ(q) {
+    clearTimers();
+    const a = QA[q] || { quote: null, tools: ['analyse · fen'], board: null, text: '(시안) 이 질문은 대본에 없습니다. 실제로는 같은 방식으로 도구를 부르고 답합니다.', ground: '—' };
+    const log = document.getElementById('log');
+    const id = `t${Date.now()}`;
+    log.insertAdjacentHTML('beforeend', `<div class="turn arrive" id="${id}"><div class="bubble user">${q}</div><div class="tools" id="${id}-tools"></div><div class="bubble tutor" id="${id}-a" hidden>${a.quote ? `<span class="quote">${a.quote}</span>` : ''}<span id="${id}-txt" class="cursor"></span></div><div id="${id}-b"></div></div>`);
+    document.getElementById('q').value = '';
+    a.tools.forEach((tool, i) => later(300 + i * 600, () => { document.getElementById(`${id}-tools`).innerHTML = a.tools.slice(0, i + 1).map((x) => `<span>${x}</span>`).join(''); }));
+    const start = 300 + a.tools.length * 600;
+    later(start, () => { document.getElementById(`${id}-a`).hidden = false; });
+    const words = a.text.split(' ');
+    words.forEach((w, i) => later(start + 60 * i, () => { const t = document.getElementById(`${id}-txt`); t.innerHTML = mark(words.slice(0, i + 1).join(' ')); if (i === words.length - 1) t.classList.remove('cursor'); }));
+    later(start + 60 * words.length + 100, () => {
+      if (a.board) {
+        const key = `qa${Object.keys(LINES).length}`; const base = a.board.base === 'pre' ? PRE_FEN : undefined;
+        LINES[key] = { sans: a.board.sans, title: a.board.caption.split(' · ')[0], base, ply0: base ? BASE_PLY - 1 : undefined };
+        document.getElementById(`${id}-b`).innerHTML = `<div class="boardcard arrive">${miniBoard(a.board.sans, base)}<span class="small">${a.board.caption}</span><button type="button" class="btn sm" data-line="${key}" data-step="${a.board.sans.length}">보드에 보기</button></div>` +
+          `<div class="ground" style="margin-top:6px"><span>근거: ${a.ground}</span><span class="grow"></span><button type="button" class="btn sm" id="${id}-add">해설에 반영</button></div>`;
+        wireSteps(document.getElementById(`${id}-b`));
+        document.getElementById(`${id}-add`).onclick = (e) => { state.addenda.push({ q, text: a.text.replace(/\[\[|\]\]/g, ''), ground: a.ground, key, n: a.board.sans.length }); e.target.textContent = '반영됨'; e.target.disabled = true; renderAddenda(); };
+      }
+    });
+  }
+
+  // ---------- tab 3: deeper ----------
+  const PVS = [
+    { ev: '+0.31', pct: 53, sans: ['Nf6', 'O-O', 'Be7', 'Re1', 'b5', 'Bb3', 'd6', 'c3', 'O-O'] },
+    { ev: '+0.28', pct: 52, sans: ['d6', 'c3', 'Nf6', 'O-O', 'Be7', 'Re1', 'O-O', 'd4'] },
+    { ev: '+0.22', pct: 52, sans: ['b5', 'Bb3', 'Na5', 'O-O', 'd6', 'd4', 'Nxb3', 'axb3'] },
+  ];
+  const MASTERS = [
+    ['Nf6', 148231, 38, 41, 21, 2420], ['d6', 21870, 42, 36, 22, 2390], ['b5', 14560, 40, 37, 23, 2405], ['Nge7', 2310, 41, 35, 24, 2380], ['Bc5', 1980, 44, 33, 23, 2370], ['f5', 1240, 45, 30, 25, 2350],
+  ];
+  function renderDeep() {
+    clearTimers();
+    PVS.forEach((p, i) => { LINES[`pv${i}`] = { sans: p.sans, title: `엔진 라인 ${i + 1}` }; });
+    panel.innerHTML = `<span class="req">3 · 더 깊이</span>` + header() + `<div class="summary">${mark(NOTE.summary)}</div>` +
+      sec('엔진 라인 <span class="badge neutral">깊이 12 · 0.9s · 열 때만 계산</span>', '3개', `<div class="lines">${PVS.map((p, i) => `<div class="line"><span class="ev">${p.ev}<i><b style="width:${p.pct}%"></b></i></span><span>${stepButtons(p.sans, `엔진 라인 ${i + 1}`, `pv${i}`)}</span><button type="button" class="btn sm">이 수 두기</button></div>`).join('')}</div><p class="small faint">평가는 백 기준. PV의 수를 누르면 보드에 미리보기, "이 수 두기"는 첫 수를 실제로 둡니다.</p>`) +
+      sec('마스터 통계 <span class="badge neutral">Lichess masters · 2200+ · 캐시</span>', '6가지', `<table class="masters"><thead><tr><th>수</th><th>판수</th><th>백승 · 무 · 흑승</th><th>평균 레이팅</th><th></th></tr></thead><tbody>${MASTERS.map(([s, g, w, d, b, r]) => `<tr><td class="mv">4…${s}</td><td class="mono">${g.toLocaleString()}</td><td><div style="display:flex;align-items:center;gap:8px"><span class="wdl"><i class="w" style="width:${w}%"></i><i class="dr" style="width:${d}%"></i><i class="b" style="width:${b}%"></i></span><span class="mono small">${w}·${d}·${b}</span></div></td><td class="mono">${r}</td><td><button type="button" class="btn sm">두기</button></td></tr>`).join('')}</tbody></table><p class="small faint">토큰이 없으면 이 섹션은 "마스터 DB 연결 없음(LICHESS_TOKEN)"으로 접힙니다.</p>`) +
+      sec('일지 내보내기', '', `<pre class="pgn">[Event "chess-tutor opening study"]
+[Opening "루이 로페즈: 모피 방어"] [ECO "C70"]
+
+1. e4 {킹즈 폰 오프닝. e4 폰이 d5와 f5를 통제합니다.} e5 {오픈 게임.}
+2. Nf3 {e5 폰을 공격하며 첫 기물을 전개합니다.} Nc6 {e5를 지킵니다.}
+3. Bb5 {루이 로페즈. c6 나이트를 공격해 e5의 수비를 흔듭니다.} a6 {모피 방어.}
+4. Ba4 {압박을 유지하는 후퇴입니다. a4 비숍은 여전히 c6 나이트를 공격합니다.} *</pre><div class="chips"><button type="button" class="btn sm">PGN 복사</button><button type="button" class="btn sm">여기서부터 두기 →</button></div>`, false) +
+      `<div class="sources"><span>근거:</span><span class="badge neutral">엔진 깊이 12</span><span class="badge neutral">Lichess masters</span><span class="badge neutral">책 · lichess TSV</span></div>`;
+    wireSteps(panel); refreshSteps();
+  }
+
+  // ---------- tab 4: Korean names ----------
+  const NAMES = [
+    ["Ruy Lopez: Morphy Defense", '루이 로페즈: 모피 방어', '고유명사 표'], ["King's Pawn Game", '킹즈 폰 게임', '규칙 사전'], ["Sicilian Defense: Najdorf Variation", '시실리안 디펜스: 나이도르프 변화', '고유명사 표 + 규칙'],
+    ["Queen's Gambit Declined: Exchange Variation", '퀸즈 갬빗 디클라인드: 익스체인지 변화', '규칙 사전'], ["Ruy Lopez: Open, Bernstein Variation", '루이 로페즈: 오픈, 번스타인 변화', 'LLM 음차 · 검수됨'], ["Zukertort Opening: Double Fianchetto Attack", '주커토르트 오프닝: 더블 피안케토 어택', 'LLM 음차'],
+    ["Caro-Kann Defense: Advance, Short Variation", '카로칸 디펜스: 어드밴스, 쇼트 변화', '고유명사 표'], ["Bird Opening: From's Gambit", '버드 오프닝: 프롬 갬빗', 'LLM 음차 · 검수됨'],
+  ];
+  function renderNames() {
+    clearTimers();
+    const card = (san, nameEn, nameKo, eco, mine, ko) => `<div class="cand">${miniBoard([san])}<div><div><span class="mv">4…${san}</span> <span class="mono faint small">${eco}</span></div><div class="name" title="${nameEn}">${ko ? nameKo : nameEn}</div><div class="small muted">${mine}</div></div></div>`;
+    const rows = [['Nf6', 'Ruy Lopez: Morphy Defense', '루이 로페즈: 모피 방어', 'C78', '내 22판 55%'], ['d6', 'Ruy Lopez: Modern Steinitz Defense', '루이 로페즈: 모던 스타이니츠 방어', 'C71', '내 3판 33%'], ['b5', 'Ruy Lopez: Morphy Defense, Caro Variation', '루이 로페즈: 모피 방어, 카로 변화', 'C70', '내 1판']];
+    const jl = (ko) => [['1.e4', "'King's Pawn Game'(B00) 국면이 됩니다. e4 폰이 d5와 f5를 통제합니다.", '킹즈 폰 게임(B00)이 됩니다. e4 폰이 d5와 f5를 통제합니다.'], ['3.Bb5', "'Ruy Lopez'(C60) 국면이 됩니다. c6 나이트를 공격합니다.", '루이 로페즈(C60)가 됩니다. c6 나이트를 공격합니다.'], ['4.Bc4', "책 밖의 수입니다. 책 수는 Bxc6('Ruy Lopez: Exchange Variation'), Ba4('Ruy Lopez: Open')입니다.", '책 밖의 수입니다. 책 수는 Bxc6(루이 로페즈: 익스체인지 변화), Ba4(루이 로페즈: 모피 방어)입니다.']].map(([l, en, k]) => `<div class="jl"><span class="mv">${l}</span><span>${ko ? k : en}</span></div>`).join('');
+    panel.innerHTML = `<span class="req">4 · 한글 이름</span>` + header() +
+      `<div class="cmp"><div class="col"><span class="cap">지금 (TSV 영어 이름)</span>${rows.map((r) => card(r[0], r[1], r[2], r[3], r[4], false)).join('')}${jl(false)}</div>` +
+      `<div class="col"><span class="cap">M8d (assets/opening_names_ko.json)</span>${rows.map((r) => card(r[0], r[1], r[2], r[3], r[4], true)).join('')}${jl(true)}</div></div>` +
+      sec('번역 출처 <span class="badge neutral">3,810개 · 규칙 사전 60단어 + 고유명사 200개 + LLM 음차 · 상위 200개 검수</span>', '', `<table class="names">${NAMES.map(([en, ko, src]) => `<tr><td>${en}</td><td>${ko}</td><td><span class="badge ${src.includes('검수') ? 'good' : 'neutral'}">${src}</span></td></tr>`).join('')}</table><p class="small faint">영어 이름은 카드의 <code>title</code>(마우스 올림)로 항상 확인할 수 있습니다. 카탈로그의 <code>name_en</code>은 그대로 둡니다.</p>`);
+  }
+
+  // ---------- tabs ----------
+  const RENDER = { stream: renderStream, chat: renderChat, deep: renderDeep, names: renderNames };
+  document.querySelectorAll('#tabs .tab').forEach((b) => b.addEventListener('click', () => {
+    state.tab = b.dataset.tab; state.preview = null;
+    document.querySelectorAll('#tabs .tab').forEach((x) => x.classList.toggle('on', x === b));
+    renderBoard(); RENDER[state.tab]();
+  }));
+  renderBoard(); renderStream();
+  later(400, runStream);
+})();
+</script>
