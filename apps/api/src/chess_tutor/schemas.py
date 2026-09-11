@@ -952,6 +952,8 @@ class OpeningContext(BaseModel):
     """Which section of the note the question came from, when it came from one."""
     quote: str | None = None
     """A sentence of the note the student quoted."""
+
+
 # ---------- 더 깊이 (M8d-4): engine lines and master statistics ----------
 
 

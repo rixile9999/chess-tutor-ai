@@ -24,14 +24,15 @@ type Props = {
   ply: number;
   /** That position, from the annotation; null while it has not arrived (then it is replayed). */
   fen: string | null;
-  note: OpeningNote;
+  note: OpeningNote | null;
   /** The page's preview callback — the same one the trap steps use (§9.2). */
   onTrap: (trap: TrapLine, index: number, step: number) => void;
   previewKey: string | null;
 };
 
 /** The position after the explained move, replayed from the note when no annotation is in hand. */
-function fenAfterNote(note: OpeningNote): string | null {
+function fenAfterNote(note: OpeningNote | null): string | null {
+  if (!note) return null;
   const before = `${note.position_key} 0 1`;
   const uci = sanToUci(before, note.san);
   const played = uci ? applyUci(before, uci) : null;
