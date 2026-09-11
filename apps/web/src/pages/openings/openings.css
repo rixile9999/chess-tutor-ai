@@ -226,3 +226,17 @@
   .op-note-stage { grid-template-columns: 18px minmax(0, 1fr); }
   .op-note-stage .detail { grid-column: 2; }
 }
+
+/* 튜터에게 질문: the note's own chat and the answers kept on it (§10.3) */
+.op-page .badge.op-badge-note { background: rgba(106, 63, 181, 0.12); color: #6a3fb5; }
+.op-note-chat { max-width: none; gap: 10px; }
+.op-note-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.op-note-ask { text-align: left; height: auto; min-height: 24px; padding: 3px 10px; white-space: normal; }
+.op-note-quotebar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.op-note-quotebar .small { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.op-note-quoted { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 6px 8px; border-left: 3px solid #6a3fb5; background: var(--paper); border-radius: 0 6px 6px 0; }
+.op-note-keep { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.op-note-addendum { display: flex; flex-direction: column; gap: 4px; padding-left: 10px; border-left: 3px solid #6a3fb5; }
+.op-note-addendum .q { font-weight: 600; }
+.op-note-unverified { font-size: 12px; color: var(--bad); }
+.op-note-chat .ch-chat-log { max-height: 420px; }

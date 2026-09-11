@@ -1,5 +1,7 @@
 import { useEffect, type ReactNode } from 'react';
 import type { MoveAnnotation, OpeningNote, TrapLine } from '../../api/types';
+import type { Preview } from '../../lib/shapes';
+import { NoteChat } from './NoteChat';
 import { NOTE_STAGES, SECTION_TITLE, STAGE_LABEL, sectionPayload, type NoteStage } from '../../api/noteStream';
 import { badgeClass, engineBadge, moveBadges } from './colors';
 import { moveLabel, type ExplainDepth } from './line';
@@ -39,6 +41,12 @@ type Props = {
   /** Trap step buttons put the line on the board as a preview; `previewKey` is "{trap}:{step}". */
   onTrap: (trap: TrapLine, index: number, step: number) => void;
   previewKey: string | null;
+  /** The position after the focused move and the line that reaches it: the chat's context. */
+  fenAfter: string | null;
+  movesSan: string[];
+  startFen: string;
+  /** A board the tutor drew, put on the main board as a preview (§10.3). */
+  onPreview: (p: Preview | null) => void;
 };
 
 /**
@@ -47,7 +55,7 @@ type Props = {
  */
 export function ExplainPanel({
   ply, label, annotation, name, eco, fenBefore, san, username, note, loading, error, onRetry,
-  depth, onDepth, onNote, onTrap, previewKey,
+  depth, onDepth, onNote, onTrap, previewKey, fenAfter, movesSan, startFen, onPreview,
 }: Props) {
   const { run, start, stop, reset } = useNoteStream(onNote);
   const key = fenBefore && san ? `${fenBefore}|${san}` : '';
@@ -212,6 +220,22 @@ export function ExplainPanel({
         </div>
         <p className="small faint">엔진 라인·마스터 통계는 다음 단계(M8d-4)입니다.</p>
       </Section>
+
+      {fenBefore && san && fenAfter && (
+        <NoteChat
+          fenBefore={fenBefore}
+          san={san}
+          label={label ?? san}
+          fenAfter={fenAfter}
+          movesSan={movesSan}
+          startFen={startFen}
+          openingName={name}
+          note={shown}
+          previewKey={previewKey}
+          onPreview={onPreview}
+          onNote={onNote}
+        />
+      )}
 
       {run?.note && (
         <div className="op-note-done">

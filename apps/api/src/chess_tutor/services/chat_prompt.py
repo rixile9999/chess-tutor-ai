@@ -286,6 +286,38 @@ def live_facts(
     }
 
 
+# ---------- the note the student is reading (M8d-3) ----------
+
+NOTE_INTRO = """\
+
+## 지금 보는 해설
+학생은 오프닝 지도에서 아래 수의 깊은 해설을 읽는 중이고, 그 해설에 대해 묻습니다. 해설의 \
+문장을 인용했다면 그 문장부터 다룹니다. 해설은 이미 검증을 거친 글이지만, 새로 말하는 수순과 \
+칸은 여기서도 도구로 확인하고 말합니다.
+"""
+
+MARK = "[[", "]]"
+"""The note's verification marks; they mean nothing to the model, so they come off."""
+
+
+def _plain(text: str) -> str:
+    return text.replace(MARK[0], "").replace(MARK[1], "")
+
+
+def note_block(opening: schemas.OpeningContext, opening_name: str | None) -> str:
+    """The '지금 보는 해설' block: the move, its name, the summary, and the quoted sentence."""
+    lines = [f"수: {opening.san}", f"그 수를 두기 전 국면 FEN: {opening.fen_before}"]
+    if opening_name:
+        lines.append(f"이 수가 이르는 국면 이름: {opening_name}")
+    if opening.note_summary.strip():
+        lines.append(f"해설 요약: {_plain(opening.note_summary).strip()}")
+    if opening.section:
+        lines.append(f"학생이 보고 있는 섹션: {opening.section}")
+    if opening.quote and opening.quote.strip():
+        lines.append(f'학생이 인용한 문장: "{_plain(opening.quote).strip()}"')
+    return NOTE_INTRO + "\n".join(lines) + "\n"
+
+
 def build_live_prompt(
     fen: str,
     start_fen: str,
@@ -294,9 +326,11 @@ def build_live_prompt(
     rating: int,
     opponent: str | None = None,
     opening_name: str | None = None,
+    opening: schemas.OpeningContext | None = None,
 ) -> str:
     body = json.dumps(
         live_facts(fen, start_fen, moves_san, user_color, rating, opponent, opening_name),
         ensure_ascii=False,
     )
-    return f"{LIVE_ROLE}\n<facts>\n{body}\n</facts>\n"
+    note = note_block(opening, opening_name) if opening is not None else ""
+    return f"{LIVE_ROLE}{note}\n<facts>\n{body}\n</facts>\n"

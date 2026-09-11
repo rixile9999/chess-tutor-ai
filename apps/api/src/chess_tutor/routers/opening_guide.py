@@ -5,6 +5,7 @@
   GET  /openings/note       the deep note for one move, or {"status": "missing"} (opening_notes)
   POST /openings/note       write that note with Claude Code and store it       (opening_notes)
   POST /openings/note/stream  the same, reported stage by stage and section by section (M8d-2)
+  POST /openings/note/addendum  keep one tutor answer on the note              (M8d-3)
 
 The first two are stateless; the notes are stored per (position key, move, language) and are
 the only endpoints here that read the database. Shares the /openings prefix with
@@ -24,6 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from chess_tutor.db import get_session, session_factory
 from chess_tutor.schemas import (
+    AddendumRequest,
     AnnotateRequest,
     AnnotateResponse,
     Color,
@@ -137,3 +139,16 @@ async def stream_note(req: NoteRequest, session: Session) -> StreamingResponse:
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+@router.post("/note/addendum", response_model=OpeningNote)
+async def note_addendum(req: AddendumRequest, session: Session) -> OpeningNote:
+    """Keep one tutor answer on this move's note ("해설에 반영", plan §10.3).
+
+    The answer is stored as the chat showed it — its unverified squares included — and comes
+    back in `GET /openings/note` as `addenda`."""
+    try:
+        return await opening_notes.add_addendum(session, req)
+    except ValueError as exc:
+        status = 404 if str(exc) == opening_notes.NO_NOTE else 422
+        raise HTTPException(status_code=status, detail=str(exc)) from exc

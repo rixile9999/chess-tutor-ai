@@ -71,6 +71,8 @@ export const api = {
     note: (fen: string, san: string) =>
       get<T.NoteLookup>(`/openings/note?fen=${encodeURIComponent(fen)}&san=${encodeURIComponent(san)}`),
     makeNote: (body: T.NoteRequest) => post<T.OpeningNote>('/openings/note', body),
+    /** Keep one tutor answer on the note ("해설에 반영"); the note comes back with it (§10.3). */
+    addendum: (body: T.AddendumRequest) => post<T.OpeningNote>('/openings/note/addendum', body),
   },
 
   training: {

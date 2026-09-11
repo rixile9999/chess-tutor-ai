@@ -6,6 +6,7 @@ import { api } from '../../api/client';
 import type { Color, OpeningNote, TrapLine } from '../../api/types';
 import type { BoardShape } from '../../components/Board';
 import { applyUci } from '../../lib/chess';
+import type { Preview } from '../../lib/shapes';
 import { getUsername, setUsername } from '../../lib/user';
 import { errorText, useBoardSize } from '../training/util';
 import { Strip } from './Strip';
@@ -131,6 +132,14 @@ export default function OpeningsPage() {
     if (focusFenBefore && focused) rememberNote(focusFenBefore, focused.san, note);
     noteQ.reload();
   }, [focusFenBefore, focused, noteQ]);
+
+  // A board the tutor drew in the note chat borrows the main board, exactly as a trap line does.
+  const onTutorBoard = useCallback((p: Preview | null) => {
+    dispatch({
+      type: 'preview',
+      preview: p ? { key: p.id, fen: p.fen, title: p.label, lastMove: p.lastMove } : null,
+    });
+  }, []);
 
   const onTrap = useCallback((trap: TrapLine, index: number, step: number) => {
     const plies = pliesFrom(fenAt(line, focusPly), trap.line_san.slice(0, step));
@@ -377,6 +386,10 @@ export default function OpeningsPage() {
             onNote={onNote}
             onTrap={onTrap}
             previewKey={line.preview?.key ?? null}
+            fenAfter={focused?.fen ?? null}
+            movesSan={sansTo(line, focusPly)}
+            startFen={line.startFen}
+            onPreview={onTutorBoard}
           />
         </div>
 

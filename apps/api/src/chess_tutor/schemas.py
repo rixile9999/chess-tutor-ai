@@ -841,6 +841,34 @@ class AnnotateResponse(BaseModel):
     annotations: list[MoveAnnotation] = []
 
 
+class ChatBoard(BaseModel):
+    """A board the tutor drew with `show_board`, as the chat stream sends it (M8d-3)."""
+
+    type: Literal["board"] = "board"
+    n: int = 0
+    start_fen: str = ""
+    fen: str = ""
+    moves: list[str] = []
+    last_move: tuple[str, str] | None = None
+    arrows: list[Arrow] = []
+    highlights: list[str] = []
+    caption: str = ""
+
+
+class Addendum(BaseModel):
+    """One question the student asked about this move and the answer they kept.
+
+    The answer is stored exactly as the chat showed it, `unverified` included: the chat's own
+    grounding is what the panel repeats, and nothing is verified a second time (plan §10.3)."""
+
+    question: str
+    answer: str
+    boards: list[ChatBoard] = []
+    unverified: list[str] = []
+    """Squares the answer named that no fact or tool result had grounded."""
+    created_at: datetime
+
+
 class TrapLine(BaseModel):
     """A trap or a typical mistake, as moves from the position after the annotated move."""
 
@@ -874,6 +902,11 @@ class OpeningNote(BaseModel):
     total_claims: int = 0
     model: str = ""
     created_at: datetime
+    addenda: list[Addendum] = []
+    """Answers the student kept from the tutor chat, oldest first (M8d-3)."""
+    questions: list[str] = []
+    """Question chips the panel offers, made from this note by the server on every read
+    (`opening_notes.suggested_questions`); never written by the model."""
 
 
 class NoteMissing(BaseModel):
@@ -888,3 +921,31 @@ class NoteRequest(BaseModel):
     username: str | None = None
     """Whose games fill the note's `mine` line; without it the line stays empty."""
     regenerate: bool = False
+
+
+# ---------- the tutor's answers kept on a note (M8d-3) ----------
+
+
+class AddendumRequest(BaseModel):
+    fen: str
+    """Position the move was played in — the note's own key."""
+    san: str
+    question: str = Field(min_length=1, max_length=4000)
+    answer: str = Field(min_length=1, max_length=20000)
+    boards: list[ChatBoard] = []
+    unverified: list[str] = []
+
+
+class OpeningContext(BaseModel):
+    """The note the student is reading while asking, attached to a live chat question.
+
+    The conversation is keyed by (fen_before, san): the question is about that move, so the
+    same position with a different move is a different conversation (plan §10.3)."""
+
+    fen_before: str
+    san: str
+    note_summary: str = ""
+    section: str | None = None
+    """Which section of the note the question came from, when it came from one."""
+    quote: str | None = None
+    """A sentence of the note the student quoted."""

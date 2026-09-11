@@ -29,6 +29,7 @@ NDJSON — one JSON object per line, one line per section, in a fixed order — 
 line is verified and sent on the moment it arrives, so the panel fills in from the top instead
 of waiting ten seconds for one JSON answer. Only a finished run is stored: a client that goes
 away cancels this generator before it ever reaches the store, and the process is killed with it.
+M8d-3 adds the student's own questions (`Addendum`), which are appended to the stored note.
 """
 
 from __future__ import annotations
@@ -56,6 +57,8 @@ from chess_tutor.engine import find_stockfish, pool
 from chess_tutor.models import Game, User
 from chess_tutor.openings import lookup, next_moves, position_key
 from chess_tutor.schemas import (
+    Addendum,
+    AddendumRequest,
     Color,
     NoteRequest,
     OpeningNote,
@@ -108,6 +111,13 @@ STREAM_LIMIT = 1 << 20
 """Longest stream-json line read from the CLI; a tool result can be far past asyncio's 64 KiB."""
 PENDING_LIMIT = 1 << 15
 """Longest half-written section object carried over to the next line before it is given up on."""
+SUGGESTED_QUESTIONS = 4
+"""Most question chips the panel offers (plan §10.3)."""
+MAX_ADDENDA = 20
+"""Answers kept on one note; the oldest goes when the student adds past this."""
+SENTENCE_MARKS = ("—", "?", "!", ".", "…", ":")
+"""Punctuation that makes a trap title a sentence rather than a name; a title like
+"공짜 폰은 없다 — 5.Nxe5?" cannot be poured into "왜 …인가요?" and has to be quoted instead."""
 
 NO_CLAUDE = "Claude Code를 찾을 수 없습니다. CHAT_CLAUDE_COMMAND를 확인해 주세요."
 NO_ANSWER = "Claude Code가 해설을 쓰지 못했습니다. 잠시 뒤 다시 시도해 주세요."
@@ -118,6 +128,7 @@ ILLEGAL_MOVE = "이 국면에서 둘 수 없는 수입니다"
 NO_GAMES = "내 기보에 없는 수입니다."
 NO_SECTIONS = "모델이 정해진 형식으로 쓰지 않아 한 번에 쓰는 방식으로 다시 시도합니다."
 INCOMPLETE = "해설이 끝나지 않아 저장하지 않았습니다. 다시 만들어 주세요."
+NO_NOTE = "이 수의 해설이 아직 없습니다."
 
 Event = dict[str, Any]
 """One line of the note stream, the same shape the chat sends (services.chat)."""
@@ -810,6 +821,7 @@ def assemble(
         model=model,
         created_at=models.utcnow(),
     )
+    note.questions = suggested_questions(note)
     return note
 
 
@@ -853,7 +865,13 @@ async def load(session: AsyncSession, fen: str, san: str) -> OpeningNote | None:
             )
         )
     ).scalar_one_or_none()
-    return OpeningNote.model_validate(row.payload) if row is not None else None
+    if row is None:
+        return None
+    note = OpeningNote.model_validate(row.payload)
+    # Made fresh on every read, so a note stored before a rule changed still offers the
+    # questions this version would ask.
+    note.questions = suggested_questions(note)
+    return note
 
 
 async def write(session: AsyncSession, req: NoteRequest) -> OpeningNote:
@@ -1149,6 +1167,51 @@ def _read_line(line: str, seen: set[str], pending: str) -> tuple[dict[str, Any] 
         log.info("opening note: a line was JSON but not a section: %s", text[:120])
         return None, ""
     return (None, "") if name in seen else (loaded, "")
+
+
+# ---------- the tutor chat about a note (M8d-3) ----------
+
+
+def _trap_question(title: str) -> str:
+    if any(mark in title for mark in SENTENCE_MARKS):
+        return f'"{title}" 함정을 자세히 설명해 주세요.'
+    return f"왜 {title}인가요?"
+
+
+def suggested_questions(note: OpeningNote) -> list[str]:
+    """Question chips made from the note itself, no model involved (plan §10.3).
+
+    Traps, alternatives and replies each give one question, in that order; a move the book does
+    not know asks about that first, because it is the thing the student came for."""
+    out: list[str] = []
+    if not note.in_book:
+        out.append("이 수가 나쁘지 않다면 왜 책에 없나요?")
+    out += [_trap_question(trap.title.strip()) for trap in note.traps if trap.title.strip()]
+    out += [
+        f"{note.san} 대신 {san}는 왜 안 되나요?" for san, _text in note.alternatives if san.strip()
+    ]
+    out += [f"상대가 {san}로 응수하면 내 계획은?" for san, _text in note.replies if san.strip()]
+    return list(dict.fromkeys(out))[:SUGGESTED_QUESTIONS]
+
+
+async def add_addendum(session: AsyncSession, req: AddendumRequest) -> OpeningNote:
+    """Keep one tutor answer on this move's note and return the note as it now stands.
+
+    Raises ValueError for a bad FEN or move (`load` parses both), or when there is no note to
+    append to — the chat is opened from a note, so that only happens if it was regenerated
+    meanwhile."""
+    note = await load(session, req.fen, req.san)
+    if note is None:
+        raise ValueError(NO_NOTE)
+    addendum = Addendum(
+        question=req.question.strip(),
+        answer=req.answer.strip(),
+        boards=req.boards,
+        unverified=req.unverified,
+        created_at=models.utcnow(),
+    )
+    note = note.model_copy(update={"addenda": [*note.addenda, addendum][-MAX_ADDENDA:]})
+    return await _store(session, note)
 
 
 # ---------- the seeded notes ----------

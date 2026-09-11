@@ -198,6 +198,18 @@ export interface TrapLine {
   line_san: string[];
   text: string;
 }
+/** A board the tutor drew, as it is kept on a note (M8d-3). */
+export interface ChatBoardOut {
+  type: 'board'; n: number; start_fen: string; fen: string; moves: string[];
+  last_move: [string, string] | null; arrows: Arrow[]; highlights: string[]; caption: string;
+}
+/** One question the student asked about this move and the answer they kept (§10.3). */
+export interface Addendum {
+  question: string; answer: string; boards: ChatBoardOut[];
+  /** Squares the answer named that nothing had grounded — shown as the chat shows them. */
+  unverified: string[];
+  created_at: string;
+}
 export interface OpeningNote {
   position_key: string; san: string; in_book: boolean;
   /** 2~3 sentences; [[...]] marks a sentence the verifier confirmed on the board. */
@@ -209,6 +221,17 @@ export interface OpeningNote {
   sources: string[];
   verified_claims: number; total_claims: number;
   model: string; created_at: string;
+  addenda: Addendum[];
+  /** Question chips the server made from this note; recomputed on every read. */
+  questions: string[];
+}
+export interface AddendumRequest {
+  fen: string; san: string; question: string; answer: string;
+  boards: ChatBoardOut[]; unverified: string[];
+}
+/** The note the student is reading, attached to a live chat question (§10.3). */
+export interface OpeningContext {
+  fen_before: string; san: string; note_summary: string; section?: string | null; quote?: string | null;
 }
 export interface NoteMissing { status: 'missing' }
 export type NoteLookup = OpeningNote | NoteMissing;
