@@ -43,11 +43,15 @@ chess-tutor-ai/
       motifs.py           계층 2: 전술 모티프 탐지기
       verify.py           계층 4 가드: 주장 검증기, 수순 재생
       services/chat*.py   국면 채팅: Claude Code 서브프로세스, MCP 체스 도구, 튜터 프롬프트
+      services/opening*.py 오프닝 지도 v2: 국면 안내·수의 의도·깊은 해설·더 깊이 (M8)
+      services/sentences.py 문장과 그 근거 주장, 검증 게이트 (계층 4 가드와 짝)
       values.py           기물 가치
-      api.py              HTTP 엔드포인트
+      api.py              앱 조립 (미들웨어·수명주기·라우터 마운트)
+      routers/            HTTP 엔드포인트. 경로 묶음 하나에 파일 하나 (`/openings` 는 openings.py 전부)
     tests/                국면 단위 테스트 (목업의 예시 국면 포함)
   apps/web/               Vite + React 프론트엔드
     src/Board.tsx         chessground 래퍼
+    src/pages/openings/   오프닝 지도 v2: 보드·후보·해설 패널·일지 (M8)
     src/tokens.css        디자인 토큰
   docker-compose.yml      Postgres
   .github/workflows/      CI
@@ -177,6 +181,32 @@ PGN/API 임포트
   - 라이브 채팅 한 답 **25.7초**(도구 3회). M6 리뷰 채팅의 첫 답 56초보다 짧은데 재료가 적어서다
 - 남은 것: 드릴 성공률은 헤더에 남을 뿐 아직 집계되지 않는다. 구조 커버리지 70.6%, 계획 실행 판정과 리포트의 구조 선택에 알려진 오차가 있다(§8). 무승부 수락 기준(±30cp·30수)은 여전히 자리표시자고, 개인 모델 상대와 간격 반복 오프닝 덱은 미결이다
 
+### M8 오프닝 지도 v2 (수순 따라가기 + 해설 일지) — 완료 (2026-09-11)
+- 기획서 [opening-map-upgrading-plan.md](opening-map-upgrading-plan.md). 오프닝 지도의 "열 탐색기"를 **직접 수를 두는 보드 + 다음 네임드 국면 후보 + 지워지지 않는 해설 일지**로 바꿨다. 어떤 수를 두든(책에 있든 없든) 그 수의 의도를 검증된 문장으로 적고, 셋업(시스템 배치) 진행과 깊은 해설·튜터 문답을 같은 패널에 붙인다. 단계는 M8a(국면 안내·셋업) → M8b(수의 의도·깊은 노트) → M8c(웹) → M8d(이름 한글화·스트리밍·질문·더 깊이·정리) 다
+- 실행 경로: 왼쪽 레일의 **오프닝** → `/openings`(`pages/openings/index.tsx`). 수순·커서·일지·미리보기는 리듀서 하나(`pages/openings/line.ts`)에 있고 URL(`?color=&moves=`)에 실려 새로고침·공유를 견딘다. 위의 아이시클 개요 스트립과 아래의 히트맵·브레이크 차트는 그대로다
+- 엔드포인트: **`routers/openings.py` 하나**가 `/openings` 전부를 낸다(M8d-5 에서 `opening_guide`·`opening_deeper` 라우터를 합쳤다. 모듈 docstring 이 목록이고 `test_api.py` 가 경로를 고정한다)
+
+| 경로 | 하는 일 |
+|---|---|
+| `GET /openings/map`, `/heatmap`, `/breaks` | M5 그대로. 내 기보 위의 DAG·기물 목적지·폰 브레이크 |
+| `GET /openings/position` | 이 국면의 다음 네임드 국면 후보(전위 포함), 폰 구조, 셋업 14종의 진행. 책 조회만 하므로 **1.7ms**, `masters=1` 일 때만 네트워크를 탄다 (`opening_guide`) |
+| `POST /openings/annotate` | 수순 전체를 한 수씩 해설. 결정론적 탐지기(중앙·전개·캐슬링·피안케토·긴장·갬빗·전위·예방·모티프·계획·셋업)가 만든 문장을 `verify_all` 로 거르고 우선순위대로 최대 4문장을 남긴다. 마이아·엔진은 요청할 때만, 엔진은 한 요청에 6수까지 (`opening_intent`) |
+| `GET /openings/note`, `POST /openings/note` | (국면 키, 수)당 하나인 깊은 해설. 없으면 `{"status":"missing"}`. 쓰기는 headless Claude Code(`claude -p`, 구독 로그인, chess MCP 도구만)가 하고 서버가 `[[…]]` 문장을 검증해 실패한 것은 "견해"로 강등한다 (`opening_notes`) |
+| `POST /openings/note/stream` | 같은 생성을 SSE 로 중계한다: `stage`(책·엔진·구조·마이아 재료 준비) → `tool`(모델의 도구 호출) → `section`(요약·왜·응수·대안·함정, 도착 즉시 검증) → `note`(저장본). 끊으면 프로세스를 죽이고 아무것도 저장하지 않는다 |
+| `POST /openings/note/addendum` | 튜터 답 하나를 그 수의 해설에 남긴다("해설에 반영"). 채팅이 보여 준 접지 표시(미확인 칸)를 그대로 저장하고 재검증하지 않는다 |
+| `GET /openings/lines`, `/openings/masters` | "더 깊이"를 열 때만 부르는 엔진 라인 3개(깊이 12, `EngineCache` 재사용 — 첫 호출 **0.49초**, 이후 **2ms**)와 마스터 통계(토큰이 없으면 `available:false`) (`opening_deeper`) |
+| `POST /play/chat` (`opening` 필드) | 해설 패널의 "튜터에게 질문". M6·M7 의 채팅 경로를 그대로 쓰고 프롬프트에 "지금 보는 해설" 블록(수·이름·요약·인용 문장)을 더한다. 세션 키는 `fen_before+san` 이라 수마다 대화가 따로 이어진다 |
+
+- 서비스: `opening_guide.py`(후보·구조·셋업 213줄) · `opening_intent.py`(사실 탐지기와 `/annotate` 859줄) · `setups.py`(시스템 오프닝 KB 14종과 도달 판정 594줄) · `opening_notes.py`(노트 생성·스트리밍·검증·저장·시드 1,269줄) · `opening_deeper.py`(엔진 라인·마스터 정규화 140줄) · **`sentences.py`**(`Sentence`/`check`/`assemble` — 문장과 그 근거를 함께 들고 검증기를 통과한 것만 남기는 게이트. `play_coach` 와 `opening_intent` 가 각자 갖고 있던 사본을 M8d-5 에서 합쳤다)
+- 오프닝 이름 한글화(M8d-1): `assets/opening_names_ko.json`(영어 → 한국어 **3,174개**, `scripts/translate_openings.py` 가 규칙 사전 → 고유명사 표 → headless 음차 순으로 만든다). 런타임 진입점은 `openings.name_ko(name)` 하나이고 **영어 이름이 여전히 식별자다**(TSV 의 `name`, `find_rows`, 카탈로그의 `tsv_name`). 후보 카드·일지 배지·해설 패널 헤더는 한글을 보여 주고 영어 이름을 `title` 로 달아 음차를 확인할 수 있게 한다(`PositionGuide.name_en`, `NamedCandidate.name_en`, `MoveAnnotation.name_after_en`)
+- 웹: `LineBoard`(두기 가능한 메인 보드 + 미리보기 칩) · `Candidates`(후보 그리드·정렬·마스터 겹치기) · `ExplainPanel`(요약/보통/깊이 토글, 스트리밍 단계 체크리스트, 섹션별 "검증 n/n", 함정 미리보기, 근거 배지) · `NoteChat`(인라인 튜터 채팅·제안 질문·해설에 반영) · `DeeperPanel`(엔진 라인·마스터) · `Journal`(한 줄 색인, 되돌아간 항목도 남는다) · `SetupPanel` · `pgn.ts`(주석 달린 PGN 복사) · `line.ts`(수순·커서·일지·미리보기 리듀서) · `api/noteStream.ts`(SSE 파서)
+- 데이터 모델: 새 테이블은 `opening_notes` 하나다(`position_key`, `san`, `lang`, `json`, `model`, `verified_claims`, `total_claims`; `(position_key, san, lang)` 유니크). 시안의 루이 로페즈 노트는 `assets/opening_notes_seed.json` 시드로 시작할 때 적재해 LLM 없이도 시연된다. 일지·수순은 서버에 저장하지 않는다(URL 과 브라우저 상태)
+- 테스트: API **524개**(M8 전용 116개 — `test_opening_intent` 26, `test_opening_notes` 22, `test_opening_note_stream` 17, `test_setups` 15, `test_opening_guide` 14, `test_opening_chat` 11, `test_opening_deeper` 11, 여기에 `test_openings`·`test_api` 의 추가분). 웹은 vitest **93개**(7파일 — `openings-line` 16, `openings` 12, `openings-pgn` 9, `openings-note-stream` 3 이 M8 몫(40개)). 노트 생성 테스트는 `claude` 를 고정 NDJSON 을 내는 스텁 스크립트로 바꿔 돌린다
+- 실측(2026-09-11, 실서버 스모크. `rixile9` 백 305판, `LICHESS_TOKEN` 없음)
+  - `GET /openings/position` **1.7ms**, `POST /openings/annotate`(8플라이 + 마이아) 첫 호출 **1.2초**·이후 **0.12초**, `GET /openings/lines` 첫 **0.49초**·캐시 **2ms**, `GET /openings/note` **2.5ms**
+  - `POST /openings/note/stream` 한 번(4…Nf6, 시드 없는 국면) **198.6초** · 도구 호출 12회 · 검증 **15/15**. 첫 섹션(`mine`)은 재료 준비가 끝난 30초 안에 도착하고 그 뒤로 섹션이 순서대로 붙는다. 기획의 "10초 안팎" 예상보다 훨씬 길다(→ §8)
+  - 해설 문맥을 단 튜터 답 한 번 **54.5초**(도구 6회, 보드 2개). "해설에 반영"은 즉시 저장된다
+
 ### 통합 상태 (2026-09-02)
 - 백엔드: `ruff format`·`ruff check`·`mypy --strict` 통과, pytest 271개 약 22초(엔진 테스트는 깊이 ≤ 8). `tests/test_e2e.py`가 TestClient로 임포트 → 분석 → 리뷰 → 프로필 → 오프닝 지도 → 퍼즐 → 스파링을 한 번에 돈다
 - 웹: `pnpm lint`, `tsc --noEmit`, `pnpm build` 통과. 라우트 `/games`, `/review/:gameId/:ply`, `/profile/:username`, `/openings`, `/training`
@@ -248,7 +278,7 @@ MIT로 가고 싶다면: chessground 대신 MIT 보드 라이브러리를 쓰고
 
 ---
 
-## 8. 후속 과제와 미결 (2026-09-02 기준)
+## 8. 후속 과제와 미결 (2026-09-11 기준)
 
 플랫폼의 다섯 단계는 모두 동작하는 수준으로 구현되어 있다. 아래는 이번 빌드에서 의도적으로 남긴 것들이다.
 
@@ -256,12 +286,12 @@ MIT로 가고 싶다면: chessground 대신 MIT 보드 라이브러리를 쓰고
 - 모티프 탐지기 10종은 손으로 만든 국면으로만 검증했다. Lichess 퍼즐 DB(테마 70개)로 정밀도·재현율을 재는 스크립트가 필요하다.
 - 폰 구조 분류기는 규칙 기반이며 라벨 테스트셋이 없다. 수백 국면을 수작업 라벨링해 `tests/`에 고정한다.
 - 프로필의 레이팅대 기준선(`services/profile.py`의 `BASELINES`)과 시간 압박 기준 0.09는 자리표시자 값이다. Lichess 월간 DB로 측정해 바꾼다.
-- 브레이크 타이밍의 마스터 중앙값과 오프닝 지도의 마스터 오버레이는 `LICHESS_TOKEN`이 있을 때만 켜진다. 월간 DB 자체 집계는 미착수.
+- 브레이크 타이밍의 마스터 중앙값, 후보 카드의 마스터 승률, `GET /openings/masters` 는 모두 `LICHESS_TOKEN`이 있을 때만 켜진다. 토큰이 없으면 화면에 "마스터 DB 연결 없음(LICHESS_TOKEN)"이 뜨고 나머지는 그대로 동작한다(2026-09-11 스모크가 이 경로였다). 월간 DB 자체 집계는 미착수.
 
 **아직 실측하지 않은 경로**
 - LLM 언어화(`services/verbalize.llm_explanation`)는 `ANTHROPIC_API_KEY`가 없어 템플릿 경로만 검증했다. 키를 넣고 LLM → 검증기 → 템플릿 폴백을 실제로 돌려봐야 한다.
 - Postgres 경로(`asyncpg` extra, docker compose)는 미검증이다. 모든 테스트는 SQLite로 돈다. Alembic 마이그레이션도 아직 없다(`create_all`).
-- 웹 단위 테스트는 M7에서 vitest로 들어왔지만(4파일 62개) 순수 로직(리듀서·포매터)만 덮는다. 컴포넌트 렌더링 테스트와 Playwright 종단 테스트는 여전히 없고, 화면은 손으로 스모크한다.
+- 웹 단위 테스트는 vitest 7파일 93개까지 늘었지만 여전히 순수 로직(리듀서·포매터·SSE 파서·PGN)만 덮는다. 컴포넌트 렌더링 테스트와 **저장소에 남는** Playwright 종단 테스트는 아직 없고, 화면은 매 마일스톤마다 손으로 스모크한다.
 
 **국면 채팅**
 - 새로고침하면 대화가 사라진다(ply 이동과 탭 전환은 유지된다). `chat_turns`에서 복원하는 `GET /chat/sessions/{id}`가 필요하다.
@@ -279,6 +309,15 @@ MIT로 가고 싶다면: chessground 대신 MIT 보드 라이브러리를 쓰고
 - 라이브 채팅의 `analyse` 도구가 한 번 **엔진 경합으로 타임아웃**했다. 채팅 도구는 깊이 18로 재는데 풀에는 엔진이 2개뿐이라, 같은 시간에 게임 분석이 돌면 도구가 기다리다 끊긴다. 도구 깊이를 낮추거나 풀을 늘려야 한다.
 - **드릴 성공률이 집계되지 않는다.** `PracticeMode`·`OpeningId` 헤더에 재료는 다 있지만 항목별 이탈 지점·성공률을 세는 곳이 없다.
 - **Alembic 은 여전히 없다.** M7 에서 `chat_turns.game_id` 를 nullable 로 바꿔야 했고, `create_all` 이 기존 테이블을 고치지 않으므로 시작할 때 `db._allow_live_chat_turns` 가 손으로 패치한다(SQLite 는 테이블 재작성). 이런 변경이 한 번 더 필요해지면 마이그레이션을 도입한다.
+
+**오프닝 지도 v2 (M8, 2026-09-11 스모크에서 나온 것)**
+- **깊은 해설 한 번이 3분 넘게 걸린다.** 시드 없는 국면(4…Nf6) 한 개를 쓰는 데 **198.6초**·도구 12회였다. 기획서 §9.2 의 "10초 안팎"과 자릿수가 다르다. 스트리밍 덕에 화면은 비어 있지 않지만, 프롬프트를 줄이거나 섹션을 나눠 생성하는 쪽을 검토한다. 비용은 사용자가 버튼으로 결정하므로 급하지는 않다.
+- **메인 보드에 해설의 화살표가 흐르지 않는다.** 보드가 그리는 도형은 후보 카드 호버와 표시한 칸뿐이고, 노트 문장의 주장(공격·수비 칸)이나 튜터가 보여 준 화살표는 채팅 카드 안에만 있다. 섹션이 도착할 때마다 그 문장의 `Claim` 을 보드에 겹쳐 주면 읽는 순서와 보는 순서가 맞는다.
+- **"해설에 반영"은 답을 재검증하지 않는다.** 채팅의 접지 표시(미확인 칸 목록)를 그대로 저장하고 화면에 같은 표시를 한다(기획서 §10.7 이 고른 선택). 노트 본문은 `[[…]]` 검증을 거치는데 addendum 만 예외라, 같은 패널 안에서 근거의 무게가 다르다.
+- **이름 번역의 긴 꼬리가 검수되지 않았다.** 3,174개 중 사람이 훑은 것은 자주 나오는 상위 200개뿐이고 나머지는 규칙·음차다. 화면은 영어 이름을 `title` 로 달아 확인할 수 있게 해 두었지만(후보 카드·일지 배지·패널 헤더), 어색한 음차를 모으는 절차는 아직 `--report` 를 손으로 돌리는 것이다.
+- **TSV 가 이름 짓지 않은 국면은 패널 헤더에 이름이 없다.** 1.e4 e5 2.Nf3 Nc6 3.Bb5 a6 **4.Ba4** 가 그렇다: 후보 카드는 전부 루이 로페즈 갈래를 보여 주는데 `lookup` 은 그 국면 자체의 행을 못 찾아 `PositionGuide.name` 이 비고, 헤더 배지가 사라진다(수의 `in_book` 은 정상이라 "책 밖" 표시는 뜨지 않는다). 가장 가까운 상위 이름을 물려주는 편이 읽기에 낫다.
+- **레퍼토리 개요 스트립의 이름은 아직 영어다.** 한글화(기획서 §10.5)는 후보·일지·해설·카탈로그에 적용했고, 스트립은 지도 DAG(`openings_map`)의 노드 이름을 그대로 쓴다.
+- 노트는 (국면 키, 수, 언어)당 하나라 **다시 만들기 말고는 갱신 경로가 없다.** 책이나 탐지기가 바뀌어도 저장된 노트는 그대로다. 모델·생성 시각은 남아 있으니 무효화 규칙을 붙일 수 있다.
 
 **제품 상 알려진 간극**
 - 마지막 수에서 저지른 실수(기권 직전)는 다음 국면 분석이 없어 퍼즐이 되지 않는다.
