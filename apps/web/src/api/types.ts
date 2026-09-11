@@ -149,8 +149,10 @@ export interface NamedCandidate {
   /** "3.Bb5" / "3…a6" — the move number is part of the string. */
   label: string;
   fen_after: string;
-  /** Empty only when nothing names this move; a master-only move that lands in the book keeps its name. */
+  /** Korean (openings.name_ko). Empty only when nothing names this move; a master-only move that lands in the book keeps its name. */
   name: string; eco: string;
+  /** The book's English name, shown as the card's `title` so a transliteration can be checked. */
+  name_en: string | null;
   /** The arriving position itself is in the book (otherwise `name` is the line this move belongs to). */
   named_here: boolean;
   /** SAN left to the next named position while the line is forced; empty when `named_here`. */

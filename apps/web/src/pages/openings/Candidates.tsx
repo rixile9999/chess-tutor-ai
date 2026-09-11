@@ -135,7 +135,7 @@ function Card({ row, orientation, onPlay, onHover }: {
           <span className="mv op-cand-label">{row.label}</span>
           {row.eco && <span className="mono faint small">{row.eco}</span>}
         </span>
-        <span className={`op-cand-name${row.named_here ? '' : ' via'}`}>
+        <span className={`op-cand-name${row.named_here ? '' : ' via'}`} title={row.name_en ?? row.name}>
           {row.named_here ? row.name : via ?? (row.name || (masterOnly ? '마스터 DB에만 있는 수' : '이름 없는 중간 국면'))}
         </span>
         {row.mine ? (

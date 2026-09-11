@@ -544,7 +544,11 @@ async def detail(
 
 def book_moves(fen: str) -> BookMoves:
     """Book continuations from this position, plus the name of the position itself when the
-    book has one. Raises ValueError for a FEN that is not a legal position."""
+    book has one. Raises ValueError for a FEN that is not a legal position.
+
+    Names are Korean (`openings.name_ko`): the book has no hand-written Korean name the way a
+    catalogue entry does, so the translated asset is the only one there is (plan §10.5). The
+    moves are sorted by that Korean name — `openings.next_moves` sorts by the English one."""
     try:
         board = chess.Board(fen)
     except ValueError as exc:
@@ -552,12 +556,21 @@ def book_moves(fen: str) -> BookMoves:
     if not board.is_valid():
         raise ValueError("체스 규칙에 맞지 않는 국면입니다.")
     here = openings.lookup(board)
-    moves = [
-        BookMove(san=board.san(move), uci=move.uci(), eco=op.eco, name=op.name)
-        for move, op in openings.next_moves(board)
-    ]
+    moves = sorted(
+        (
+            BookMove(
+                san=board.san(move), uci=move.uci(), eco=op.eco, name=openings.name_ko(op.name)
+            )
+            for move, op in openings.next_moves(board)
+        ),
+        key=lambda entry: (entry.name, entry.uci),
+    )
     return BookMoves(
         fen=board.fen(),
-        opening=None if here is None else BookMove(san="", uci="", eco=here.eco, name=here.name),
+        opening=(
+            None
+            if here is None
+            else BookMove(san="", uci="", eco=here.eco, name=openings.name_ko(here.name))
+        ),
         moves=moves,
     )

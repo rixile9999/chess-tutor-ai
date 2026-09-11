@@ -58,7 +58,7 @@ def test_the_start_position_offers_the_main_first_moves() -> None:
     assert {"e4", "d4", "c4", "Nf3"} <= set(by_san)
     e4 = by_san["e4"]
     assert e4.label == "1.e4" and e4.uci == "e2e4"
-    assert e4.name == "King's Pawn Game" and e4.eco == "B00"
+    assert e4.name == "킹즈 폰 게임" and e4.name_en == "King's Pawn Game" and e4.eco == "B00"
     assert e4.named_here and e4.to_name == []
     assert chess.Board(e4.fen_after).piece_at(chess.E4) == chess.Piece(chess.PAWN, chess.WHITE)
     assert e4.master_games is None and not e4.master_only
@@ -68,7 +68,8 @@ def test_black_labels_carry_the_move_number_and_ellipsis() -> None:
     cards = opening_guide.candidates(board(RUY_LOPEZ))
     a6 = next(c for c in cards if c.san == "a6")
     assert a6.label == "3…a6"
-    assert a6.named_here and a6.name == "Ruy Lopez: Morphy Defense" and a6.eco == "C70"
+    assert a6.named_here and a6.name == "루이 로페즈: 모피 방어" and a6.eco == "C70"
+    assert a6.name_en == "Ruy Lopez: Morphy Defense"
     assert a6.to_name == []
 
 
@@ -78,7 +79,7 @@ def test_an_unnamed_arrival_keeps_the_moves_up_to_the_next_name() -> None:
     d3 = next(c for c in cards if c.san == "d3")
     assert not d3.named_here
     assert d3.to_name == ["f5", "exf5"]
-    assert d3.name == "Latvian Gambit: Clam Gambit"
+    assert d3.name == "라트비안 갬빗: 클램 갬빗" and d3.name_en == "Latvian Gambit: Clam Gambit"
     # Named arrivals come first, so the one unnamed card is last.
     assert cards[-1].san == "d3"
 
@@ -86,7 +87,7 @@ def test_an_unnamed_arrival_keeps_the_moves_up_to_the_next_name() -> None:
 def test_a_transposition_sees_the_same_candidates() -> None:
     najdorf = opening_guide.guide(fen(NAJDORF))
     okelly = opening_guide.guide(fen(OKELLY))
-    assert najdorf.name == okelly.name == "Sicilian Defense: Najdorf Variation"
+    assert najdorf.name == okelly.name == "시실리안 디펜스: 나이도르프 변화"
     assert [c.san for c in najdorf.candidates] == [c.san for c in okelly.candidates]
     assert [c.label for c in najdorf.candidates] == [c.label for c in okelly.candidates]
 
@@ -97,7 +98,7 @@ def test_a_transposition_sees_the_same_candidates() -> None:
 def test_guide_carries_the_name_the_structure_and_every_setup() -> None:
     guide = opening_guide.guide(fen(RUY_LOPEZ), color="white")
     assert guide.side == "black" and guide.in_book
-    assert guide.name == "Ruy Lopez" and guide.eco == "C60"
+    assert guide.name == "루이 로페즈" and guide.eco == "C60"
     assert guide.structure.key and guide.structure.name
     assert len(guide.setups) == 14
     assert guide.setups[0].side == "black"  # the side to move comes first
@@ -145,7 +146,7 @@ def test_master_statistics_are_laid_over_the_book(monkeypatch: pytest.MonkeyPatc
 
     # A move only masters play joins the list without a book name.
     h6 = next(c for c in cards if c.san == "h6")
-    assert h6.master_only and h6.name == "" and h6.eco == ""
+    assert h6.master_only and h6.name == "" and h6.eco == "" and h6.name_en is None
     assert not h6.named_here and h6.master_games == 50
     assert h6.label == "3…h6"
     assert cards[-1] is h6  # unnamed arrivals sort last
@@ -195,7 +196,7 @@ async def test_position_endpoint(aclient: AsyncClient) -> None:
     res = await aclient.get("/openings/position", params={"fen": fen(RUY_LOPEZ)})
     assert res.status_code == 200, res.text
     body = res.json()
-    assert body["name"] == "Ruy Lopez" and body["side"] == "black"
+    assert body["name"] == "루이 로페즈" and body["side"] == "black"
     assert len(body["setups"]) == 14
     a6 = next(c for c in body["candidates"] if c["san"] == "a6")
     assert a6["label"] == "3…a6" and a6["named_here"] is True

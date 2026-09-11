@@ -14,6 +14,9 @@ Book work is cached per position key, so walking a line back and forth costs not
 first visit; the master overlay keeps its own per-process cache in
 `services.openings_map.fetch_master_moves` and stays outside ours, so a failed explorer call is
 never remembered as "no master games".
+
+Names are Korean (`openings.name_ko`, plan §10.5); a candidate also carries the book's English
+`name_en`, which is what the card shows on hover and what `openings.find_rows` is keyed by.
 """
 
 from __future__ import annotations
@@ -24,7 +27,7 @@ from typing import Any
 import chess
 
 from chess_tutor.config import get_settings
-from chess_tutor.openings import lookup, next_moves, position_key
+from chess_tutor.openings import lookup, name_ko, next_moves, position_key
 from chess_tutor.schemas import Color, NamedCandidate, PositionGuide, SetupStatus
 from chess_tutor.services import setups
 from chess_tutor.services.openings_map import fetch_master_moves, move_label
@@ -91,7 +94,8 @@ def _book_candidates(key: str, ply: int) -> tuple[NamedCandidate, ...]:
                 uci=move.uci(),
                 label=move_label(ply + 1, san),
                 fen_after=after.fen(),
-                name=opening.name,
+                name=name_ko(opening.name),
+                name_en=opening.name,
                 eco=opening.eco,
                 named_here=named_here,
                 to_name=[] if named_here else _to_name(after),
@@ -153,7 +157,8 @@ def _with_masters(
                 uci=uci,
                 label=move_label(ply + 1, san),
                 fen_after=after.fen(),
-                name=here.name if here is not None else "",
+                name=name_ko(here.name) if here is not None else "",
+                name_en=here.name if here is not None else None,
                 eco=here.eco if here is not None else "",
                 named_here=here is not None,
                 master_games=games,
@@ -184,13 +189,14 @@ def guide(fen: str, color: Color = "white", masters: bool = False) -> PositionGu
     """Candidates, book name, pawn structure and setup progress for one position.
 
     `color` is the user's side and only decides whose point of view the master score is from.
+    `name` is Korean; the English name of a line stays on each candidate as `name_en`.
     Raises ValueError for a FEN that is not a legal position."""
     board = _board(fen)
     here = lookup(board)
     return PositionGuide(
         fen=board.fen(),
         side=_side(board),
-        name=here.name if here is not None else None,
+        name=name_ko(here.name) if here is not None else None,
         eco=here.eco if here is not None else None,
         in_book=here is not None,
         structure=classify(board),

@@ -126,8 +126,8 @@ def test_the_first_move_takes_the_centre() -> None:
     assert has_claim(centre, "attacks", "e4", "d5")
     assert has_claim(centre, "attacks", "e4", "f5")
     assert annotation.label == "1.e4" and annotation.in_book
-    assert annotation.name_after == "King's Pawn Game"
-    assert annotation.text.startswith("'King's Pawn Game'")
+    assert annotation.name_after == "킹즈 폰 게임"
+    assert annotation.text.startswith("킹즈 폰 게임(B00)이 됩니다.")
 
 
 def test_a_developing_move_that_attacks_says_both_in_one_sentence() -> None:
@@ -148,8 +148,8 @@ def test_a_defending_knight_is_said_to_defend() -> None:
 
 def test_the_ruy_lopez_bishop_attacks_the_knight_and_names_the_opening() -> None:
     annotation = last("e4 e5 Nf3 Nc6 Bb5")
-    assert annotation.name_after == "Ruy Lopez"
-    assert "Ruy Lopez" in fact_of(annotation, "name").text
+    assert annotation.name_after == "루이 로페즈"
+    assert fact_of(annotation, "name").text == "루이 로페즈(C60)가 됩니다."
     motif = fact_of(annotation, "motif")
     assert motif.text == "c6 나이트를 공격합니다."
     assert has_claim(motif, "attacks", "b5", "c6")
@@ -171,7 +171,7 @@ def test_a_book_move_has_no_alternatives_and_no_warning() -> None:
     annotation = last(f"{RUY} Bxc6")
     assert annotation.in_book and annotation.book_alternatives == []
     assert "book" not in kinds(annotation)
-    assert annotation.name_after == "Ruy Lopez: Exchange Variation"
+    assert annotation.name_after == "루이 로페즈: 익스체인지 변화"
 
 
 def test_a_fianchetto_is_prepared_and_then_completed() -> None:
@@ -200,17 +200,17 @@ def test_the_kings_gambit_offers_a_pawn_nothing_defends() -> None:
     assert gambit.text.startswith("f4 폰을 내어 주는 수입니다.")
     assert has_claim(gambit, "attacks", "e5", "f4")
     assert has_claim(gambit, "piece_on", "f4", "P")
-    assert "King's Gambit" in fact_of(annotation, "name").text
+    assert "킹즈 갬빗" in fact_of(annotation, "name").text
 
 
 def test_a_transposition_is_named_as_one() -> None:
     okelly = last(OKELLY)
     assert okelly.transposition
-    assert okelly.name_after == "Sicilian Defense: Najdorf Variation"
+    assert okelly.name_after == "시실리안 디펜스: 나이도르프 변화"
     assert fact_of(okelly, "transposition").text == "다른 수순으로 같은 국면에 합류합니다."
     direct = last(NAJDORF)
     assert not direct.transposition
-    assert direct.name_after == "Sicilian Defense: Najdorf Variation"
+    assert direct.name_after == "시실리안 디펜스: 나이도르프 변화"
     assert okelly.fen_after.split(" ")[0] == direct.fen_after.split(" ")[0]
 
 
