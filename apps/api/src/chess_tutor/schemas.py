@@ -952,3 +952,47 @@ class OpeningContext(BaseModel):
     """Which section of the note the question came from, when it came from one."""
     quote: str | None = None
     """A sentence of the note the student quoted."""
+# ---------- 더 깊이 (M8d-4): engine lines and master statistics ----------
+
+
+class DeeperLine(BaseModel):
+    """One engine continuation from a position, as the panel draws it: the move, its score and
+    the principal variation the score comes from."""
+
+    san: str
+    uci: str
+    score: Score
+    """From White's point of view, like every other score in the API."""
+    pv_san: list[str] = []
+    """The whole line in SAN, first move included, cut at services.opening_deeper.PV_CAP."""
+
+
+class DeeperLines(BaseModel):
+    fen: str
+    """The normalised FEN that was searched."""
+    depth: int
+    lines: list[DeeperLine] = []
+    """Best first (engine rank), at most `multipv` of them."""
+
+
+class MasterMove(BaseModel):
+    """One move in the Lichess master explorer, with the results as whole percents."""
+
+    san: str
+    uci: str
+    games: int
+    white: int
+    draws: int
+    black: int
+    """Percentages, 0-100, adding up to 100; `games` keeps the raw count."""
+    avg_rating: int | None = None
+
+
+class MasterStats(BaseModel):
+    """GET /openings/masters. `available` is false whenever the numbers could not be fetched
+    (no token, explorer down); `reason` then says why, in Korean, and `moves` is empty."""
+
+    fen: str
+    available: bool = False
+    reason: str | None = None
+    moves: list[MasterMove] = []

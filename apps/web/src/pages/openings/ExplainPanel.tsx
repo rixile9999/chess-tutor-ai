@@ -6,6 +6,7 @@ import { NOTE_STAGES, SECTION_TITLE, STAGE_LABEL, sectionPayload, type NoteStage
 import { badgeClass, engineBadge, moveBadges } from './colors';
 import { moveLabel, type ExplainDepth } from './line';
 import { useNoteStream, type NoteRun, type StreamedSection } from './useNote';
+import { DeeperPanel } from './DeeperPanel';
 
 const DEPTHS: { id: ExplainDepth; label: string }[] = [
   { id: 'brief', label: '요약' },
@@ -218,7 +219,7 @@ export function ExplainPanel({
             {generating ? '다시 쓰는 중…' : '해설 다시 만들기'}
           </button>
         </div>
-        <p className="small faint">엔진 라인·마스터 통계는 다음 단계(M8d-4)입니다.</p>
+        <DeeperPanel ply={ply} fen={annotation?.fen_after ?? null} note={note} onTrap={onTrap} previewKey={previewKey} />
       </Section>
 
       {fenBefore && san && fenAfter && (

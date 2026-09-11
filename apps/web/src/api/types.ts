@@ -238,3 +238,27 @@ export interface OpeningContext {
 export interface NoteMissing { status: 'missing' }
 export type NoteLookup = OpeningNote | NoteMissing;
 export interface NoteRequest { fen: string; san: string; username?: string | null; regenerate?: boolean }
+
+// ---------- 더 깊이 (M8d-4: 엔진 라인 · 마스터 통계) ----------
+export interface DeeperLine {
+  san: string; uci: string;
+  /** From White's point of view, like every other score in the API. */
+  score: Score;
+  /** The whole line in SAN, the first move included (server cap: 10 plies). */
+  pv_san: string[];
+}
+export interface DeeperLines { fen: string; depth: number; lines: DeeperLine[] }
+export interface MasterMove {
+  san: string; uci: string;
+  /** Raw number of master games with this move; `white`/`draws`/`black` are percents adding up to 100. */
+  games: number;
+  white: number; draws: number; black: number;
+  avg_rating: number | null;
+}
+export interface MasterStats {
+  fen: string;
+  /** False when the numbers could not be fetched (no token, explorer down); `reason` says why. */
+  available: boolean;
+  reason: string | null;
+  moves: MasterMove[];
+}

@@ -14,6 +14,8 @@ import { Heatmap, defaultPiece, mirrorPiece, pieceOptions } from './Heatmap';
 import { BreakTimeline } from './BreakTimeline';
 import { Candidates, type MyMoves } from './Candidates';
 import { ExplainPanel } from './ExplainPanel';
+import { JournalExport } from './DeeperPanel';
+import { useDeeperPlay } from './useDeeper';
 import { Journal } from './Journal';
 import { LineBoard, type PositionLine } from './LineBoard';
 import { SetupPanel } from './SetupPanel';
@@ -97,6 +99,9 @@ export default function OpeningsPage() {
     dispatch({ type: 'play', uci });
     annotate([...sansTo(line, line.cursor), r.san]);
   }, [line, annotate]);
+
+  // The 더 깊이 panel sits inside ExplainPanel and cannot reach this action, so the page registers it (§10.4).
+  useDeeperPlay(play);
 
   const jumpTo = useCallback((sans: string[]) => {
     dispatch({ type: 'jumpTo', sans });
@@ -417,6 +422,7 @@ export default function OpeningsPage() {
           <span className="small muted">
             둔 수의 시간순 색인. 항목을 누르면 보드가 그 국면으로 가고 옆 패널이 그 수의 해설로 바뀝니다. 되돌아가 다른 수를 두어도 이전 항목은 지워지지 않습니다
           </span>
+          <JournalExport plies={line.plies} cursor={line.cursor} name={guide?.name ?? null} eco={guide?.eco ?? null} noteSummary={(seq) => noteSummaries.get(seqKey(seq)) ?? null} />
         </div>
         <Journal
           journal={line.journal}
