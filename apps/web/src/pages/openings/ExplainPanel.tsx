@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import type { MoveAnnotation, OpeningNote, TrapLine } from '../../api/types';
 import { badgeClass, engineBadge, moveBadges } from './colors';
 import { moveLabel, type ExplainDepth } from './line';
+import { DeeperPanel } from './DeeperPanel';
 
 const DEPTHS: { id: ExplainDepth; label: string }[] = [
   { id: 'brief', label: '요약' },
@@ -186,7 +187,7 @@ export function ExplainPanel({
             {generating ? '다시 쓰는 중…' : '해설 다시 만들기'}
           </button>
         </div>
-        <p className="small faint">엔진 라인·마스터 통계·튜터 질문 연결은 다음 단계(M8d)입니다.</p>
+        <DeeperPanel ply={ply} fen={annotation?.fen_after ?? null} note={note} onTrap={onTrap} previewKey={previewKey} />
       </Section>
 
       <div className="op-explain-sources">

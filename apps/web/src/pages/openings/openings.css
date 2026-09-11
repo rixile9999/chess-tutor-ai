@@ -202,3 +202,32 @@
   .op-journal-entry, .op-journal-note { grid-template-columns: 62px minmax(0, 1fr); }
   .op-journal-detail { grid-column: 2; }
 }
+
+/* 더 깊이 (M8d-4): engine lines, master statistics, PGN export */
+.op-deep { display: flex; flex-direction: column; }
+.op-deep-sec:first-child { border-top: none; }
+.op-deep-sec summary .op-badge { font-weight: 400; }
+.op-deep-lines { display: flex; flex-direction: column; gap: 6px; }
+.op-deep-line { display: grid; grid-template-columns: 58px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 6px 8px; border-radius: 8px; background: rgba(43, 38, 34, 0.04); }
+.op-deep-ev { display: flex; flex-direction: column; gap: 3px; font-size: 12.5px; font-weight: 600; }
+.op-deep-ev i { display: block; height: 5px; border-radius: 3px; background: var(--ink); overflow: hidden; }
+.op-deep-ev i b { display: block; height: 100%; background: var(--surface); border-right: 1px solid var(--line-strong); }
+.op-deep-masters { border-collapse: collapse; width: 100%; font-size: 13px; }
+.op-deep-masters th { text-align: left; font-weight: 500; color: var(--ink-3); font-size: 11px; letter-spacing: 0.04em; padding: 4px 6px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.op-deep-masters td { padding: 6px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.op-deep-masters tr:last-child td { border-bottom: none; }
+.op-deep-wdl-cell { display: flex; align-items: center; gap: 8px; }
+.op-deep-wdl { display: flex; height: 10px; width: 150px; border-radius: 5px; overflow: hidden; background: var(--line); }
+.op-deep-wdl i { display: block; height: 100%; }
+.op-deep-wdl .w { background: var(--surface); }
+.op-deep-wdl .dr { background: var(--line-strong); }
+.op-deep-wdl .b { background: var(--ink-2); }
+.op-deep-veil { position: fixed; inset: 0; background: rgba(43, 38, 34, 0.42); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 40; }
+.op-deep-dialog { width: min(620px, 100%); padding: 18px 20px; display: flex; flex-direction: column; gap: 10px; text-align: left; }
+.op-deep-pgn { width: 100%; box-sizing: border-box; border: 1px solid var(--line-strong); border-radius: 8px; padding: 8px 10px; font-family: var(--font-mono); font-size: 12px; line-height: 1.6; background: var(--surface); color: var(--ink); resize: vertical; }
+.op-deep-pgn:focus { outline: 2px solid var(--ink); outline-offset: -1px; }
+@media (max-width: 900px) {
+  .op-deep-line { grid-template-columns: 58px minmax(0, 1fr); }
+  .op-deep-line > .btn { grid-column: 2; justify-self: start; }
+  .op-deep-wdl { width: 90px; }
+}
